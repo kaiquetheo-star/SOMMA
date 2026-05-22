@@ -6,7 +6,36 @@ export interface BiologicalProfile {
   body_fat_percentage: number | null;
   current_injuries: string | null;
   baseline_stress_level: number | null;
+  /** Per-pillar training goals — injected into each AI coach's CoT step */
+  goal_iron: IronGoal | null;
+  goal_combat: CombatGoal | null;
+  goal_flow: FlowGoal | null;
+  goal_spirit: SpiritGoal | null;
 }
+
+export type IronGoal = 'Hypertrophy' | 'Strength' | 'Endurance' | 'Recomposition';
+export type CombatGoal =
+  | 'Cardio Conditioning'
+  | 'Technical Mastery'
+  | 'Power Development'
+  | 'Self-Defence';
+export type FlowGoal = 'Mobility' | 'Recovery' | 'Flexibility' | 'Stress Relief';
+export type SpiritGoal = 'Breathwork' | 'Meditation' | 'Recovery' | 'Pre-Session Prime';
+
+export const IRON_GOALS: IronGoal[] = ['Hypertrophy', 'Strength', 'Endurance', 'Recomposition'];
+export const COMBAT_GOALS: CombatGoal[] = [
+  'Cardio Conditioning',
+  'Technical Mastery',
+  'Power Development',
+  'Self-Defence',
+];
+export const FLOW_GOALS: FlowGoal[] = ['Mobility', 'Recovery', 'Flexibility', 'Stress Relief'];
+export const SPIRIT_GOALS: SpiritGoal[] = [
+  'Breathwork',
+  'Meditation',
+  'Recovery',
+  'Pre-Session Prime',
+];
 
 export const initialBiologicalProfile: BiologicalProfile = {
   date_of_birth: null,
@@ -15,6 +44,10 @@ export const initialBiologicalProfile: BiologicalProfile = {
   body_fat_percentage: null,
   current_injuries: null,
   baseline_stress_level: null,
+  goal_iron: null,
+  goal_combat: null,
+  goal_flow: null,
+  goal_spirit: null,
 };
 
 export function isBiologicalProfileComplete(profile: BiologicalProfile): boolean {
