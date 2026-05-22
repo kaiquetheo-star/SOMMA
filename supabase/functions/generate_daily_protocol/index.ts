@@ -42,6 +42,11 @@ interface BiologicalPassport {
   body_fat_percentage: number | null;
   current_injuries: string | null;
   baseline_stress_level: number | null;
+  /** Per-pillar training goals declared by the user — fed into each coach's CoT step */
+  goal_iron: string | null;
+  goal_combat: string | null;
+  goal_flow: string | null;
+  goal_spirit: string | null;
 }
 
 interface ProfileRow {
@@ -52,6 +57,10 @@ interface ProfileRow {
   body_fat_percentage: number | null;
   current_injuries: string | null;
   baseline_stress_level: number | null;
+  goal_iron: string | null;
+  goal_combat: string | null;
+  goal_flow: string | null;
+  goal_spirit: string | null;
 }
 
 interface LibraryExercise {
@@ -394,6 +403,10 @@ function mapBiologicalPassport(profile: ProfileRow | null): BiologicalPassport {
     current_injuries: profile?.current_injuries ?? null,
     baseline_stress_level:
       profile?.baseline_stress_level != null ? Number(profile.baseline_stress_level) : null,
+    goal_iron: profile?.goal_iron ?? null,
+    goal_combat: profile?.goal_combat ?? null,
+    goal_flow: profile?.goal_flow ?? null,
+    goal_spirit: profile?.goal_spirit ?? null,
   };
 }
 
@@ -447,6 +460,12 @@ BIOLOGICAL PASSPORT (authoritative — used in STEP 1):
 - Baseline stress (1–10): ${biological.baseline_stress_level ?? 'unknown'}
 - ${stressRule}
 - ${injuryRule}
+
+PILLAR GOALS (declared by the user — each coach MUST honour their specific goal):
+- Iron goal: ${biological.goal_iron ?? 'not specified (use pillar-weight heuristics)'}
+- Combat goal: ${biological.goal_combat ?? 'not specified (use pillar-weight heuristics)'}
+- Flow goal: ${biological.goal_flow ?? 'not specified (use pillar-weight heuristics)'}
+- Spirit goal: ${biological.goal_spirit ?? 'not specified (use pillar-weight heuristics)'}
 
 GLOBAL LAWS (violation = invalid response):
 1. <AVAILABLE_ASSETS> is the authoritative movement catalog — every exercise_id, combo_id, asana_id, and tempo_id MUST exist in that list. expert_context narrows choices but NEVER adds IDs.
@@ -516,6 +535,14 @@ OUTPUT SCHEMA:
 
 STEP 2 DETAIL — IRON COACH (Elite Hypertrophy / Bodybuilding Coach):
 
+IRON GOAL DIRECTIVE (from Biological Passport):
+- User declared goal: "${biological.goal_iron ?? 'not specified'}"
+- Hypertrophy → bias 8–12 rep ranges, 2 RIR, Slow Eccentric on stretch movements, MEV→MRV volume progression.
+- Strength → bias 3–6 rep ranges, 1–2 RIR, longer rest (150–180s), heavy compound prioritisation, Cluster Sets on CNS ≤ 3 when stress low.
+- Endurance → bias 15–20 rep ranges, 1 RIR, shorter rest (60–75s), Myo-Reps on isolation, reduce compound sets to 3.
+- Recomposition → moderate reps (10–15), 2 RIR, mix compounds + isolation, keep rest ≤ 105s.
+- Not specified → default to Hypertrophy protocol if mesocycle and stress allow.
+
 MESOCYCLE (21-day window — iron_expert.mesocycle):
 - Read iron_expert.performance_history_3w and iron_expert.mesocycle.per_exercise summaries.
 - If athlete hit prescribed reps with RPE ≤ 8 across recent sessions for an exercise_id → MUST progress: +2.5% load OR +1 rep on the top of the rep range (state which in progression_note).
@@ -560,6 +587,15 @@ SMART SUBSTITUTION (alternative_exercise_id — mandatory when possible):
 - Use null only if no valid alternative exists.
 
 STEP 3 DETAIL — COMBAT COACH (Blood & Bone — Elite Striking Coach):
+
+COMBAT GOAL DIRECTIVE (from Biological Passport):
+- User declared goal: "${biological.goal_combat ?? 'not specified'}"
+- Cardio Conditioning → maximise aerobic volume: longer work intervals (180–240s), shorter rest (45–60s), burnout finisher mandatory, 4–5 rounds.
+- Technical Mastery → prioritise complexity: choose combos at or near max_complexity_for_user, emphasise defensive cues in coach_intent, prefer footwork_range + defense_counter segments.
+- Power Development → prioritise power_inside segments, heavy pad emphasis in coach_intent, 2–3 rounds, rest 90s.
+- Self-Defence → mix footwork_range + defense_counter + power_inside; always include at least one defense_counter segment; coach_intent must reference practical application.
+- Not specified → standard tactical arc at coach's discretion.
+
 - Cross-pillar rule from Head Coach: inspect the Iron block's exercises[] you built in STEP 2. Identify the primary muscle groups taxed (lower_body: quads/hamstrings/glutes/calves; upper_body: chest/back/shoulders/biceps/triceps). Then:
   * Iron taxed lower body heavily → ENTIRE Combat sequence MUST be Boxing-dominant (jabs, crosses, hooks, uppercuts, slips, head movement, footwork). Avoid roundhouses, teeps, knees, low kicks.
   * Iron taxed upper body heavily → ENTIRE Combat sequence MUST be Muay Thai-dominant (teeps, roundhouse kicks, knees, push kicks, leg kicks). Minimize punching volume on the arms.
@@ -578,6 +614,23 @@ STEP 3 DETAIL — COMBAT COACH (Blood & Bone — Elite Striking Coach):
 - High stress or yesterday_main_rpe >= 8: shorten burnout, add defense_counter segment, reduce round count to 3.
 
 STEP 4 DETAIL — FLOW / SPIRIT COACH (Biomechanical Healer):
+
+FLOW GOAL DIRECTIVE (from Biological Passport):
+- User declared Flow goal: "${biological.goal_flow ?? 'not specified'}"
+- Mobility → select asanas with wide range-of-motion emphasis; longer hold_seconds (60–120s); favour hip/shoulder openers.
+- Recovery → short holds (30–60s); gentle dynamic flows; favour parasympathetic poses (child's pose, supine twist, legs-up-the-wall); breathwork tempo if RPE ≥ 8.
+- Flexibility → passive holds (90–150s); prioritise end-range positions; no dynamic flows.
+- Stress Relief → bias breathwork mode unless healer_48h demands flow; if flow, choose grounding poses (forward fold, seated twist); hold_seconds 60–90s.
+- Not specified → let healer_48h and RPE dictate mode and pose selection.
+
+SPIRIT GOAL DIRECTIVE (from Biological Passport):
+- User declared Spirit goal: "${biological.goal_spirit ?? 'not specified'}"
+- Breathwork → always use breathwork mode; choose tempo from allowed_tempo_ids that matches stress and RPE (high RPE → tempo_478 or box breathing).
+- Meditation → breathwork mode with the most neutral / steady tempo; duration ≥ 15 min; prescribed_reason must reference mental clarity.
+- Recovery → as with Flow Recovery: favour breathwork when stress high, flow when muscle fatigue is the primary driver.
+- Pre-Session Prime → shorter session (8–12 min); upregulating breath pattern if catalog supports it; else choose a primer flow with dynamic poses.
+- Not specified → defer to healer_48h + RPE heuristics.
+
 - Cross-pillar rule from Head Coach: inspect the muscle groups taxed in STEPS 2 AND 3. Select asanas that directly decompress those muscles. Examples:
   * Heavy lower body Iron + Boxing Combat → prioritize hip flexors, quads, hamstrings, lumbar (e.g. pigeon, low lunge, supine twist, forward fold).
   * Heavy upper body Iron + Muay Thai Combat → prioritize chest, shoulders, lats, hip flexors from kicks (e.g. doorframe stretch analog, thread the needle, low lunge).
@@ -2358,7 +2411,7 @@ Deno.serve(async (req) => {
       supabase
         .from('profiles')
         .select(
-          'focus_preference, date_of_birth, weight_kg, height_cm, body_fat_percentage, current_injuries, baseline_stress_level',
+          'focus_preference, date_of_birth, weight_kg, height_cm, body_fat_percentage, current_injuries, baseline_stress_level, goal_iron, goal_combat, goal_flow, goal_spirit',
         )
         .eq('id', user.id)
         .maybeSingle(),
