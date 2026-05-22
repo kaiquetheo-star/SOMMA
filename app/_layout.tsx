@@ -1,59 +1,115 @@
+import 'react-native-gesture-handler';
+import '../global.css';
+
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+} from '@expo-google-fonts/inter';
+import {
+  PlayfairDisplay_400Regular,
+  PlayfairDisplay_700Bold,
+} from '@expo-google-fonts/playfair-display';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import 'react-native-reanimated';
 
-import { useColorScheme } from '@/components/useColorScheme';
+import { FontFamily } from '@/constants/typography';
+import { PerformanceSyncBridge } from '@/components/routing/PerformanceSyncBridge';
+import { AuthProvider, useAuth } from '@/providers/AuthProvider';
 
 export {
-  // Catch any errors thrown by the Layout component.
   ErrorBoundary,
 } from 'expo-router';
 
 export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
-  initialRouteName: '(tabs)',
+  initialRouteName: '(auth)',
 };
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
+
+const SommaDarkTheme = {
+  dark: true,
+  colors: {
+    primary: '#BFA06A',
+    background: '#0F1512',
+    card: '#0F1512',
+    text: '#E8E4DC',
+    border: 'rgba(191, 160, 106, 0.2)',
+    notification: '#BFA06A',
+  },
+  fonts: {
+    regular: { fontFamily: FontFamily.body, fontWeight: '400' as const },
+    medium: { fontFamily: FontFamily.bodyMedium, fontWeight: '500' as const },
+    bold: { fontFamily: FontFamily.displayBold, fontWeight: '700' as const },
+    heavy: { fontFamily: FontFamily.displayBold, fontWeight: '700' as const },
+  },
+};
+
+/** Hide splash once fonts are ready and auth bootstrap has finished (or failed). */
+function SplashGate({ fontsReady, children }: { fontsReady: boolean; children: ReactNode }) {
+  const { isLoading, isConfigured } = useAuth();
+  const authReady = !isConfigured || !isLoading;
+  const appReady = fontsReady && authReady;
+
+  useEffect(() => {
+    if (!fontsReady) return;
+
+    const hideSplash = async () => {
+      try {
+        if (appReady) {
+          await SplashScreen.hideAsync();
+        }
+      } finally {
+        if (authReady) {
+          await SplashScreen.hideAsync().catch(() => undefined);
+        }
+      }
+    };
+
+    void hideSplash();
+  }, [fontsReady, authReady, appReady]);
+
+  return <>{children}</>;
+}
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
+    PlayfairDisplay_400Regular,
+    PlayfairDisplay_700Bold,
+    Inter_400Regular,
+    Inter_500Medium,
     ...FontAwesome.font,
   });
 
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
   useEffect(() => {
-    if (error) throw error;
-  }, [error]);
-
-  useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
+    if (error) {
+      void SplashScreen.hideAsync().catch(() => undefined);
+      throw error;
     }
-  }, [loaded]);
+  }, [error]);
 
   if (!loaded) {
     return null;
   }
 
-  return <RootLayoutNav />;
-}
-
-function RootLayoutNav() {
-  const colorScheme = useColorScheme();
-
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-      </Stack>
-    </ThemeProvider>
+    <AuthProvider>
+      <SplashGate fontsReady={loaded}>
+        <PerformanceSyncBridge />
+        <ThemeProvider value={SommaDarkTheme}>
+          <Stack
+            screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0F1512' } }}
+          >
+            <Stack.Screen name="(auth)" />
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="(workout)" />
+          </Stack>
+        </ThemeProvider>
+      </SplashGate>
+    </AuthProvider>
   );
 }
