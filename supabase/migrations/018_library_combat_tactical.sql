@@ -1,5 +1,5 @@
 -- Blood & Bone — tactical_focus for elite striking coach rounds
--- Run after 004_library_catalog.sql (and existing combat rows)
+-- Renumbered from 009 → 018 (duplicate prefix fix). Run after 004_library_catalog.sql
 
 alter table public.library_combat
   add column if not exists tactical_focus text not null default 'footwork_range';

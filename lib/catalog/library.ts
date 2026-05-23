@@ -5,7 +5,6 @@ import { getSupabase } from '@/lib/supabase/client';
 import { findSpiritSessionByTempoId } from '@/lib/breathwork/fromCatalog';
 import { COMBAT_TACTICAL_FOCUS_LABELS, type GameplanBlock } from '@/types/gameplan';
 import {
-  parseLibraryVisualAsset,
   type LibraryCombatCombo,
   type LibraryExercise,
   type LibraryFlowSpiritSession,
@@ -17,16 +16,23 @@ export type {
   LibraryCombatCombo,
   LibraryExercise,
   LibraryFlowSpiritSession,
-  LibraryVisualAsset,
   MovementPattern,
-  VisualAssetType,
 } from '@/types/catalog';
-export { formatCnsFatigueCost, formatJointStress, parseLibraryVisualAsset } from '@/types/catalog';
+export { formatCnsFatigueCost, formatJointStress } from '@/types/catalog';
+
+const LIBRARY_EXERCISE_SELECT =
+  'id, slug, name, biomechanical_instructions, equipment_required, default_sets, default_reps, movement_pattern, primary_muscle, synergist_muscles, cns_fatigue_cost, joint_stress_profile, stretch_mediated_hypertrophy';
+
+const LIBRARY_COMBAT_SELECT =
+  'id, slug, combo_name, sequence, complexity_level, tactical_focus';
+
+const LIBRARY_FLOW_SPIRIT_SELECT =
+  'id, slug, pillar, session_name, description, duration_minutes, tempo_profile, complexity_level, target_recovery_zones, complexity_tier, is_dynamic_flow, default_hold_seconds';
 
 const CACHE_KEYS = {
-  exercises: 'somma-cache-library-exercises-v2',
-  combat: 'somma-cache-library-combat-v2',
-  flowSpirit: 'somma-cache-library-flow-spirit-v2',
+  exercises: 'somma-cache-library-exercises-v3',
+  combat: 'somma-cache-library-combat-v3',
+  flowSpirit: 'somma-cache-library-flow-spirit-v3',
 } as const;
 
 const CACHE_TTL_MS = 1000 * 60 * 60 * 12;
@@ -87,7 +93,6 @@ function mapExerciseRow(row: Record<string, unknown>): LibraryExercise {
         : null;
 
   return {
-    ...parseLibraryVisualAsset(row),
     id: String(row.id),
     slug: String(row.slug),
     name: String(row.name),
@@ -130,7 +135,6 @@ function mapCombatRow(row: Record<string, unknown>): LibraryCombatCombo {
       : 'footwork_range';
 
   return {
-    ...parseLibraryVisualAsset(row),
     id: String(row.id),
     slug: String(row.slug),
     combo_name: String(row.combo_name),
@@ -149,7 +153,6 @@ function mapFlowSpiritRow(row: Record<string, unknown>): LibraryFlowSpiritSessio
       : 2;
 
   return {
-    ...parseLibraryVisualAsset(row),
     id: String(row.id),
     slug: String(row.slug),
     pillar: row.pillar === 'flow' ? 'flow' : 'spirit',
@@ -176,6 +179,7 @@ function mapFlowSpiritRow(row: Record<string, unknown>): LibraryFlowSpiritSessio
 async function fetchTable<T>(
   table: 'library_exercises' | 'library_combat' | 'library_flow_spirit',
   cacheKey: string,
+  select: string,
   mapper: (row: Record<string, unknown>) => T,
   memoryRef: { current: T[] | null },
 ): Promise<T[]> {
@@ -192,12 +196,16 @@ async function fetchTable<T>(
   const supabase = getSupabase();
   if (!supabase) return [];
 
-  const { data, error } = await supabase.from(table).select('*');
-  if (error || !data?.length) {
+  const { data, error } = await supabase.from(table).select(select);
+  if (error) {
+    console.warn(`[SOMMA] ${table} fetch failed:`, error.message);
+    return memoryRef.current ?? [];
+  }
+  if (!data?.length) {
     return memoryRef.current ?? [];
   }
 
-  const rows = data.map((row) => mapper(row as Record<string, unknown>));
+  const rows = data.map((row) => mapper(row as unknown as Record<string, unknown>));
   memoryRef.current = rows;
   await writeCache(cacheKey, rows);
   return rows;
@@ -207,6 +215,7 @@ export async function fetchLibraryExercises(): Promise<LibraryExercise[]> {
   return fetchTable(
     'library_exercises',
     CACHE_KEYS.exercises,
+    LIBRARY_EXERCISE_SELECT,
     mapExerciseRow,
     { current: memoryExercises },
   ).then((rows) => {
@@ -219,6 +228,7 @@ export async function fetchLibraryCombat(): Promise<LibraryCombatCombo[]> {
   return fetchTable(
     'library_combat',
     CACHE_KEYS.combat,
+    LIBRARY_COMBAT_SELECT,
     mapCombatRow,
     { current: memoryCombat },
   ).then((rows) => {
@@ -231,6 +241,7 @@ export async function fetchLibraryFlowSpirit(): Promise<LibraryFlowSpiritSession
   return fetchTable(
     'library_flow_spirit',
     CACHE_KEYS.flowSpirit,
+    LIBRARY_FLOW_SPIRIT_SELECT,
     mapFlowSpiritRow,
     { current: memoryFlowSpirit },
   ).then((rows) => {
@@ -259,6 +270,20 @@ export function getCombatComboById(
   id: string,
 ): LibraryCombatCombo | null {
   return combos.find((row) => row.id === id) ?? null;
+}
+
+export function getFlowSpiritById(
+  sessions: LibraryFlowSpiritSession[],
+  id: string,
+): LibraryFlowSpiritSession | null {
+  return sessions.find((row) => row.id === id) ?? null;
+}
+
+export function getFlowSpiritBySlug(
+  sessions: LibraryFlowSpiritSession[],
+  slug: string,
+): LibraryFlowSpiritSession | null {
+  return sessions.find((row) => row.slug === slug) ?? null;
 }
 
 export function filterCombatByMastery(

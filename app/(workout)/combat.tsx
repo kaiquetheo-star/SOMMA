@@ -15,7 +15,9 @@ import {
   CombatIntervalClock,
   CombatTimerPreview,
 } from '@/components/combat/CombatIntervalClock';
+import { ComboSequencePanel } from '@/components/combat/ComboSequencePanel';
 import { RpeSelector } from '@/components/combat/RpeSelector';
+import { CommandCenterShell } from '@/components/command-center/CommandCenterShell';
 import { COMBAT_ARENA, comboCalloutFull, formatTimer } from '@/constants/combat';
 import { useActiveGameplanBlock } from '@/hooks/useActiveGameplanBlock';
 import {
@@ -29,10 +31,8 @@ import {
   releaseCombatAudio,
 } from '@/lib/audio/combatAudio';
 import {
-  COMBAT_TACTICAL_FOCUS_DISPLAY,
   COMBAT_TACTICAL_FOCUS_LABELS,
 } from '@/types/gameplan';
-import { ModularMovementPlayer } from '@/components/ui/ModularMovementPlayer';
 import {
   fetchLibraryCombat,
   filterCombatByMastery,
@@ -161,11 +161,6 @@ export default function CombatModeScreen() {
     [currentRound, roundSchedule],
   );
 
-  const activeComboLibrary = useMemo(
-    () => getCombatComboById(catalog, currentCombo?.id ?? ''),
-    [catalog, currentCombo?.id],
-  );
-
   const activeCoachIntent = useMemo(() => {
     const structure = activeBlock?.combat?.rounds_structure;
     if (!structure?.length) return null;
@@ -177,18 +172,25 @@ export default function CombatModeScreen() {
     );
   }, [activeBlock?.combat?.rounds_structure, currentRound]);
 
-  const displayCombo = useMemo(() => {
-    if (phase === 'rest') return 'REST';
-    if (phase === 'finished') return 'SESSION COMPLETE';
-    const fullSequence = comboCalloutFull(currentCombo);
-    if (phase === 'work') {
-      return fullSequence;
-    }
-    return fullSequence;
-  }, [phase, currentCombo]);
+  const activeLibraryCombo = useMemo((): LibraryCombatCombo | null => {
+    const fromCatalog = getCombatComboById(catalog, currentCombo.id);
+    if (fromCatalog) return fromCatalog;
+    return {
+      id: currentCombo.id,
+      slug: currentCombo.id,
+      combo_name: currentCombo.name,
+      sequence: currentCombo.sequence,
+      complexity_level: 5,
+      tactical_focus: activeTacticalFocus ?? 'footwork_range',
+    };
+  }, [catalog, currentCombo, activeTacticalFocus]);
 
-  const workCalloutHint =
-    phase === 'work' && comboCallout && comboCallout !== displayCombo ? comboCallout : null;
+  const commandCenterMeta = useMemo(() => {
+    if (phase === 'finished') return 'Session complete';
+    if (phase === 'rest') return `Rest · Round ${currentRound}/${totalRounds}`;
+    if (phase === 'work') return `Round ${currentRound}/${totalRounds} · Work`;
+    return `${totalRounds} rounds · ${formatTimer(workSeconds)} work / ${formatTimer(restSeconds)} rest`;
+  }, [phase, currentRound, totalRounds, workSeconds, restSeconds]);
 
   const sessionActive = phase === 'work' || phase === 'rest';
   const canSync = phase === 'finished' && roundLogs.length > 0;
@@ -326,78 +328,64 @@ export default function CombatModeScreen() {
             ) : null}
           </View>
 
-          <View className="min-h-[140px] flex-1 items-center justify-center px-2">
-            {sessionActive && activeTacticalFocus && phase === 'work' ? (
-              <Text
-                className="mb-5 text-center font-body text-[11px] uppercase tracking-[0.32em] text-[#8A9488]"
-                style={{ letterSpacing: 3.2 }}
-              >
-                {COMBAT_TACTICAL_FOCUS_DISPLAY[activeTacticalFocus]}
+          <View className="min-h-[140px] flex-1 justify-center px-1">
+            {phase === 'finished' ? (
+              <Text className="text-center font-body-medium text-xl uppercase tracking-[0.2em] text-[#E8E4DC]">
+                Session complete
               </Text>
-            ) : null}
-
-            {phase !== 'rest' && phase !== 'finished' ? (
-              <View className="mb-6 w-full gap-4">
-                <ModularMovementPlayer
-                  url={activeComboLibrary?.visual_asset_url}
-                  type={activeComboLibrary?.visual_asset_type}
-                  movementName={activeComboLibrary?.combo_name ?? currentCombo?.name}
-                  subtitle={
-                    activeTacticalFocus
-                      ? COMBAT_TACTICAL_FOCUS_LABELS[activeTacticalFocus]
-                      : undefined
-                  }
-                  accent="gold"
-                  height={176}
-                />
+            ) : phase === 'rest' ? (
+              <View className="items-center gap-3">
+                <Text className="font-body-medium text-3xl uppercase tracking-[0.35em] text-[#E8E4DC]">
+                  Rest
+                </Text>
+                <Text className="font-body text-sm text-[#8A9488]">
+                  Round {currentRound}/{totalRounds} recovery
+                </Text>
               </View>
-            ) : null}
-
-            <Text
-              className="text-center font-body-medium uppercase leading-[1.12] text-[#E8E4DC]"
-              style={{
-                fontSize: phase === 'work' ? 32 : 26,
-                fontFamily: 'Inter_500Medium',
-                letterSpacing: phase === 'work' ? 1.5 : 1,
-              }}
-              numberOfLines={4}
-              adjustsFontSizeToFit
-            >
-              {displayCombo}
-            </Text>
-            {workCalloutHint ? (
-              <Text className="mt-3 text-center font-body text-sm uppercase tracking-[0.2em] text-matte-gold/70">
-                {workCalloutHint}
+            ) : activeLibraryCombo ? (
+              <CommandCenterShell
+                pillarLabel="Combat · Command"
+                title={activeLibraryCombo.combo_name}
+                meta={commandCenterMeta}
+              >
+                <ComboSequencePanel
+                  combo={activeLibraryCombo}
+                  tacticalFocus={activeTacticalFocus}
+                />
+                {phase === 'work' && comboCallout ? (
+                  <Text className="text-center font-body text-sm uppercase tracking-[0.2em] text-matte-gold/75">
+                    Now · {comboCallout}
+                  </Text>
+                ) : null}
+                {activeCoachIntent && sessionActive ? (
+                  <Text className="font-body text-sm leading-5 text-[#8A9488]">
+                    {activeCoachIntent}
+                  </Text>
+                ) : null}
+                {phase === 'idle' && activeBlock?.combat?.rounds_structure?.length ? (
+                  <Text className="font-body text-[10px] uppercase tracking-[0.35em] text-matte-gold/60">
+                    {activeBlock.combat.rounds_structure
+                      .map((segment) => {
+                        const range =
+                          segment.round_start === segment.round_end
+                            ? `R${segment.round_start}`
+                            : `R${segment.round_start}–${segment.round_end}`;
+                        return `${range} ${COMBAT_TACTICAL_FOCUS_LABELS[segment.tactical_focus]}`;
+                      })
+                      .join(' · ')}
+                  </Text>
+                ) : null}
+                {phase === 'idle' ? (
+                  <Text className="font-body text-sm text-[#6B7568]">
+                    {title ?? 'Blood & Bone'}
+                  </Text>
+                ) : null}
+              </CommandCenterShell>
+            ) : (
+              <Text className="text-center font-body text-sm text-[#8A9488]">
+                Loading combo from catalog…
               </Text>
-            ) : null}
-            {sessionActive && phase === 'work' ? (
-              <Text className="mt-2 text-center font-body text-[10px] uppercase tracking-[0.3em] text-[#6B7568]">
-                {currentCombo.name}
-              </Text>
-            ) : null}
-            {activeCoachIntent && sessionActive ? (
-              <Text className="mt-4 px-4 text-center font-body text-sm leading-5 text-[#8A9488]">
-                {activeCoachIntent}
-              </Text>
-            ) : null}
-            {phase === 'idle' && activeBlock?.combat?.rounds_structure?.length ? (
-              <Text className="mt-4 font-body text-[10px] uppercase tracking-[0.4em] text-matte-gold/60">
-                {activeBlock.combat.rounds_structure
-                  .map((segment) => {
-                    const range =
-                      segment.round_start === segment.round_end
-                        ? `R${segment.round_start}`
-                        : `R${segment.round_start}–${segment.round_end}`;
-                    return `${range} ${COMBAT_TACTICAL_FOCUS_LABELS[segment.tactical_focus]}`;
-                  })
-                  .join(' · ')}
-              </Text>
-            ) : null}
-            {phase === 'idle' ? (
-              <Text className="mt-2 text-center font-body text-sm text-[#6B7568]">
-                {title ?? 'Blood & Bone'}
-              </Text>
-            ) : null}
+            )}
           </View>
 
           <View className="gap-3 pb-2">

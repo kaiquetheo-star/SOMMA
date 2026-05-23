@@ -6,8 +6,9 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FlowGestureZones } from '@/components/spirit/FlowGestureZones';
+import { FlowStepper } from '@/components/spirit/FlowStepper';
 import { SanctuaryBreathOrb } from '@/components/spirit/SanctuaryBreathOrb';
-import { ModularMovementPlayer } from '@/components/ui/ModularMovementPlayer';
+import { CommandCenterShell } from '@/components/command-center/CommandCenterShell';
 import {
   FLOW_BREATH_DYNAMIC,
   FLOW_BREATH_STATIC,
@@ -23,6 +24,8 @@ import { cyclesForDuration } from '@/lib/breathwork/tempoMap';
 import { resolveSpiritSequence } from '@/lib/gameplan/spiritSequence';
 import {
   fetchLibraryFlowSpirit,
+  getFlowSpiritById,
+  getFlowSpiritBySlug,
   type LibraryFlowSpiritSession,
 } from '@/lib/catalog/library';
 import { useSommaStore } from '@/store/useSommaStore';
@@ -188,25 +191,6 @@ export default function SpiritModeScreen() {
   const showBreathActive =
     !isFlowMode && (breathEngine.status === 'running' || breathEngine.status === 'paused');
 
-  const activeMovementLibrary = useMemo((): LibraryFlowSpiritSession | null => {
-    if (isFlowMode) {
-      const asana = flowSession.currentAsana ?? flowSession.sortedAsanas[0];
-      if (!asana) return null;
-      return (
-        flowSpiritCatalog.find(
-          (row) => row.slug === asana.slug || row.id === asana.asana_id,
-        ) ?? null
-      );
-    }
-    return spiritSession;
-  }, [
-    flowSession.currentAsana,
-    flowSession.sortedAsanas,
-    flowSpiritCatalog,
-    isFlowMode,
-    spiritSession,
-  ]);
-
   const activeMovementName = useMemo(() => {
     if (isFlowMode) {
       return (
@@ -224,6 +208,22 @@ export default function SpiritModeScreen() {
     isFlowMode,
     prescribedTempo.name,
     spiritSession?.session_name,
+  ]);
+
+  const activeFlowCatalogRow = useMemo((): LibraryFlowSpiritSession | null => {
+    if (!isFlowMode || flowSpiritCatalog.length === 0) return null;
+    const asana = flowSession.currentAsana ?? flowSession.sortedAsanas[0];
+    if (!asana) return null;
+    return (
+      getFlowSpiritById(flowSpiritCatalog, asana.asana_id) ??
+      getFlowSpiritBySlug(flowSpiritCatalog, asana.slug) ??
+      null
+    );
+  }, [
+    flowSession.currentAsana,
+    flowSession.sortedAsanas,
+    flowSpiritCatalog,
+    isFlowMode,
   ]);
 
   return (
@@ -263,6 +263,36 @@ export default function SpiritModeScreen() {
           </FlowGestureZones>
 
           {isFlowMode && (showFlowIdle || showFlowActive) ? (
+            <View style={styles.commandCenterRail}>
+              <CommandCenterShell
+                pillarLabel="Spirit · Command"
+                title={activeMovementName}
+                meta={
+                  showFlowActive && flowSession.currentAsana
+                    ? `Pose ${flowSession.currentIndex + 1}/${flowSession.totalPoses}${
+                        flowSession.isLastPose ? ' · final' : ''
+                      }`
+                    : `${flowSession.totalPoses} poses · ~${
+                        activeBlock?.spirit?.duration_minutes ?? 15
+                      } min`
+                }
+              >
+                <FlowStepper
+                  catalogRow={activeFlowCatalogRow}
+                  poseMeta={
+                    showFlowActive
+                      ? `${flowSession.currentIndex + 1} / ${flowSession.totalPoses}`
+                      : undefined
+                  }
+                  holdLabel={
+                    showFlowActive ? formatSpiritTimer(flowSession.secondsLeft) : undefined
+                  }
+                />
+              </CommandCenterShell>
+            </View>
+          ) : null}
+
+          {isFlowMode && (showFlowIdle || showFlowActive) ? (
             <View style={styles.sequenceRail}>
               <FlatList
                 horizontal
@@ -288,23 +318,6 @@ export default function SpiritModeScreen() {
                     </View>
                   );
                 }}
-              />
-            </View>
-          ) : null}
-
-          {showFlowIdle || showBreathActive || showFlowActive ? (
-            <View style={styles.movementVisualStage} pointerEvents="none">
-              <ModularMovementPlayer
-                url={activeMovementLibrary?.visual_asset_url}
-                type={activeMovementLibrary?.visual_asset_type}
-                movementName={activeMovementName}
-                subtitle={
-                  isFlowMode && flowSession.currentAsana
-                    ? `${flowSession.currentAsana.hold_seconds}s hold`
-                    : undefined
-                }
-                accent={isFlowMode ? 'silver' : 'gold'}
-                height={168}
               />
             </View>
           ) : null}
@@ -453,6 +466,14 @@ const styles = StyleSheet.create({
     right: 0,
     top: 56,
     zIndex: 20,
+  },
+  commandCenterRail: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    bottom: '22%',
+    zIndex: 25,
+    maxHeight: '42%',
   },
   sequenceContent: {
     paddingHorizontal: 20,
