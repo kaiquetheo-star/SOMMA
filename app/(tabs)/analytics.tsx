@@ -15,9 +15,6 @@ import { LoadTelemetryStrip } from '@/components/iron/LoadTelemetryStrip';
 import { BiologicalPassportSummary } from '@/components/analytics/BiologicalPassportSummary';
 import { BiologicalPassportForm } from '@/components/foundation/BiologicalPassportForm';
 import { useBiomarkerVault } from '@/hooks/useBiomarkerVault';
-import { isSupabaseConfigured } from '@/lib/config';
-import { upsertBiologicalPassport } from '@/lib/supabase/profile';
-import { useAuth } from '@/providers/AuthProvider';
 import { useSommaStore } from '@/store/useSommaStore';
 import {
   initialBiologicalProfile,
@@ -28,7 +25,6 @@ import {
 /** Biological Passport — read, edit, and session controls */
 export default function AnalyticsScreen() {
   const router = useRouter();
-  const { session, signOut, refreshRemoteProfile } = useAuth();
   const storedBiological = useSommaStore((state) => state.user_biological);
   const setUserBiological = useSommaStore((state) => state.setUserBiological);
   const resetStore = useSommaStore((state) => state.resetStore);
@@ -36,32 +32,11 @@ export default function AnalyticsScreen() {
 
   const [draft, setDraft] = useState<BiologicalProfile>(storedBiological);
   const [saving, setSaving] = useState(false);
-  const [hydrating, setHydrating] = useState(false);
-
-  const biomarkerVault = useBiomarkerVault({
-    userId: session?.user?.id,
-    enabled: isSupabaseConfigured && Boolean(session?.user?.id),
-  });
+  const biomarkerVault = useBiomarkerVault({ enabled: true });
 
   useEffect(() => {
     setDraft(storedBiological);
   }, [storedBiological]);
-
-  useEffect(() => {
-    if (!isSupabaseConfigured || !session?.user?.id) return;
-
-    let mounted = true;
-    setHydrating(true);
-    void refreshRemoteProfile()
-      .catch(() => undefined)
-      .finally(() => {
-        if (mounted) setHydrating(false);
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, [session?.user?.id, refreshRemoteProfile]);
 
   const handleDraftChange = useCallback((patch: Partial<BiologicalProfile>) => {
     setDraft((prev) => ({ ...prev, ...patch }));
@@ -84,11 +59,7 @@ export default function AnalyticsScreen() {
       };
       setUserBiological(normalized);
 
-      if (isSupabaseConfigured && session?.user?.id) {
-        await upsertBiologicalPassport(session.user.id, normalized);
-      }
-
-      Alert.alert('Passport updated', 'Your biological baseline is saved and will inform AI protocols.');
+      Alert.alert('Passport updated', 'Your biological baseline is saved on this device.');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Could not save to the cloud.';
       Alert.alert('Save failed', message);
@@ -104,31 +75,9 @@ export default function AnalyticsScreen() {
   const hasChanges =
     JSON.stringify(draft) !== JSON.stringify(storedBiological ?? initialBiologicalProfile);
 
-  const handleSignOut = async () => {
-    try {
-      if (isSupabaseConfigured && session) {
-        await signOut();
-      }
-    } finally {
-      await resetStore();
-      router.replace('/(auth)');
-    }
-  };
-
-  const handleResetProfile = async () => {
-    try {
-      if (isSupabaseConfigured && session) {
-        await signOut();
-      }
-    } finally {
-      await resetStore();
-      router.replace('/(auth)');
-    }
-  };
-
-  const handleResetLocalOnly = async () => {
+  const handleResetDevice = async () => {
     await resetStore();
-    router.replace('/(auth)/foundation');
+    router.replace('/(tabs)/home');
   };
 
   return (
@@ -149,12 +98,7 @@ export default function AnalyticsScreen() {
           coaches, plus your biomarker vault preview.
         </Text>
 
-        {hydrating ? (
-          <View className="mt-8 items-center py-6">
-            <ActivityIndicator color="#BFA06A" />
-          </View>
-        ) : (
-          <View className="mt-8 gap-8">
+        <View className="mt-8 gap-8">
             <BiologicalPassportSummary profile={draft} />
 
             <LoadTelemetryStrip
@@ -210,52 +154,23 @@ export default function AnalyticsScreen() {
               </View>
             </View>
           </View>
-        )}
 
         <View className="mt-12 gap-3">
           <Text className="font-body text-[10px] uppercase tracking-[0.35em] text-[#6B7568]">
-            Session
+            Device
           </Text>
 
-          {isSupabaseConfigured && session ? (
-            <Pressable
-              onPress={handleSignOut}
-              accessibilityRole="button"
-              accessibilityLabel="Sign out"
-              className="rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-4 active:opacity-80"
-            >
-              <Text className="font-body-medium text-sm uppercase tracking-[0.25em] text-[#E8E4DC]">
-                Sign out
-              </Text>
-              <Text className="mt-1 font-body text-xs text-[#6B7568]">{session.user.email}</Text>
-            </Pressable>
-          ) : null}
-
           <Pressable
-            onPress={handleResetProfile}
+            onPress={handleResetDevice}
             accessibilityRole="button"
-            accessibilityLabel="Reset profile and sign out"
+            accessibilityLabel="Reset all local SOMMA data"
             className="rounded-2xl border border-blood-red/30 bg-blood-red/10 px-5 py-4 active:opacity-80"
           >
             <Text className="font-body-medium text-sm uppercase tracking-[0.25em] text-blood-red">
-              Reset profile
+              Reset device data
             </Text>
             <Text className="mt-1 font-body text-xs text-[#8A9488]">
-              Signs out, clears all local data, and returns to Welcome.
-            </Text>
-          </Pressable>
-
-          <Pressable
-            onPress={handleResetLocalOnly}
-            accessibilityRole="button"
-            accessibilityLabel="Reset local foundation data"
-            className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4 active:opacity-80"
-          >
-            <Text className="font-body-medium text-sm uppercase tracking-[0.25em] text-[#E8E4DC]">
-              Reset local foundation
-            </Text>
-            <Text className="mt-1 font-body text-xs text-[#8A9488]">
-              Clears Zustand cache and opens Foundation Scan (keeps sign-in if active).
+              Clears all local protocols, logs, and passport data on this device.
             </Text>
           </Pressable>
         </View>

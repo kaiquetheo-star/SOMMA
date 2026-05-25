@@ -18,15 +18,16 @@ import { useEffect, type ReactNode } from 'react';
 import 'react-native-reanimated';
 
 import { FontFamily } from '@/constants/typography';
+import { LocalBootstrap } from '@/components/routing/LocalBootstrap';
 import { PerformanceSyncBridge } from '@/components/routing/PerformanceSyncBridge';
-import { AuthProvider, useAuth } from '@/providers/AuthProvider';
+import { AuthProvider } from '@/providers/AuthProvider';
 
 export {
   ErrorBoundary,
 } from 'expo-router';
 
 export const unstable_settings = {
-  initialRouteName: '(auth)',
+  initialRouteName: '(tabs)',
 };
 
 SplashScreen.preventAutoHideAsync();
@@ -49,29 +50,11 @@ const SommaDarkTheme = {
   },
 };
 
-/** Hide splash once fonts are ready and auth bootstrap has finished (or failed). */
 function SplashGate({ fontsReady, children }: { fontsReady: boolean; children: ReactNode }) {
-  const { isLoading, isConfigured } = useAuth();
-  const authReady = !isConfigured || !isLoading;
-  const appReady = fontsReady && authReady;
-
   useEffect(() => {
     if (!fontsReady) return;
-
-    const hideSplash = async () => {
-      try {
-        if (appReady) {
-          await SplashScreen.hideAsync();
-        }
-      } finally {
-        if (authReady) {
-          await SplashScreen.hideAsync().catch(() => undefined);
-        }
-      }
-    };
-
-    void hideSplash();
-  }, [fontsReady, authReady, appReady]);
+    void SplashScreen.hideAsync().catch(() => undefined);
+  }, [fontsReady]);
 
   return <>{children}</>;
 }
@@ -99,14 +82,15 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <SplashGate fontsReady={loaded}>
+        <LocalBootstrap />
         <PerformanceSyncBridge />
         <ThemeProvider value={SommaDarkTheme}>
           <Stack
             screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0F1512' } }}
           >
-            <Stack.Screen name="(auth)" />
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="(workout)" />
+            <Stack.Screen name="(auth)" />
           </Stack>
         </ThemeProvider>
       </SplashGate>

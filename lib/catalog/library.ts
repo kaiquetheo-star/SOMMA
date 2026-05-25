@@ -1,7 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { isSupabaseConfigured } from '@/lib/config';
-import { getSupabase } from '@/lib/supabase/client';
+import { LOCAL_FIRST_MODE } from '@/lib/config';
+import {
+  getBundledCombat,
+  getBundledExercises,
+  getBundledFlowSpirit,
+} from '@/lib/catalog/bundledCatalog';
 import { findSpiritSessionByTempoId } from '@/lib/breathwork/fromCatalog';
 import { COMBAT_TACTICAL_FOCUS_LABELS, type GameplanBlock } from '@/types/gameplan';
 import {
@@ -192,48 +196,28 @@ async function fetchTable<T>(
     return cached;
   }
 
-  if (!isSupabaseConfigured) return [];
+  if (LOCAL_FIRST_MODE) {
+    const bundled =
+      table === 'library_exercises'
+        ? (getBundledExercises() as T[])
+        : table === 'library_combat'
+          ? (getBundledCombat() as T[])
+          : (getBundledFlowSpirit() as T[]);
 
-  const supabase = getSupabase();
-  if (!supabase) return [];
-
-  let data: Record<string, unknown>[] | null = null;
-  let fetchError: { message: string } | null = null;
-
-  try {
-    const result = await supabase.from(table).select(select);
-    data = (result.data as Record<string, unknown>[] | null) ?? null;
-    fetchError = result.error;
-  } catch (err) {
-    console.warn(
-      `[SOMMA] ${table} fetch threw:`,
-      err instanceof Error ? err.message : err,
-    );
-    fetchError = { message: 'network' };
-  }
-
-  if (fetchError) {
-    console.warn(`[SOMMA] ${table} fetch failed:`, fetchError.message);
-    const stale = await readCache<T>(cacheKey, { allowStale: true });
-    if (stale?.length) {
-      memoryRef.current = stale;
-      return stale;
+    if (bundled.length) {
+      memoryRef.current = bundled;
+      await writeCache(cacheKey, bundled);
+      return bundled;
     }
-    return memoryRef.current ?? [];
-  }
-  if (!data?.length) {
-    const stale = await readCache<T>(cacheKey, { allowStale: true });
-    if (stale?.length) {
-      memoryRef.current = stale;
-      return stale;
-    }
-    return memoryRef.current ?? [];
   }
 
-  const rows = data.map((row) => mapper(row as unknown as Record<string, unknown>));
-  memoryRef.current = rows;
-  await writeCache(cacheKey, rows);
-  return rows;
+  const stale = await readCache<T>(cacheKey, { allowStale: true });
+  if (stale?.length) {
+    memoryRef.current = stale;
+    return stale;
+  }
+
+  return memoryRef.current ?? [];
 }
 
 export async function fetchLibraryExercises(): Promise<LibraryExercise[]> {

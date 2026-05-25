@@ -1,19 +1,14 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
-import {
-  fetchBiomarkerDocuments,
-  fetchLatestBiomarkerReadings,
-  insertBiomarkerReading,
-  uploadBiomarkerLabDocument,
-} from '@/lib/supabase/biomarkers';
-import type { BiomarkerDocument, BiomarkerLatestMap } from '@/types/biomarker';
+import type { BiomarkerDocument, BiomarkerLatestMap, BiomarkerReading } from '@/types/biomarker';
 
 interface UseBiomarkerVaultOptions {
-  userId: string | undefined;
+  userId?: string;
   enabled?: boolean;
 }
 
-export function useBiomarkerVault({ userId, enabled = true }: UseBiomarkerVaultOptions) {
+/** Local-only biomarker vault — persisted in session memory (device). */
+export function useBiomarkerVault({ enabled = true }: UseBiomarkerVaultOptions = {}) {
   const [latest, setLatest] = useState<BiomarkerLatestMap>({});
   const [documents, setDocuments] = useState<BiomarkerDocument[]>([]);
   const [loading, setLoading] = useState(false);
@@ -21,64 +16,51 @@ export function useBiomarkerVault({ userId, enabled = true }: UseBiomarkerVaultO
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    if (!userId || !enabled) return;
-
-    setLoading(true);
+    if (!enabled) return;
+    setLoading(false);
     setError(null);
-    try {
-      const [readings, docs] = await Promise.all([
-        fetchLatestBiomarkerReadings(userId),
-        fetchBiomarkerDocuments(userId),
-      ]);
-      setLatest(readings);
-      setDocuments(docs);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not load biomarkers.');
-    } finally {
-      setLoading(false);
-    }
-  }, [userId, enabled]);
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
+  }, [enabled]);
 
   const logReading = useCallback(
     async (markerId: string, value: number, unit: string) => {
-      if (!userId) throw new Error('Sign in to log biomarkers.');
-      const reading = await insertBiomarkerReading({
-        userId,
-        markerId,
+      const reading: BiomarkerReading = {
+        id: `local-biomarker-${markerId}-${Date.now()}`,
+        user_id: 'local',
+        marker_id: markerId,
         value,
         unit,
+        recorded_at: new Date().toISOString(),
         source: 'manual',
-      });
+        document_id: null,
+        notes: null,
+      };
       setLatest((prev) => ({ ...prev, [markerId]: reading }));
       return reading;
     },
-    [userId],
+    [],
   );
 
   const uploadLab = useCallback(
     async (uri: string, fileName: string, mimeType: string | null, byteSize: number | null) => {
-      if (!userId) throw new Error('Sign in to upload labs.');
       setUploading(true);
       setError(null);
       try {
-        const doc = await uploadBiomarkerLabDocument({
-          userId,
-          uri,
-          fileName,
-          mimeType,
-          byteSize,
-        });
+        const doc: BiomarkerDocument = {
+          id: `local-doc-${Date.now()}`,
+          user_id: 'local',
+          file_name: fileName,
+          storage_path: uri,
+          mime_type: mimeType,
+          byte_size: byteSize,
+          uploaded_at: new Date().toISOString(),
+        };
         setDocuments((prev) => [doc, ...prev]);
         return doc;
       } finally {
         setUploading(false);
       }
     },
-    [userId],
+    [],
   );
 
   return {

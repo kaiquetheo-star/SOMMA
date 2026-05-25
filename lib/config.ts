@@ -1,12 +1,8 @@
-/** Supabase is optional until EXPO_PUBLIC_* keys are set in `.env` */
-const supabaseAnonKey =
-  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ??
-  process.env.EXPO_PUBLIC_SUPABASE_KEY ??
-  '';
+/** SOMMA runs as a 100% local-first PWA — no Supabase, auth, or Edge in production. */
+export const LOCAL_FIRST_MODE = true;
 
-export const isSupabaseConfigured = Boolean(
-  process.env.EXPO_PUBLIC_SUPABASE_URL?.length && supabaseAnonKey.length,
-);
+/** Always false in local-first mode; legacy call sites gate cloud paths. */
+export const isSupabaseConfigured = false;
 
-export const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
-export { supabaseAnonKey };
+export const supabaseUrl = '';
+export const supabaseAnonKey = '';

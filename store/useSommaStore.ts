@@ -2,13 +2,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import { isSupabaseConfigured } from '@/lib/config';
 import { fetchDailyGameplan } from '@/lib/gameplan/fetchDailyGameplan';
 import { isGameplanFetchError } from '@/lib/gameplan/gameplanErrors';
-import {
-  generateStubGameplan,
-  isProtocolDateStale,
-} from '@/lib/gameplan/generateStubGameplan';
+import { isProtocolDateStale } from '@/lib/gameplan/generateStubGameplan';
+import { normalizePersistedSnapshot, type SommaPersistedSnapshot } from '@/lib/local/backup';
+import { recalibrateFromPerformanceQueue } from '@/lib/local/recalibrate';
 import { isDegenerateMicrocycle } from '@/lib/gameplan/microcycleValidation';
 import { getMicrocycleDay, getTodayDayIndex } from '@/lib/gameplan/microcycleWeek';
 import { applyReadinessAutoregulationToMicrocycle } from '@/lib/gameplan/engine/clinicalLaws';
@@ -17,10 +15,8 @@ import {
   nextMesocycleWeekAfterReview,
 } from '@/lib/gameplan/engine/progression';
 import type { ClinicalExitInterview } from '@/types/clinical';
-import { syncPerformanceQueueAndRecalibrate } from '@/lib/supabase/sync';
 import { fetchLibraryCombat, fetchLibraryExercises } from '@/lib/catalog/library';
 import { buildWorkoutSessionSummary } from '@/lib/workout/buildSessionSummary';
-import { getSupabase } from '@/lib/supabase/client';
 import type { BiologicalProfile } from '@/types/biological';
 import {
   DEFAULT_TRAINING_DAYS_PER_WEEK,
@@ -253,6 +249,8 @@ interface SommaState {
   }) => void;
   /** Clears all local SOMMA state and persisted offline cache */
   resetStore: () => Promise<void>;
+  /** Replace persisted offline data from a backup JSON payload */
+  restoreFromBackup: (raw: unknown) => Promise<void>;
   /** @deprecated Use resetStore */
   resetSommaState: () => void;
 }
@@ -399,46 +397,24 @@ export const useSommaStore = create<SommaState>()(
               },
         ),
 
-      ensureDailyGameplan: () =>
-        set((state) => {
-          const focus = state.user_foundation.focus_preference;
-          if (!focus) return state;
-
-          if (!isProtocolDateStale(state.protocolDate) && state.weeklyMicrocycle) {
-            return state;
-          }
-
-          if (isSupabaseConfigured) {
-            return state;
-          }
-
-          const gameplan = generateStubGameplan(
-            focus,
-            state.user_environment.available_equipment,
-            state.user_biological.training_days_per_week ?? DEFAULT_TRAINING_DAYS_PER_WEEK,
-          );
-          return {
-            ...applyGameplanToState(gameplan, 'stub'),
-            gameplan_error: null,
-          };
-        }),
+      ensureDailyGameplan: () => {
+        const state = get();
+        if (!state.user_foundation.focus_preference) return;
+        if (!isProtocolDateStale(state.protocolDate) && state.weeklyMicrocycle) return;
+        void get().fetchDailyGameplanAsync();
+      },
 
       fetchDailyGameplanAsync: async (options) => {
         const state = get();
         const focus = state.user_foundation.focus_preference;
         if (!focus) return;
 
-        const trainingDays =
-          state.user_biological.training_days_per_week ?? DEFAULT_TRAINING_DAYS_PER_WEEK;
-
         set({ gameplan_loading: true, gameplan_error: null });
 
         try {
-          const userId = (await getSupabase()?.auth.getSession())?.data.session?.user?.id ?? null;
           const result = await fetchDailyGameplan({
             focus,
             equipment: state.user_environment.available_equipment,
-            userId,
             forceRefresh: options?.forceRefresh ?? false,
             biological: state.user_biological,
             userStats: state.user_stats,
@@ -451,38 +427,24 @@ export const useSommaStore = create<SommaState>()(
             gameplan_error: null,
           });
         } catch (error) {
-          if (isSupabaseConfigured) {
-            const message = isGameplanFetchError(error)
+          const message = isGameplanFetchError(error)
+            ? error.message
+            : error instanceof Error
               ? error.message
-              : error instanceof Error
-                ? error.message
-                : 'Neural link failed — could not reach Head Coach';
-            console.error('[SOMMA] fetchDailyGameplanAsync failed:', message, error);
-            const current = get();
-            set({
-              gameplan_loading: false,
-              gameplan_error: message,
-              ...(current.weeklyMicrocycle
-                ? {}
-                : {
-                    weeklyMicrocycle: null,
-                    protocolDate: null,
-                    weekStartDate: null,
-                    protocolGeneratedAt: null,
-                  }),
-            });
-            return;
-          }
-
-          const gameplan = generateStubGameplan(
-            focus,
-            state.user_environment.available_equipment,
-            trainingDays,
-          );
+              : 'Head Coach could not build your protocol locally';
+          console.error('[SOMMA] fetchDailyGameplanAsync failed:', message, error);
+          const current = get();
           set({
-            ...applyGameplanToState(gameplan, 'stub'),
             gameplan_loading: false,
-            gameplan_error: null,
+            gameplan_error: message,
+            ...(current.weeklyMicrocycle
+              ? {}
+              : {
+                  weeklyMicrocycle: null,
+                  protocolDate: null,
+                  weekStartDate: null,
+                  protocolGeneratedAt: null,
+                }),
           });
         }
       },
@@ -525,49 +487,9 @@ export const useSommaStore = create<SommaState>()(
         }),
 
       logIronSet: (input) => {
-        const state = get();
-        const queueItem: PerformanceQueueItem = {
-          id: `queue-set-${input.block_id}-${input.exercise_id}-${input.set.set_index}-${Date.now()}`,
-          kind: 'iron_set',
-          input: {
-            block_id: input.block_id,
-            pillar: 'iron',
-            exercise_id: input.exercise_id,
-            weight_used: input.set.weight_kg,
-            reps_completed: input.set.reps,
-            target_rir: input.target_rir ?? null,
-          },
-          session: null,
-          iron_set: input.set,
-          created_at: input.set.logged_at,
-        };
-
-        set({
+        set((state) => ({
           performance_logs: upsertIronSetLog(state.performance_logs, input),
-          performanceQueue: [...state.performanceQueue, queueItem],
-        });
-
-        const focus = state.user_foundation.focus_preference;
-        const equipment = state.user_environment.available_equipment;
-
-        void (async () => {
-          if (!focus) return;
-          try {
-            await syncPerformanceQueueAndRecalibrate([queueItem], {
-              focus,
-              equipment,
-              biological: state.user_biological,
-              userStats: state.user_stats,
-              performanceLogs: state.performance_logs,
-              recalibrate: false,
-            });
-            set({
-              performanceQueue: get().performanceQueue.filter((item) => item.id !== queueItem.id),
-            });
-          } catch (err) {
-            console.warn('[SOMMA] Iron set sync deferred:', err);
-          }
-        })();
+        }));
       },
 
       prepareWorkoutSummary: async () => {
@@ -646,7 +568,7 @@ export const useSommaStore = create<SommaState>()(
         set({ performance_syncing: true });
 
         try {
-          const result = await syncPerformanceQueueAndRecalibrate(state.performanceQueue, {
+          const result = await recalibrateFromPerformanceQueue(state.performanceQueue, {
             focus,
             equipment: state.user_environment.available_equipment,
             biological: state.user_biological,
@@ -654,7 +576,7 @@ export const useSommaStore = create<SommaState>()(
             performanceLogs: state.performance_logs,
           });
 
-          if (result.insertedCount > 0) {
+          if (result.processedCount > 0) {
             const previousMicrocycle = get().weeklyMicrocycle;
             const patch: Partial<SommaState> = { performanceQueue: [] };
 
@@ -675,7 +597,7 @@ export const useSommaStore = create<SommaState>()(
                 patch,
                 applyGameplanToState(
                   { ...result.gameplan, microcycle: mergedMicrocycle },
-                  result.source ?? 'ai',
+                  result.source ?? 'local',
                 ),
               );
             }
@@ -710,7 +632,7 @@ export const useSommaStore = create<SommaState>()(
 
         try {
           if (focus) {
-            const result = await syncPerformanceQueueAndRecalibrate([queueItem], {
+            const result = await recalibrateFromPerformanceQueue([queueItem], {
               focus,
               equipment,
               biological: get().user_biological,
@@ -728,7 +650,7 @@ export const useSommaStore = create<SommaState>()(
               const patch: Partial<SommaState> = {
                 ...applyGameplanToState(
                   { ...result.gameplan, microcycle: mergedMicrocycle },
-                  result.source ?? 'ai',
+                  result.source ?? 'local',
                 ),
                 performanceQueue: get().performanceQueue.filter((item) => item.id !== queueItem.id),
               };
@@ -742,7 +664,7 @@ export const useSommaStore = create<SommaState>()(
               return;
             }
 
-            if (result.insertedCount > 0) {
+            if (result.processedCount > 0) {
               const patch: Partial<SommaState> = {
                 performanceQueue: get().performanceQueue.filter((item) => item.id !== queueItem.id),
               };
@@ -756,18 +678,13 @@ export const useSommaStore = create<SommaState>()(
             }
           }
         } catch (err) {
-          console.warn('[SOMMA] Performance sync failed:', err);
+          console.warn('[SOMMA] Local recalibration failed:', err);
         } finally {
           set({ performance_syncing: false });
         }
       },
 
       completeFoundationScan: ({ focus_preference, available_equipment, biological }) => {
-        const gameplan = generateStubGameplan(
-          focus_preference,
-          available_equipment,
-          biological.training_days_per_week ?? DEFAULT_TRAINING_DAYS_PER_WEEK,
-        );
         set({
           user_foundation: {
             focus_preference,
@@ -784,8 +701,8 @@ export const useSommaStore = create<SommaState>()(
             spirit_essence: focus_preference.spirit,
             combat_mastery: focus_preference.combat,
           },
-          ...applyGameplanToState(gameplan, 'stub'),
         });
+        void get().fetchDailyGameplanAsync({ forceRefresh: true });
       },
 
       hydrateFoundationFromRemote: ({
@@ -833,6 +750,26 @@ export const useSommaStore = create<SommaState>()(
         } catch {
           // Storage may be unavailable on some web/private modes
         }
+      },
+
+      restoreFromBackup: async (raw) => {
+        const snapshot = normalizePersistedSnapshot(raw);
+        if (!snapshot) {
+          throw new Error('Invalid SOMMA backup file.');
+        }
+
+        const patch: SommaPersistedSnapshot & {
+          performance_syncing: boolean;
+          gameplan_loading: boolean;
+          gameplan_error: string | null;
+        } = {
+          ...snapshot,
+          performance_syncing: false,
+          gameplan_loading: false,
+          gameplan_error: null,
+        };
+
+        set(patch);
       },
 
       resetSommaState: () => {

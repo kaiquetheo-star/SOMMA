@@ -222,7 +222,6 @@ export async function syncPerformanceQueueAndRecalibrate(
       const result = await fetchDailyGameplan({
         focus: context.focus,
         equipment: context.equipment,
-        userId,
         forceRefresh: true,
         biological: biologicalForRecalibrate,
         userStats: context.userStats,

@@ -1,4 +1,4 @@
-import { getSupabase } from '@/lib/supabase/client';
+import type { PerformanceLogEntry } from '@/types/performance';
 
 /** Iron prescription goal — maps from profiles.goal_iron */
 export type IronGoalType = 'hypertrophy' | 'strength' | 'default';
@@ -126,45 +126,59 @@ export function hasIronHistoryForExercise(
   return estimateBestE1RMFromLogs(logs, exerciseId) != null;
 }
 
+function performanceEntriesToSamples(entries: PerformanceLogEntry[]): PerformanceLogSample[] {
+  const cutoff = Date.now() - THREE_WEEKS_MS;
+  const samples: PerformanceLogSample[] = [];
+
+  for (const entry of entries) {
+    if (entry.pillar !== 'iron' || !entry.iron?.sets.length) continue;
+    if (Date.parse(entry.timestamp) < cutoff) continue;
+
+    samples.push({
+      exercise_id: entry.iron.exercise_id,
+      weight_used: entry.iron.sets[entry.iron.sets.length - 1]?.weight_kg ?? null,
+      reps_completed: entry.iron.sets[entry.iron.sets.length - 1]?.reps ?? null,
+      timestamp: entry.timestamp,
+      payload: {
+        iron: {
+          exercise_id: entry.iron.exercise_id,
+          sets: entry.iron.sets.map((set) => ({
+            weight_kg: set.weight_kg,
+            reps: set.reps,
+          })),
+        },
+      },
+    });
+  }
+
+  return samples;
+}
+
 /**
- * Queries performance_logs for the last 3 weeks, estimates E1RM (Epley),
- * and returns goal-aware target weight for the prescribed reps / RIR.
- * Returns null when no history — never a flat body-mass guess.
+ * Local performance_logs (Zustand) → E1RM → goal-aware target weight.
  */
-export async function getTargetWeight(
-  userId: string,
+export function getTargetWeightFromLogs(
+  entries: PerformanceLogEntry[],
   exerciseId: string,
   targetReps: number,
   targetRIR: number,
   goalType: string | null,
-): Promise<number | null> {
-  const supabase = getSupabase();
-  if (!supabase || !userId || !exerciseId) return null;
-
-  const cutoff = new Date(Date.now() - THREE_WEEKS_MS).toISOString();
-
-  const { data, error } = await supabase
-    .from('performance_logs')
-    .select('exercise_id, weight_used, reps_completed, timestamp, payload')
-    .eq('user_id', userId)
-    .eq('pillar', 'iron')
-    .eq('exercise_id', exerciseId)
-    .gte('timestamp', cutoff)
-    .order('timestamp', { ascending: false })
-    .limit(120);
-
-  if (error || !data?.length) return null;
-
-  const logs: PerformanceLogSample[] = data.map((row) => ({
-    exercise_id: row.exercise_id,
-    weight_used: row.weight_used,
-    reps_completed: row.reps_completed,
-    timestamp: row.timestamp,
-    payload: row.payload as PerformanceLogSample['payload'],
-  }));
-
+): number | null {
+  if (!exerciseId) return null;
+  const logs = performanceEntriesToSamples(entries);
   const e1rm = estimateBestE1RMFromLogs(logs, exerciseId);
   if (e1rm == null) return null;
-
   return targetWeightFromE1RM(e1rm, goalType, targetReps, targetRIR);
+}
+
+/** @deprecated Use getTargetWeightFromLogs — local-first only */
+export async function getTargetWeight(
+  _userId: string,
+  exerciseId: string,
+  targetReps: number,
+  targetRIR: number,
+  goalType: string | null,
+  performanceLogs: PerformanceLogEntry[] = [],
+): Promise<number | null> {
+  return getTargetWeightFromLogs(performanceLogs, exerciseId, targetReps, targetRIR, goalType);
 }

@@ -14,7 +14,6 @@ import {
   BIOMARKER_PLACEHOLDERS,
   type BiomarkerPlaceholder,
 } from '@/constants/biomarkers';
-import { isSupabaseConfigured } from '@/lib/config';
 import type { BiomarkerDocument, BiomarkerLatestMap } from '@/types/biomarker';
 
 interface BiomarkerGridProps {
@@ -107,11 +106,6 @@ export function BiomarkerGrid({
   const [saving, setSaving] = useState(false);
 
   const handleUpload = async () => {
-    if (!isSupabaseConfigured) {
-      Alert.alert('Cloud required', 'Connect Supabase to upload lab documents.');
-      return;
-    }
-
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: ['application/pdf', 'image/*'],

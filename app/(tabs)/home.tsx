@@ -9,13 +9,11 @@ import { ReviewForm } from '@/components/clinical/ReviewForm';
 import { GameplanBlockCard } from '@/components/sanctuary/GameplanBlockCard';
 import { WeeklyMicrocycleStrip } from '@/components/sanctuary/WeeklyMicrocycleStrip';
 import { useStoreHydrated } from '@/hooks/useStoreHydrated';
-import { useUserStatsRealtime } from '@/hooks/useUserStatsRealtime';
 import { useWorkoutNavigation } from '@/hooks/useWorkoutNavigation';
 import { prefetchLibraryCatalogs } from '@/lib/catalog/library';
 import { suggestedAverageRpeForClinicalReview } from '@/lib/physics/loadTelemetry';
 import { isProtocolDateStale } from '@/lib/gameplan/generateStubGameplan';
 import { getTodayDayIndex, MICROCYCLE_DAY_LABELS } from '@/lib/gameplan/microcycleWeek';
-import { useAuth } from '@/providers/AuthProvider';
 import {
   getMicrocycleDay,
   getTodayBlocksFromStore,
@@ -28,7 +26,6 @@ import type { DailyGameplan } from '@/types/gameplan';
 export default function DailyCommandScreen() {
   const router = useRouter();
   const storeHydrated = useStoreHydrated();
-  const { user } = useAuth();
   const userStats = useSommaStore((state) => state.user_stats);
   const userEnvironment = useSommaStore((state) => state.user_environment);
   const userFoundation = useSommaStore((state) => state.user_foundation);
@@ -59,8 +56,6 @@ export default function DailyCommandScreen() {
   );
 
   const { openBlock } = useWorkoutNavigation();
-
-  useUserStatsRealtime(user?.id);
 
   const todayDayIndex = getTodayDayIndex(weekStartDate);
   const selectedDay = getMicrocycleDay(weeklyMicrocycle, selectedDayIndex);
@@ -149,7 +144,7 @@ export default function DailyCommandScreen() {
           />
         </View>
 
-        {foundationComplete ? (
+        {foundationComplete || weeklyMicrocycle ? (
           <>
             <WeeklyMicrocycleStrip
               microcycle={weeklyMicrocycle}
@@ -209,7 +204,7 @@ export default function DailyCommandScreen() {
                     Neural Link Failed
                   </Text>
                   <Text className="mt-4 text-center font-display text-xl leading-8 text-[#E8C4C4]">
-                    Head Coach could not reach the clinic.
+                    Head Coach could not build your protocol locally.
                   </Text>
                   <Text className="mt-2 text-center font-body text-sm leading-6 text-[#B89090]">
                     {gameplanError}
@@ -274,31 +269,18 @@ export default function DailyCommandScreen() {
                   Recalibrate
                 </Text>
                 <Text className="mt-1 font-body text-xs text-[#6B7568]">
-                  Invoke AI Edge Function · refresh this week&apos;s microcycle
+                  Rebuild this week&apos;s microcycle on-device
                 </Text>
               </Pressable>
             </View>
           </>
         ) : (
-          <Pressable
-            onPress={() => router.push('/(auth)/foundation')}
-            accessibilityRole="button"
-            accessibilityLabel="Begin Foundation Scan"
-            className="mt-10 overflow-hidden rounded-2xl border border-matte-gold/25 bg-white/5 px-5 py-4 active:opacity-75"
-          >
-            <Text className="font-body text-[10px] uppercase tracking-[0.3em] text-matte-gold/80">
-              Protocol awaiting
+          <View className="mt-10 items-center py-12">
+            <ActivityIndicator color="#BFA06A" />
+            <Text className="mt-4 font-body text-sm text-[#8A9488]">
+              Building your local protocol…
             </Text>
-            <Text className="mt-2 font-display text-xl text-[#E8E4DC]">
-              Complete your Foundation Scan
-            </Text>
-            <Text className="mt-2 font-body text-sm leading-6 text-[#8A9488]">
-              Your AI-curated blocks will appear here once attunement is established.
-            </Text>
-            <Text className="mt-4 font-body-medium text-xs uppercase tracking-[0.3em] text-matte-gold">
-              Begin Foundation Scan →
-            </Text>
-          </Pressable>
+          </View>
         )}
       </ScrollView>
     </SafeAreaView>

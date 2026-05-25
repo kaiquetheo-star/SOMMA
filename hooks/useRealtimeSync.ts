@@ -6,6 +6,7 @@ import type {
   SupabaseClient,
 } from '@supabase/supabase-js';
 
+import { isSupabaseConfigured } from '@/lib/config';
 import { getSupabase } from '@/lib/supabase/client';
 
 type PostgresChangeBinding = {
@@ -47,6 +48,8 @@ export function useRealtimeSync(config: RealtimeSyncConfig | null): void {
   configRef.current = config;
 
   useEffect(() => {
+    if (!isSupabaseConfigured) return;
+
     const activeConfig = configRef.current;
     if (!activeConfig) return;
 

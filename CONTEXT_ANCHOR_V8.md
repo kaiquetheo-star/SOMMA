@@ -6,10 +6,10 @@
 |------|--------|
 | **Product** | SOMMA — The Longevity OS |
 | **North star** | SHRED-level performance for ~6×/week athletes |
-| **Checkpoint** | May 2026 — Text-Only Elite · **local $0 Head Coach** · **RIR gate + load telemetry** · **Vercel web SPA** · email-only auth · migrations **001–021** |
+| **Checkpoint** | May 2026 — **100% local-first PWA** · **$0 on-device Head Coach** · **RIR gate + load telemetry** · **Vercel web SPA** · **zero cloud auth/DB** |
 | **Prior anchors** | V1–V7 — historical only |
 | **Last commit** | *(uncommitted session work — verify with `git log -1`)* |
-| **Deploy gate** | **`021` migration** must be applied; Edge LLM is **opt-in** only |
+| **Deploy gate** | `npm run build` (web export) · no Supabase required |
 
 ---
 
@@ -19,12 +19,12 @@
 |-------|--------|------|
 | **Client** | **Expo SDK 54** · RN 0.81 · React 19 · **Expo Router** v6 | `(auth)` · `(tabs)` · `(workout)` |
 | **Styling** | **NativeWind v4** + Tailwind 3 | Obsidian `#0F1512` / `#0A0E0C` · Matte Gold `#BFA06A` |
-| **State** | **Zustand** + `AsyncStorage` (`somma-offline-store`) | Offline-first gameplan, logs, performance queue |
-| **Head Coach** | **`lib/gameplan/engine/*`** | **Deterministic microcycle — $0 API** (catalog + passport + logs) |
-| **Sync** | `lib/supabase/sync.ts` | Per-set + block-complete → `performance_logs`; finish → **local** recalibrate |
-| **Backend** | **Supabase** | Postgres · Auth (magic link only in UI) · RLS · catalog tables · `daily_protocols` cache |
-| **Load telemetry** | `lib/physics/loadTelemetry.ts` | On-device ACWR · sRPE · RPE σ — feeds Head Coach autoreg ($0 API) |
-| **Edge (legacy / optional)** | `generate_weekly_microcycle` → `generate_daily_protocol` | Deterministic by default; LLM only if `HEAD_COACH_USE_LLM=true` |
+| **State** | **Zustand** + `AsyncStorage` (`somma-offline-store`) | **Sole source of truth** — gameplan, logs, passport, queue |
+| **Head Coach** | **`lib/gameplan/engine/*`** | **Deterministic microcycle — client-only** (bundled catalog + passport + logs) |
+| **Recalibrate** | `lib/local/recalibrate.ts` | Queue flush → merge logs → `fetchDailyGameplan` on-device |
+| **Catalog** | `lib/catalog/bundledCatalog.ts` | Bundled iron/combat/flow when `LOCAL_FIRST_MODE` |
+| **Load telemetry** | `lib/physics/loadTelemetry.ts` | On-device ACWR · sRPE · RPE σ — feeds Head Coach autoreg |
+| **Backend** | *(none at runtime)* | `lib/supabase/*` retained for reference only; `isSupabaseConfigured = false` |
 | **Deploy (Vercel)** | `npm run build` → `dist/` SPA | **Web-only** — no iOS/Android bundle in CI |
 
 ### Vercel / web export (strict)
@@ -52,55 +52,49 @@ iOS/Android blocks removed from `app.json` until native ship returns. Hermes/bin
 |-------|---------|
 | `weeklyMicrocycle` | 7-day `MicrocycleDay[]` (Mon–Sun) |
 | `selectedDayIndex` | Active strip day (1–7) |
-| `performance_logs` / `performanceQueue` | Local history + pending Supabase sync |
+| `performance_logs` / `performanceQueue` | Local history; queue flushed via `recalibrateFromPerformanceQueue` |
 | `user_biological` | Passport + **granular frequencies** + pillar time budgets |
-| `gameplan_source` | `'local'` \| `'deterministic'` \| `'ai'` \| `'stub'` \| `'fallback'` |
-| `gameplan_error` | Surfaces generation failures (no silent stub when Supabase configured) |
-| `fetchDailyGameplanAsync` | Sole owner of `weeklyMicrocycle` after foundation |
-| `hydrateFoundationFromRemote` | Profile/stats/equipment only — **no gameplan mutation** |
+| `gameplan_source` | `'local'` \| `'deterministic'` \| `'stub'` \| `'fallback'` |
+| `gameplan_error` | Surfaces on-device generation failures |
+| `fetchDailyGameplanAsync` | Sole owner of `weeklyMicrocycle` |
+| `logIronSet` | Writes to `performance_logs` only — no per-set cloud sync |
 
-### Head Coach data path (V8 — client-first)
+### Head Coach data path (V8 — local-first only)
 
 ```
+app/index.tsx → Redirect /(tabs)/home
+LocalBootstrap → seed default athlete (first launch) → fetchDailyGameplanAsync
 fetchDailyGameplanAsync
   → fetchDailyGameplan (lib/gameplan/fetchDailyGameplan.ts)
-      → cache hit? daily_protocols (today)
-      → else generateDeterministicGameplan (lib/gameplan/engine/)
-          → fetchLibraryExercises / Combat / FlowSpirit (cached v3)
-          → user_biological (frequency_iron/combat/spirit, time budgets, goals)
-          → performance_logs (Zustand → engine rows)
-          → user_stats (combat_mastery, spirit_essence)
-      → upsert daily_protocols (source: 'local')
-  → parseGameplan → Home strip → workout screens
+      → generateDeterministicGameplan (lib/gameplan/engine/)
+          → bundled catalog (lib/catalog/bundledCatalog.ts)
+          → user_biological + performance_logs + user_stats
+      → finalizeGameplanOrdering (neuro-mechanical sort)
+  → weeklyMicrocycle in Zustand → Home strip → workout screens
 ```
 
-**No OpenRouter / Edge call on the standard path.**
+Post-workout: `completeWorkout` / `flushPerformanceQueue` → `lib/local/recalibrate.ts` (same engine).
 
-Post-workout recalibrate (`completeWorkout`, `flushPerformanceQueue`) uses the **same local engine** via `syncPerformanceQueueAndRecalibrate`.
+### Boot (no auth)
 
-### Hydration path (no gameplan race)
+| Component | Behavior |
+|-----------|----------|
+| `app/index.tsx` | Redirect straight to **Daily Command** (`/(tabs)/home`) |
+| `providers/AuthProvider.tsx` | Stub `LOCAL_USER` — always “signed in” locally |
+| `components/routing/LocalBootstrap.tsx` | Auto foundation + gameplan on hydrate |
+| `components/routing/FoundationGuard.tsx` | No-op (no redirects) |
+| `(auth)/*` | Legacy routes; not linked from main flow |
 
-```
-AuthProvider → hydrateLocalStoreFromRemote → hydrateFoundationFromRemote
-Home (foundationComplete) → fetchDailyGameplanAsync
-Command tab save → upsertSteeringWheelSettings → setUserBiological → fetchDailyGameplanAsync({ forceRefresh: true })
-```
-
-### Auth (minimal — DONE)
-
-| Surface | Behavior |
-|---------|----------|
-| `app/(auth)/index.tsx` | **Email magic link only** — no Google OAuth button |
-| `components/auth/EmailAuthPanel.tsx` | Email input + **Send magic link** (full-width); success state “Link dispatched” |
-| Offline | **Begin Awakening** when Supabase env unset |
-
-`signInWithGoogle` remains in `lib/supabase/auth.ts` / `AuthProvider` for legacy redirects only — **do not re-add Google UI** unless requested.
+Command tab save → `setUserBiological` → `fetchDailyGameplanAsync({ forceRefresh: true })` — device only.
 
 ### Repo map (operational)
 
 ```
-app/(auth)/index.tsx                              # welcome · EmailAuthPanel only
+app/index.tsx                                     # → /(tabs)/home
+components/routing/{LocalBootstrap,PerformanceSyncBridge}.tsx
 app/(tabs)/{home,mastery,analytics,profile}.tsx   # profile = Command · analytics = passport + telemetry
+lib/local/{defaultAthlete,recalibrate}.ts
+lib/catalog/bundledCatalog.ts
 app/(workout)/{iron,combat,spirit,ascension,summary}.tsx
 components/auth/EmailAuthPanel.tsx
 components/iron/{RirSelector,LoadTelemetryStrip,ExerciseCueCard,TargetLoadBanner,...}.tsx

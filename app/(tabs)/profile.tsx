@@ -9,11 +9,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BackupRestorePanel } from '@/components/profile/BackupRestorePanel';
 import { LoadTelemetryStrip } from '@/components/iron/LoadTelemetryStrip';
 import { ValueStepper } from '@/components/iron/ValueStepper';
-import { isSupabaseConfigured } from '@/lib/config';
-import { upsertSteeringWheelSettings } from '@/lib/supabase/profile';
-import { useAuth } from '@/providers/AuthProvider';
 import { useSommaStore } from '@/store/useSommaStore';
 import {
   clampPillarFrequency,
@@ -50,7 +48,6 @@ const PILLAR_CONTROLS = [
 
 /** Command Center — granular pillar frequencies & session time budget */
 export default function ProfileScreen() {
-  const { session, refreshRemoteProfile } = useAuth();
   const storedBiological = useSommaStore((state) => state.user_biological);
   const setUserBiological = useSommaStore((state) => state.setUserBiological);
   const fetchDailyGameplanAsync = useSommaStore((state) => state.fetchDailyGameplanAsync);
@@ -60,28 +57,11 @@ export default function ProfileScreen() {
   const [draft, setDraft] = useState<BiologicalProfile>(storedBiological);
   const [timeBudgetId, setTimeBudgetId] = useState<TimeBudgetPresetId>('45');
   const [saving, setSaving] = useState(false);
-  const [hydrating, setHydrating] = useState(false);
 
   useEffect(() => {
     setDraft(storedBiological);
     setTimeBudgetId(inferTimeBudgetPresetId(storedBiological));
   }, [storedBiological]);
-
-  useEffect(() => {
-    if (!isSupabaseConfigured || !session?.user?.id) return;
-
-    let mounted = true;
-    setHydrating(true);
-    void refreshRemoteProfile()
-      .catch(() => undefined)
-      .finally(() => {
-        if (mounted) setHydrating(false);
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, [session?.user?.id, refreshRemoteProfile]);
 
   const activeTrainingDays = useMemo(() => deriveTrainingDaysFromFrequencies(draft), [draft]);
 
@@ -126,10 +106,6 @@ export default function ProfileScreen() {
 
     setSaving(true);
     try {
-      if (isSupabaseConfigured && session?.user?.id) {
-        await upsertSteeringWheelSettings(session.user.id, payload);
-      }
-
       setUserBiological(payload);
       await fetchDailyGameplanAsync({ forceRefresh: true });
 
@@ -163,12 +139,7 @@ export default function ProfileScreen() {
           rebuild your 7-day microcycle immediately.
         </Text>
 
-        {hydrating ? (
-          <View className="mt-10 items-center py-8">
-            <ActivityIndicator color="#BFA06A" />
-          </View>
-        ) : (
-          <View className="mt-10 gap-10">
+        <View className="mt-10 gap-10">
             <LoadTelemetryStrip performanceLogs={performanceLogs} goalIron={draft.goal_iron} />
 
             <View className="rounded-2xl border border-white/10 bg-[#0A0E0C] px-5 py-6">
@@ -262,8 +233,9 @@ export default function ProfileScreen() {
                 Settings synced with Head Coach
               </Text>
             ) : null}
+
+            <BackupRestorePanel />
           </View>
-        )}
       </ScrollView>
     </SafeAreaView>
   );

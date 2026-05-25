@@ -14,9 +14,6 @@ import {
   PILLAR_OPTIONS,
   type FoundationStep,
 } from '@/constants/foundation';
-import { isSupabaseConfigured } from '@/lib/config';
-import { syncFoundationToSupabase } from '@/lib/supabase/profile';
-import { useAuth } from '@/providers/AuthProvider';
 import type { BiologicalProfile } from '@/types/biological';
 import { initialBiologicalProfile, isBiologicalProfileComplete } from '@/types/biological';
 import type { EquipmentTag, FocusPreference, PillarId } from '@/store/useSommaStore';
@@ -24,15 +21,8 @@ import { useSommaStore } from '@/store/useSommaStore';
 
 export default function FoundationScanScreen() {
   const router = useRouter();
-  const { user, isConfigured, isLoading } = useAuth();
   const completeFoundationScan = useSommaStore((state) => state.completeFoundationScan);
   const fetchDailyGameplanAsync = useSommaStore((state) => state.fetchDailyGameplanAsync);
-
-  useEffect(() => {
-    if (isConfigured && !isLoading && !user) {
-      router.replace('/(auth)');
-    }
-  }, [isConfigured, isLoading, user, router]);
 
   const [stepIndex, setStepIndex] = useState(0);
   const [selectedPillarId, setSelectedPillarId] = useState<PillarId | null>(null);
@@ -82,17 +72,6 @@ export default function FoundationScanScreen() {
         available_equipment: selectedEquipment,
         biological,
       });
-
-      const localStats = useSommaStore.getState().user_stats;
-
-      if (isSupabaseConfigured && user?.id) {
-        await syncFoundationToSupabase(user.id, {
-          focus_preference: selectedPreference,
-          available_equipment: selectedEquipment,
-          user_stats: localStats,
-          biological,
-        });
-      }
 
       await fetchDailyGameplanAsync({ forceRefresh: true });
 

@@ -28,11 +28,10 @@ import { resolveIronExerciseView } from '@/lib/iron/resolveExercise';
 import { resolvePrimaryInstruction } from '@/lib/iron/instructionCues';
 import { hapticSetLogged } from '@/lib/haptics';
 import { formatExerciseProgressionHint } from '@/lib/physics/loadTelemetry';
-import { getTargetWeight } from '@/lib/physics/rmCalculator';
+import { getTargetWeightFromLogs } from '@/lib/physics/rmCalculator';
 import type { IronExerciseBiomechanics } from '@/types/catalog';
 import type { IronExercisePrescription } from '@/types/gameplan';
 import type { IronSetLog } from '@/types/performance';
-import { useAuth } from '@/providers/AuthProvider';
 import { useSommaStore } from '@/store/useSommaStore';
 
 type IronPhase = 'lifting' | 'rir_gate' | 'resting' | 'done';
@@ -69,7 +68,7 @@ function stubPrescriptionFromTemplate(template: IronExerciseTemplate): IronExerc
 }
 
 export default function IronModeScreen() {
-  const { user } = useAuth();
+  const performanceLogs = useSommaStore((state) => state.performance_logs);
   const { blockId, title } = useLocalSearchParams<{ blockId?: string; title?: string }>();
   useRequireDailyScan({ blockId, title, pillar: 'iron' });
   const { activeBlock, isReady, waitingForBlock } = useWorkoutBlockReady(blockId);
@@ -78,7 +77,6 @@ export default function IronModeScreen() {
   const goalIron = useSommaStore((state) => state.user_biological.goal_iron);
   const appendIronSession = useSommaStore((state) => state.appendIronSession);
   const logIronSet = useSommaStore((state) => state.logIronSet);
-  const performanceLogs = useSommaStore((state) => state.performance_logs);
 
   const localFallback = useMemo(() => resolveIronExercise(equipment), [equipment]);
 
@@ -171,7 +169,7 @@ export default function IronModeScreen() {
       : undefined;
 
   useEffect(() => {
-    if (!user?.id || !exercise?.exercise_id) {
+    if (!exercise?.exercise_id) {
       setE1rmTargetWeight(null);
       return;
     }
@@ -181,22 +179,16 @@ export default function IronModeScreen() {
       return;
     }
 
-    let cancelled = false;
-    void getTargetWeight(
-      user.id,
+    const resolved = getTargetWeightFromLogs(
+      performanceLogs,
       exercise.exercise_id,
       exercise.target_reps,
       exercise.target_rir,
       goalIron,
-    ).then((resolved) => {
-      if (!cancelled) setE1rmTargetWeight(resolved);
-    });
-
-    return () => {
-      cancelled = true;
-    };
+    );
+    setE1rmTargetWeight(resolved);
   }, [
-    user?.id,
+    performanceLogs,
     exercise?.exercise_id,
     exercise?.target_reps,
     exercise?.target_rir,
