@@ -157,13 +157,14 @@ export default function IronModeScreen() {
     [catalog, exercise?.exercise_id],
   );
   const totalSets = exercise?.target_sets ?? 4;
+  const activePrescription = prescriptions[exerciseIndex];
+  const prescriptionIsPassportBaseline =
+    activePrescription?.progression_note?.includes('Passport baseline') ?? false;
 
   const prescribedTargetKg = useMemo(() => {
-    const raw = prescriptions.length
-      ? prescriptions[exerciseIndex]?.target_weight_kg
-      : exercise?.target_weight_kg;
+    const raw = prescriptions.length ? activePrescription?.target_weight_kg : null;
     return raw != null && raw > 0 ? raw : null;
-  }, [prescriptions, exerciseIndex, exercise?.target_weight_kg]);
+  }, [prescriptions.length, activePrescription?.target_weight_kg]);
 
   const passportTargetKg = useMemo(() => {
     if (!exercise) return null;
@@ -190,9 +191,9 @@ export default function IronModeScreen() {
 
   const targetLoadSource: 'prescription' | 'e1rm' | 'passport' | undefined = e1rmTargetWeight
     ? 'e1rm'
-    : prescribedTargetKg
+    : prescribedTargetKg && !prescriptionIsPassportBaseline
       ? 'prescription'
-      : passportTargetKg
+      : prescribedTargetKg || passportTargetKg
         ? 'passport'
         : undefined;
 
