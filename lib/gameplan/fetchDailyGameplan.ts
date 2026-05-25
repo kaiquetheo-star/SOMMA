@@ -41,6 +41,8 @@ export interface FetchDailyGameplanInput {
   biological: BiologicalProfile;
   userStats: UserStats;
   performanceLogs: PerformanceLogEntry[];
+  /** Metabolic Steering: true when 2+ consecutive deficit days detected */
+  glycogenDepleted?: boolean;
 }
 
 export interface FetchDailyGameplanResult {
@@ -84,6 +86,7 @@ export async function fetchDailyGameplan({
   biological,
   userStats,
   performanceLogs,
+  glycogenDepleted,
 }: FetchDailyGameplanInput): Promise<FetchDailyGameplanResult> {
   const trainingDaysPerWeek = deriveTrainingDaysFromFrequencies(biological);
 
@@ -100,6 +103,7 @@ export async function fetchDailyGameplan({
       biological,
       userStats,
       performanceLogs,
+      glycogenDepleted,
     });
     const gameplan = await finalizeGameplanOrdering(generated);
 
