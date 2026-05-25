@@ -185,6 +185,7 @@ export async function generateDeterministicGameplan(
         pillarTime,
         mesocycleWeek,
         input.biological.clinical_exit_interview,
+        input.biological.target_archetype,
       );
       ironBlockForPrereqs.order = order++;
       blocks.push(ironBlockForPrereqs);
