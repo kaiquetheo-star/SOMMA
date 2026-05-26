@@ -308,7 +308,7 @@ export default function IronModeScreen() {
     setPhase('rir_gate');
   };
 
-  const commitSetWithRir = async (reportedRir: number) => {
+  const commitSetWithRir = (reportedRir: number) => {
     if (!exercise || !pendingSet) return;
 
     const entry: IronSetLog = {
@@ -321,10 +321,6 @@ export default function IronModeScreen() {
       rest_seconds_used: restBeforeSet,
       logged_at: new Date().toISOString(),
     };
-    setRestBeforeSet(0);
-    setPendingSet(null);
-    setPendingReportedRir(null);
-
     setLogs((prev) => [...prev, entry]);
     logIronSet({
       block_id: resolvedBlockId,
@@ -333,20 +329,26 @@ export default function IronModeScreen() {
       set: entry,
       target_rir: exercise.target_rir,
     });
-    await hapticSetLogged();
+
+    setRestBeforeSet(0);
+    setPendingSet(null);
+    setPendingReportedRir(null);
 
     if (currentSet >= totalSets) {
       setPhase('done');
+      void hapticSetLogged();
       return;
     }
 
+    const prescribedRestSeconds = exercise.rest_seconds ?? DEFAULT_REST_SECONDS;
     setPhase('resting');
-    start(exercise.rest_seconds);
+    start(prescribedRestSeconds);
+    void hapticSetLogged();
   };
 
   const handleConfirmRir = () => {
     if (pendingReportedRir == null) return;
-    void commitSetWithRir(pendingReportedRir);
+    commitSetWithRir(pendingReportedRir);
   };
 
   const advanceToNextExercise = () => {
