@@ -1,6 +1,7 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
+
+import { sommaPersistStorage } from '@/lib/storage/persistStorage';
 
 import { fetchDailyGameplan } from '@/lib/gameplan/fetchDailyGameplan';
 import { isGameplanFetchError } from '@/lib/gameplan/gameplanErrors';
@@ -187,6 +188,8 @@ function upsertIronSetLog(
 }
 
 interface SommaState {
+  /** False until persist rehydration completes — never written to storage */
+  _hasHydrated: boolean;
   user_environment: UserEnvironment;
   user_stats: UserStats;
   user_foundation: UserFoundation;
@@ -282,6 +285,7 @@ function findSessionForBlock(
 export const useSommaStore = create<SommaState>()(
   persist(
     (set, get) => ({
+      _hasHydrated: false,
       user_environment: initialEnvironment,
       user_stats: initialStats,
       user_foundation: initialFoundation,
@@ -725,6 +729,7 @@ export const useSommaStore = create<SommaState>()(
 
       resetStore: async () => {
         set({
+          _hasHydrated: true,
           user_environment: { ...initialEnvironment },
           user_stats: { ...initialStats },
           user_foundation: { ...initialFoundation },
@@ -759,11 +764,13 @@ export const useSommaStore = create<SommaState>()(
         }
 
         const patch: SommaPersistedSnapshot & {
+          _hasHydrated: boolean;
           performance_syncing: boolean;
           gameplan_loading: boolean;
           gameplan_error: string | null;
         } = {
           ...snapshot,
+          _hasHydrated: true,
           performance_syncing: false,
           gameplan_loading: false,
           gameplan_error: null,
@@ -778,7 +785,8 @@ export const useSommaStore = create<SommaState>()(
     }),
     {
       name: 'somma-offline-store',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: sommaPersistStorage,
+      skipHydration: true,
       partialize: (state) => ({
         user_environment: state.user_environment,
         user_stats: state.user_stats,
@@ -795,8 +803,14 @@ export const useSommaStore = create<SommaState>()(
         performanceQueue: state.performanceQueue,
         lastWorkoutSummary: state.lastWorkoutSummary,
       }),
-      onRehydrateStorage: () => (state) => {
-        if (!state) return;
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          console.warn('[SOMMA] Persist rehydrate error:', error);
+        }
+        if (!state) {
+          useSommaStore.setState({ _hasHydrated: true });
+          return;
+        }
         if (!state.user_biological) {
           state.user_biological = { ...initialBiologicalProfile };
         } else {
@@ -856,6 +870,8 @@ export const useSommaStore = create<SommaState>()(
           state.protocolGeneratedAt = null;
           state.gameplan_source = null;
         }
+
+        useSommaStore.setState({ _hasHydrated: true });
       },
     },
   ),

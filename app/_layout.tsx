@@ -18,6 +18,7 @@ import { useEffect, type ReactNode } from 'react';
 import 'react-native-reanimated';
 
 import { FontFamily } from '@/constants/typography';
+import { HydrationGate } from '@/components/routing/HydrationGate';
 import { LocalBootstrap } from '@/components/routing/LocalBootstrap';
 import { PerformanceSyncBridge } from '@/components/routing/PerformanceSyncBridge';
 import { AuthProvider } from '@/providers/AuthProvider';
@@ -82,17 +83,19 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <SplashGate fontsReady={loaded}>
-        <LocalBootstrap />
-        <PerformanceSyncBridge />
-        <ThemeProvider value={SommaDarkTheme}>
-          <Stack
-            screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0F1512' } }}
-          >
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="(workout)" />
-            <Stack.Screen name="(auth)" />
-          </Stack>
-        </ThemeProvider>
+        <HydrationGate>
+          <LocalBootstrap />
+          <PerformanceSyncBridge />
+          <ThemeProvider value={SommaDarkTheme}>
+            <Stack
+              screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0F1512' } }}
+            >
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="(workout)" />
+              <Stack.Screen name="(auth)" />
+            </Stack>
+          </ThemeProvider>
+        </HydrationGate>
       </SplashGate>
     </AuthProvider>
   );

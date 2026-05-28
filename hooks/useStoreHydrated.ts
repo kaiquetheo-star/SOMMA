@@ -1,21 +1,6 @@
-import { useEffect, useState } from 'react';
-
 import { useSommaStore } from '@/store/useSommaStore';
 
-/** True after AsyncStorage persist has finished rehydrating the offline store */
+/** True after offline store rehydration — safe to read/write persisted fields. */
 export function useStoreHydrated(): boolean {
-  const [hydrated, setHydrated] = useState(() => useSommaStore.persist.hasHydrated());
-
-  useEffect(() => {
-    if (useSommaStore.persist.hasHydrated()) {
-      setHydrated(true);
-      return;
-    }
-
-    return useSommaStore.persist.onFinishHydration(() => {
-      setHydrated(true);
-    });
-  }, []);
-
-  return hydrated;
+  return useSommaStore((state) => state._hasHydrated);
 }

@@ -78,7 +78,7 @@ export default function DailyCommandScreen() {
   });
 
   useEffect(() => {
-    if (!foundationComplete) return;
+    if (!storeHydrated || !foundationComplete) return;
 
     if (isProtocolDateStale(protocolDate) || !weeklyMicrocycle) {
       fetchDailyGameplanAsync();
@@ -87,6 +87,7 @@ export default function DailyCommandScreen() {
 
     ensureDailyGameplan();
   }, [
+    storeHydrated,
     foundationComplete,
     protocolDate,
     weeklyMicrocycle,
@@ -95,9 +96,9 @@ export default function DailyCommandScreen() {
   ]);
 
   useEffect(() => {
-    if (!foundationComplete) return;
+    if (!storeHydrated || !foundationComplete) return;
     void prefetchLibraryCatalogs();
-  }, [foundationComplete]);
+  }, [storeHydrated, foundationComplete]);
 
   const dayBlocks = selectedDay?.blocks ?? [];
   const completedCount = dayBlocks.filter((block) => block.status === 'completed').length;
