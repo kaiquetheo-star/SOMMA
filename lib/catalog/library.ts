@@ -34,9 +34,9 @@ const LIBRARY_FLOW_SPIRIT_SELECT =
   'id, slug, pillar, session_name, description, duration_minutes, tempo_profile, complexity_level, target_recovery_zones, complexity_tier, is_dynamic_flow, default_hold_seconds';
 
 const CACHE_KEYS = {
-  exercises: 'somma-cache-library-exercises-v3',
-  combat: 'somma-cache-library-combat-v3',
-  flowSpirit: 'somma-cache-library-flow-spirit-v3',
+  exercises: 'somma-cache-library-exercises-v4',
+  combat: 'somma-cache-library-combat-v4',
+  flowSpirit: 'somma-cache-library-flow-spirit-v4',
 } as const;
 
 const CACHE_TTL_MS = 1000 * 60 * 60 * 12;
@@ -190,12 +190,6 @@ async function fetchTable<T>(
 ): Promise<T[]> {
   if (memoryRef.current?.length) return memoryRef.current;
 
-  const cached = await readCache<T>(cacheKey);
-  if (cached?.length) {
-    memoryRef.current = cached;
-    return cached;
-  }
-
   if (LOCAL_FIRST_MODE) {
     const bundled =
       table === 'library_exercises'
@@ -209,6 +203,12 @@ async function fetchTable<T>(
       await writeCache(cacheKey, bundled);
       return bundled;
     }
+  }
+
+  const cached = await readCache<T>(cacheKey);
+  if (cached?.length) {
+    memoryRef.current = cached;
+    return cached;
   }
 
   const stale = await readCache<T>(cacheKey, { allowStale: true });

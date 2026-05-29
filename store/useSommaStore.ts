@@ -24,6 +24,7 @@ import {
   DEFAULT_TRAINING_DAYS_PER_WEEK,
   initialBiologicalProfile,
   isBiologicalProfileComplete,
+  normalizeBodyFatFields,
 } from '@/types/biological';
 import type {
   DailyGameplan,
@@ -335,9 +336,10 @@ export const useSommaStore = create<SommaState>()(
         })),
 
       setUserBiological: (patch) =>
-        set((state) => ({
-          user_biological: { ...state.user_biological, ...patch },
-        })),
+        set((state) => {
+          const merged = { ...state.user_biological, ...patch, ...normalizeBodyFatFields({ ...state.user_biological, ...patch }) };
+          return { user_biological: merged };
+        }),
 
       setSelectedDayIndex: (dayIndex) =>
         set({
@@ -850,6 +852,10 @@ export const useSommaStore = create<SommaState>()(
           state.user_biological = {
             ...initialBiologicalProfile,
             ...state.user_biological,
+            ...normalizeBodyFatFields({
+              ...initialBiologicalProfile,
+              ...state.user_biological,
+            }),
             training_days_per_week:
               state.user_biological.training_days_per_week ?? DEFAULT_TRAINING_DAYS_PER_WEEK,
           };

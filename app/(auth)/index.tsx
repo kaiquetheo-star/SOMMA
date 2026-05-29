@@ -1,6 +1,5 @@
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useRef } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -13,11 +12,10 @@ export default function WelcomeAuthScreen() {
   const router = useRouter();
   const { isConfigured, isLoading, session } = useAuth();
 
+  const hasHydrated = useSommaStore((state) => state._hasHydrated);
   const userFoundation = useSommaStore((state) => state.user_foundation);
   const userEnvironment = useSommaStore((state) => state.user_environment);
   const userBiological = useSommaStore((state) => state.user_biological);
-
-  const hasRoutedRef = useRef(false);
 
   const foundationComplete = hasCompletedFoundationScan({
     user_foundation: userFoundation,
@@ -25,24 +23,8 @@ export default function WelcomeAuthScreen() {
     user_biological: userBiological,
   });
 
-  useEffect(() => {
-    hasRoutedRef.current = false;
-  }, [session?.user?.id, foundationComplete]);
-
-  useEffect(() => {
-    if (!isConfigured || isLoading || !session || hasRoutedRef.current) return;
-
-    hasRoutedRef.current = true;
-
-    if (foundationComplete) {
-      router.replace('/(tabs)/home');
-      return;
-    }
-
-    router.replace('/(auth)/foundation');
-  }, [isConfigured, isLoading, session, foundationComplete, router]);
-
   const handleBeginAwakeningOffline = () => {
+    if (!hasHydrated) return;
     if (foundationComplete) {
       router.replace('/(tabs)/home');
       return;
@@ -50,7 +32,7 @@ export default function WelcomeAuthScreen() {
     router.push('/(auth)/foundation');
   };
 
-  if (isConfigured && isLoading) {
+  if (!hasHydrated) {
     return (
       <SafeAreaView className="flex-1 items-center justify-center bg-obsidian">
         <ActivityIndicator color="#BFA06A" />
@@ -58,7 +40,7 @@ export default function WelcomeAuthScreen() {
     );
   }
 
-  if (isConfigured && session && !hasRoutedRef.current) {
+  if (isConfigured && isLoading) {
     return (
       <SafeAreaView className="flex-1 items-center justify-center bg-obsidian">
         <ActivityIndicator color="#BFA06A" />

@@ -1,4 +1,9 @@
-import { ageFromDateOfBirth, type BiologicalProfile, type TargetArchetype } from '@/types/biological';
+import {
+  ageFromDateOfBirth,
+  getBodyFatPercentage,
+  type BiologicalProfile,
+  type TargetArchetype,
+} from '@/types/biological';
 
 export type NutritionStatus = 'DEFICIT' | 'ON_TARGET' | 'SURPLUS';
 
@@ -62,7 +67,7 @@ export function calculateMacroTargets(profile: BiologicalProfile): MacroTargets 
   if (!target_archetype || weight_kg == null || weight_kg <= 0) return null;
   if (height_cm == null || height_cm <= 0) return null;
 
-  const bodyFat = profile.current_body_fat_estimate ?? profile.body_fat_percentage;
+  const bodyFat = getBodyFatPercentage(profile);
   const age = ageFromDateOfBirth(date_of_birth);
 
   let bmr: number;

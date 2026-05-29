@@ -12,7 +12,9 @@ import type { LibraryExercise } from '@/types/catalog';
 import type { EquipmentTag } from '@/store/useSommaStore';
 
 import { MICROCYCLE_FOCUS_ROTATIONS } from '@/lib/gameplan/engine/constants';
+import type { DeterministicGenerationContext } from '@/lib/gameplan/engine/generation';
 import { selectExercisesByIronBlueprint } from '@/lib/gameplan/engine/ironBlueprints';
+import { maxIronExercisesForMinutes } from '@/lib/gameplan/engine/volumePruning';
 import {
   BIOMECH_SLUG_CHEST_OPENER,
   BIOMECH_SLUG_MALASANA,
@@ -65,17 +67,22 @@ export function isHypertrophyGoal(goalIron: string | null): boolean {
 }
 
 export function targetIronExerciseCount(minutes: number, goalIron: string | null = null): number {
+  const { cap } = maxIronExercisesForMinutes(minutes);
+
+  let target: number;
   if (isHypertrophyGoal(goalIron)) {
-    if (minutes <= 50) return 6;
-    if (minutes <= 65) return 7;
-    if (minutes <= 80) return 8;
-    return 8;
+    if (minutes <= 30) target = 3;
+    else if (minutes <= 45) target = 4;
+    else target = 6;
+  } else if (minutes <= 30) {
+    target = 3;
+  } else if (minutes <= 45) {
+    target = 4;
+  } else {
+    target = 6;
   }
-  if (minutes <= 35) return 3;
-  if (minutes <= 50) return 4;
-  if (minutes <= 65) return 5;
-  if (minutes <= 80) return 6;
-  return 8;
+
+  return Math.min(cap, target);
 }
 
 export function targetCombatRoundCount(minutes: number): number {
@@ -192,6 +199,7 @@ export function selectExercisesForSplit(
   equipment: EquipmentTag[],
   targetCount: number,
   blockedJointProfiles: string[],
+  generation: DeterministicGenerationContext,
 ): string[] {
   return selectExercisesByIronBlueprint(
     focusLabel,
@@ -199,6 +207,7 @@ export function selectExercisesForSplit(
     equipment,
     targetCount,
     blockedJointProfiles,
+    generation,
   );
 }
 

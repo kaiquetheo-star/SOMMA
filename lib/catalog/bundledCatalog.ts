@@ -2,14 +2,21 @@ import type {
   LibraryCombatCombo,
   LibraryExercise,
   LibraryFlowSpiritSession,
+  MovementPattern,
 } from '@/types/catalog';
 
 function iron(
   slug: string,
   name: string,
   primaryMuscle: string,
+  movementPattern: MovementPattern,
   equipment: string[] = ['barbell', 'dumbbells', 'full_gym'],
+  options?: { cns?: number; stretch?: boolean },
 ): LibraryExercise {
+  const cns =
+    options?.cns ??
+    (movementPattern === 'squat' || movementPattern === 'hinge' ? 5 : movementPattern === 'isolation' ? 2 : 4);
+
   return {
     id: `local-${slug}`,
     slug,
@@ -22,40 +29,105 @@ function iron(
     },
     equipment_required: equipment,
     default_sets: 4,
-    default_reps: 8,
-    movement_pattern: null,
+    default_reps: movementPattern === 'isolation' ? 12 : 8,
+    movement_pattern: movementPattern,
     primary_muscle: primaryMuscle,
     synergist_muscles: [],
-    cns_fatigue_cost: slug.includes('squat') || slug.includes('deadlift') ? 5 : 3,
+    cns_fatigue_cost: cns,
     joint_stress_profile: null,
-    stretch_mediated_hypertrophy: slug.includes('fly'),
+    stretch_mediated_hypertrophy: options?.stretch ?? /fly|pullover|curl/.test(slug),
   };
 }
 
 const BUNDLED_EXERCISES: LibraryExercise[] = [
-  iron('barbell_bench_press', 'Barbell Bench Press', 'chest'),
-  iron('barbell_incline_bench_press', 'Barbell Incline Bench Press', 'chest'),
-  iron('cable_fly', 'Cable Fly', 'chest', ['full_gym', 'dumbbells']),
-  iron('overhead_press', 'Overhead Press', 'shoulders'),
-  iron('barbell_overhead_press', 'Barbell Overhead Press', 'shoulders'),
-  iron('cable_pushdown', 'Cable Triceps Pushdown', 'triceps', ['full_gym']),
-  iron('cable_pushdown_with_rope_attachment', 'Rope Triceps Pushdown', 'triceps', ['full_gym']),
-  iron('abdominal_crunch', 'Abdominal Crunch', 'core', ['bodyweight', 'full_gym']),
-  iron('cable_bar_lateral_pulldown', 'Lat Pulldown', 'back', ['full_gym']),
-  iron('barbell_bent_over_row', 'Barbell Bent-Over Row', 'back'),
-  iron('reverse_dumbbell_fly', 'Reverse Dumbbell Fly', 'rear delts', ['dumbbells', 'full_gym']),
-  iron('dumbbell_reverse_fly', 'Dumbbell Reverse Fly', 'rear delts', ['dumbbells']),
-  iron('barbell_curl', 'Barbell Curl', 'biceps'),
-  iron('hammer_curl', 'Hammer Curl', 'biceps', ['dumbbells']),
-  iron('dumbbell_hammer_curl', 'Dumbbell Hammer Curl', 'biceps', ['dumbbells']),
-  iron('barbell_squat', 'Barbell Back Squat', 'quads'),
-  iron('leg_press', 'Leg Press', 'quads', ['full_gym']),
-  iron('romanian_deadlift', 'Romanian Deadlift', 'hamstrings'),
-  iron('leg_curl', 'Leg Curl', 'hamstrings', ['full_gym']),
-  iron('barbell_seated_calf_raise', 'Seated Calf Raise', 'calves', ['full_gym', 'barbell']),
-  iron('standing_calf_raise', 'Standing Calf Raise', 'calves', ['bodyweight', 'full_gym']),
-  iron('squat_malasana', 'Malasana Squat', 'hips', ['bodyweight']),
-  iron('sphinx', 'Sphinx Pose', 'chest', ['bodyweight']),
+  // —— Push / chest compounds ——
+  iron('barbell_bench_press', 'Barbell Bench Press', 'chest', 'push'),
+  iron('dumbbell_bench_press', 'Dumbbell Bench Press', 'chest', 'push', ['dumbbells', 'full_gym']),
+  iron('barbell_incline_bench_press', 'Barbell Incline Bench Press', 'chest', 'push'),
+  iron('dumbbell_incline_press', 'Dumbbell Incline Press', 'chest', 'push', ['dumbbells', 'full_gym']),
+  iron('decline_barbell_bench', 'Decline Barbell Bench Press', 'chest', 'push'),
+  iron('machine_chest_press', 'Machine Chest Press', 'chest', 'push', ['full_gym']),
+  iron('push_up', 'Push-Up', 'chest', 'push', ['bodyweight', 'full_gym'], { cns: 2 }),
+
+  // —— Push / shoulders ——
+  iron('barbell_overhead_press', 'Barbell Overhead Press', 'shoulders', 'push'),
+  iron('overhead_press', 'Standing Overhead Press', 'shoulders', 'push'),
+  iron('dumbbell_shoulder_press', 'Dumbbell Shoulder Press', 'shoulders', 'push', ['dumbbells', 'full_gym']),
+  iron('arnold_press', 'Arnold Press', 'shoulders', 'push', ['dumbbells', 'full_gym'], { cns: 3 }),
+  iron('landmine_press', 'Landmine Press', 'shoulders', 'push', ['barbell', 'full_gym'], { cns: 3 }),
+
+  // —— Push / isolations ——
+  iron('cable_fly', 'Cable Fly', 'chest', 'isolation', ['full_gym'], { stretch: true }),
+  iron('dumbbell_fly', 'Dumbbell Fly', 'chest', 'isolation', ['dumbbells', 'full_gym'], { stretch: true }),
+  iron('pec_deck', 'Pec Deck Fly', 'chest', 'isolation', ['full_gym'], { stretch: true }),
+  iron('lateral_raise', 'Lateral Raise', 'shoulders', 'isolation', ['dumbbells', 'full_gym']),
+  iron('cable_lateral_raise', 'Cable Lateral Raise', 'shoulders', 'isolation', ['full_gym']),
+  iron('front_raise', 'Front Raise', 'shoulders', 'isolation', ['dumbbells', 'full_gym']),
+  iron('cable_pushdown', 'Cable Triceps Pushdown', 'triceps', 'isolation', ['full_gym']),
+  iron('cable_pushdown_with_rope_attachment', 'Rope Triceps Pushdown', 'triceps', 'isolation', ['full_gym']),
+  iron('skullcrusher', 'EZ-Bar Skullcrusher', 'triceps', 'isolation', ['barbell', 'full_gym']),
+  iron('overhead_tricep_extension', 'Overhead Triceps Extension', 'triceps', 'isolation', ['dumbbells', 'full_gym']),
+  iron('dip', 'Parallel Bar Dip', 'triceps', 'push', ['bodyweight', 'full_gym'], { cns: 3 }),
+
+  // —— Pull / back compounds ——
+  iron('barbell_bent_over_row', 'Barbell Bent-Over Row', 'back', 'pull'),
+  iron('pendlay_row', 'Pendlay Row', 'back', 'pull'),
+  iron('dumbbell_row', 'Single-Arm Dumbbell Row', 'back', 'pull', ['dumbbells', 'full_gym']),
+  iron('chest_supported_row', 'Chest-Supported Row', 'back', 'pull', ['full_gym', 'dumbbells']),
+  iron('cable_bar_lateral_pulldown', 'Lat Pulldown', 'lats', 'pull', ['full_gym']),
+  iron('lat_pulldown', 'Wide-Grip Lat Pulldown', 'lats', 'pull', ['full_gym']),
+  iron('pull_up', 'Pull-Up', 'lats', 'pull', ['bodyweight', 'pull_up_bar', 'full_gym'], { cns: 4 }),
+  iron('chin_up', 'Chin-Up', 'lats', 'pull', ['bodyweight', 'pull_up_bar', 'full_gym'], { cns: 4 }),
+  iron('seated_cable_row', 'Seated Cable Row', 'back', 'pull', ['full_gym']),
+  iron('t_bar_row', 'T-Bar Row', 'back', 'pull', ['barbell', 'full_gym'], { cns: 4 }),
+
+  // —— Pull / isolations ——
+  iron('reverse_dumbbell_fly', 'Reverse Dumbbell Fly', 'rear delts', 'isolation', ['dumbbells', 'full_gym']),
+  iron('dumbbell_reverse_fly', 'Dumbbell Reverse Fly', 'rear delts', 'isolation', ['dumbbells']),
+  iron('face_pull', 'Cable Face Pull', 'rear delts', 'isolation', ['full_gym']),
+  iron('barbell_curl', 'Barbell Curl', 'biceps', 'isolation', ['barbell', 'full_gym']),
+  iron('ez_bar_curl', 'EZ-Bar Curl', 'biceps', 'isolation', ['barbell', 'full_gym']),
+  iron('hammer_curl', 'Hammer Curl', 'biceps', 'isolation', ['dumbbells', 'full_gym']),
+  iron('dumbbell_hammer_curl', 'Dumbbell Hammer Curl', 'biceps', 'isolation', ['dumbbells']),
+  iron('incline_dumbbell_curl', 'Incline Dumbbell Curl', 'biceps', 'isolation', ['dumbbells', 'full_gym'], {
+    stretch: true,
+  }),
+  iron('preacher_curl', 'Preacher Curl', 'biceps', 'isolation', ['full_gym', 'barbell']),
+
+  // —— Squat / quad ——
+  iron('barbell_squat', 'Barbell Back Squat', 'quads', 'squat'),
+  iron('front_squat', 'Front Squat', 'quads', 'squat', ['barbell', 'full_gym'], { cns: 5 }),
+  iron('goblet_squat', 'Goblet Squat', 'quads', 'squat', ['dumbbells', 'kettlebell', 'full_gym'], { cns: 3 }),
+  iron('leg_press', 'Leg Press', 'quads', 'squat', ['full_gym'], { cns: 4 }),
+  iron('hack_squat', 'Hack Squat', 'quads', 'squat', ['full_gym'], { cns: 4 }),
+  iron('bulgarian_split_squat', 'Bulgarian Split Squat', 'quads', 'lunge', ['dumbbells', 'full_gym'], { cns: 4 }),
+  iron('walking_lunge', 'Walking Lunge', 'quads', 'lunge', ['dumbbells', 'bodyweight', 'full_gym'], { cns: 3 }),
+  iron('leg_extension', 'Leg Extension', 'quads', 'isolation', ['full_gym']),
+
+  // —— Hinge / posterior ——
+  iron('conventional_deadlift', 'Conventional Deadlift', 'hamstrings', 'hinge'),
+  iron('romanian_deadlift', 'Romanian Deadlift', 'hamstrings', 'hinge'),
+  iron('trap_bar_deadlift', 'Trap-Bar Deadlift', 'hamstrings', 'hinge', ['barbell', 'full_gym'], { cns: 5 }),
+  iron('hip_thrust', 'Barbell Hip Thrust', 'glutes', 'hinge', ['barbell', 'full_gym'], { cns: 4 }),
+  iron('back_extension', '45° Back Extension', 'lower back', 'hinge', ['full_gym', 'bodyweight'], { cns: 2 }),
+  iron('leg_curl', 'Lying Leg Curl', 'hamstrings', 'isolation', ['full_gym'], { stretch: true }),
+  iron('seated_leg_curl', 'Seated Leg Curl', 'hamstrings', 'isolation', ['full_gym'], { stretch: true }),
+
+  // —— Calves / carry ——
+  iron('barbell_seated_calf_raise', 'Seated Calf Raise', 'calves', 'isolation', ['full_gym', 'barbell']),
+  iron('standing_calf_raise', 'Standing Calf Raise', 'calves', 'isolation', ['bodyweight', 'full_gym']),
+  iron('farmers_walk', 'Farmer Carry', 'traps', 'carry', ['dumbbells', 'kettlebell', 'full_gym'], { cns: 3 }),
+  iron('suitcase_carry', 'Suitcase Carry', 'core', 'carry', ['dumbbells', 'kettlebell', 'full_gym'], { cns: 2 }),
+
+  // —— Core / mobility ——
+  iron('abdominal_crunch', 'Abdominal Crunch', 'core', 'isolation', ['bodyweight', 'full_gym']),
+  iron('cable_crunch', 'Cable Crunch', 'core', 'isolation', ['full_gym']),
+  iron('hanging_leg_raise', 'Hanging Leg Raise', 'core', 'isolation', ['pull_up_bar', 'full_gym'], { cns: 2 }),
+  iron('pallof_press', 'Pallof Press', 'core', 'isolation', ['full_gym']),
+  iron('plank', 'Plank Hold', 'core', 'isolation', ['bodyweight'], { cns: 1 }),
+  iron('dead_bug', 'Dead Bug', 'core', 'isolation', ['bodyweight'], { cns: 1 }),
+  iron('squat_malasana', 'Malasana Squat', 'hips', 'squat', ['bodyweight'], { cns: 1 }),
+  iron('sphinx', 'Sphinx Pose', 'chest', 'isolation', ['bodyweight'], { cns: 1 }),
 ];
 
 const BUNDLED_COMBAT: LibraryCombatCombo[] = [
@@ -140,6 +212,10 @@ const BUNDLED_FLOW_SPIRIT: LibraryFlowSpiritSession[] = [
 
 export function getBundledExercises(): LibraryExercise[] {
   return BUNDLED_EXERCISES;
+}
+
+export function getBundledExerciseCount(): number {
+  return BUNDLED_EXERCISES.length;
 }
 
 export function getBundledCombat(): LibraryCombatCombo[] {

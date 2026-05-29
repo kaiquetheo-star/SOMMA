@@ -20,6 +20,7 @@ import 'react-native-reanimated';
 import { FontFamily } from '@/constants/typography';
 import { HydrationGate } from '@/components/routing/HydrationGate';
 import { LocalBootstrap } from '@/components/routing/LocalBootstrap';
+import { PassportNavigationGuard } from '@/components/routing/PassportNavigationGuard';
 import { PerformanceSyncBridge } from '@/components/routing/PerformanceSyncBridge';
 import { AuthProvider } from '@/providers/AuthProvider';
 
@@ -84,6 +85,7 @@ export default function RootLayout() {
     <AuthProvider>
       <SplashGate fontsReady={loaded}>
         <HydrationGate>
+          <PassportNavigationGuard />
           <LocalBootstrap />
           <PerformanceSyncBridge />
           <ThemeProvider value={SommaDarkTheme}>

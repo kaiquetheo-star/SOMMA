@@ -39,6 +39,8 @@ import {
   targetCombatRoundCount,
   targetIronExerciseCount,
 } from '@/lib/gameplan/engine/periodization';
+import type { DeterministicGenerationContext } from '@/lib/gameplan/engine/generation';
+import { maxIronExercisesForMinutes, pruneIronExercisesForTimeBudget } from '@/lib/gameplan/engine/volumePruning';
 import { adjustTargetWeightForMonth2 } from '@/lib/gameplan/engine/progression';
 import type { ClinicalExitInterview } from '@/types/clinical';
 import type { TargetArchetype } from '@/types/biological';
@@ -350,10 +352,14 @@ export function buildIronBlock(
   clinicalReview: ClinicalExitInterview | null = null,
   targetArchetype: TargetArchetype | null = null,
   glycogenDepleted = false,
+  generation: DeterministicGenerationContext,
 ): GameplanBlock {
   const isDeload = isDeloadMesocycleWeek(mesocycleWeek);
-  let targetCount = targetIronExerciseCount(pillarTime.available_time_iron, goalIron) + archetypeExerciseCountDelta(targetArchetype);
-  targetCount = Math.max(2, targetCount);
+  const sessionMinutes = pillarTime.available_time_iron;
+  const { cap: timeCap } = maxIronExercisesForMinutes(sessionMinutes);
+  let targetCount =
+    targetIronExerciseCount(sessionMinutes, goalIron) + archetypeExerciseCountDelta(targetArchetype);
+  targetCount = Math.min(timeCap, Math.max(2, targetCount));
   if (isDeload) targetCount = Math.min(targetCount, 4);
   const mrvClamp = glycogenMrvClampFactor(glycogenDepleted);
 
@@ -363,6 +369,7 @@ export function buildIronBlock(
     equipment,
     targetCount,
     autoreg.blocked_joint_profiles,
+    generation,
   );
   if (routineIds.length === 0) {
     routineIds = exerciseIds.slice(0, targetCount);
@@ -381,6 +388,7 @@ export function buildIronBlock(
   );
 
   routineIds = capIronExercisesForDeload(routineIds, isDeload);
+  routineIds = routineIds.slice(0, timeCap);
 
   const mesocycle = buildMesocycleSummaries(routineIds, catalog, ironLogs3w);
   const mesoById = new Map(mesocycle.map((row) => [row.exercise_id, row]));
@@ -413,6 +421,12 @@ export function buildIronBlock(
   }
 
   exercises = sortIronExercises(exercises, catalog, prerequisiteSlugs);
+  exercises = pruneIronExercisesForTimeBudget(
+    exercises,
+    catalog,
+    prerequisiteSlugs,
+    sessionMinutes,
+  );
 
   const names = exercises
     .map((row) => row.display_name)

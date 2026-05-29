@@ -126,6 +126,31 @@ export const initialBiologicalProfile: BiologicalProfile = {
   target_archetype: null,
 };
 
+/** Valid body fat % for passport and physics (0–60). */
+export function clampBodyFatPercent(value: number | null | undefined): number | null {
+  if (value == null || !Number.isFinite(value)) return null;
+  if (value <= 0 || value > 60) return null;
+  return Math.round(value * 10) / 10;
+}
+
+/** Single source of truth — prefers `body_fat_percentage`, falls back to legacy estimate. */
+export function getBodyFatPercentage(profile: BiologicalProfile): number | null {
+  const primary = clampBodyFatPercent(profile.body_fat_percentage);
+  if (primary != null) return primary;
+  return clampBodyFatPercent(profile.current_body_fat_estimate);
+}
+
+/** Keep legacy column in sync when persisting from the one UI field. */
+export function normalizeBodyFatFields(
+  profile: BiologicalProfile,
+): Pick<BiologicalProfile, 'body_fat_percentage' | 'current_body_fat_estimate'> {
+  const unified = getBodyFatPercentage(profile);
+  return {
+    body_fat_percentage: unified,
+    current_body_fat_estimate: unified,
+  };
+}
+
 export function clampMesocycleWeekProfile(value: number | null | undefined): number {
   if (value == null || !Number.isFinite(value)) return 1;
   return Math.min(4, Math.max(1, Math.round(value)));

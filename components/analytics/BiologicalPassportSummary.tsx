@@ -4,6 +4,7 @@ import {
   ageFromDateOfBirth,
   formatTrainingDaysPerWeek,
   type BiologicalProfile,
+  getBodyFatPercentage,
   isBiologicalProfileComplete,
   TARGET_ARCHETYPE_OPTIONS,
 } from '@/types/biological';
@@ -70,19 +71,10 @@ export function BiologicalPassportSummary({ profile, nutritionStatus, nutritionS
       />
       <SummaryRow
         label="Body fat"
-        value={
-          profile.body_fat_percentage != null
-            ? `${profile.body_fat_percentage}%`
-            : 'Not recorded'
-        }
-      />
-      <SummaryRow
-        label="BF estimate"
-        value={
-          profile.current_body_fat_estimate != null
-            ? `${profile.current_body_fat_estimate}%`
-            : '—'
-        }
+        value={(() => {
+          const bf = getBodyFatPercentage(profile);
+          return bf != null ? `${bf}%` : 'Not recorded';
+        })()}
       />
       <SummaryRow
         label="Stress baseline"

@@ -5,7 +5,15 @@ import { webTextInputProps } from '@/lib/ux/webTextInput';
 import { TrainingFrequencySelect } from '@/components/foundation/TrainingFrequencySelect';
 import { ValueStepper } from '@/components/iron/ValueStepper';
 import { RpeSelector } from '@/components/combat/RpeSelector';
-import { TARGET_ARCHETYPE_OPTIONS, type BiologicalProfile, type PillarGoalKey, type TargetArchetype } from '@/types/biological';
+import {
+  clampBodyFatPercent,
+  getBodyFatPercentage,
+  normalizeBodyFatFields,
+  TARGET_ARCHETYPE_OPTIONS,
+  type BiologicalProfile,
+  type PillarGoalKey,
+  type TargetArchetype,
+} from '@/types/biological';
 
 interface BiologicalPassportFormProps {
   value: BiologicalProfile;
@@ -54,28 +62,31 @@ export function BiologicalPassportForm({ value, onChange }: BiologicalPassportFo
 
       <View className="gap-2">
         <Text className="font-body text-[10px] uppercase tracking-[0.35em] text-[#6B7568]">
-          Body fat % (optional)
+          Body fat %
         </Text>
         <TextInput
-          value={
-            value.body_fat_percentage != null ? String(value.body_fat_percentage) : ''
-          }
+          value={(() => {
+            const bf = getBodyFatPercentage(value);
+            return bf != null ? String(bf) : '';
+          })()}
           onChangeText={(text) => {
             const trimmed = text.trim();
             if (!trimmed) {
-              onChange({ body_fat_percentage: null });
+              onChange(normalizeBodyFatFields({ ...value, body_fat_percentage: null, current_body_fat_estimate: null }));
               return;
             }
-            const parsed = Number.parseFloat(trimmed);
-            onChange({
-              body_fat_percentage: Number.isFinite(parsed) ? parsed : null,
-            });
+            const parsed = clampBodyFatPercent(Number.parseFloat(trimmed));
+            onChange(normalizeBodyFatFields({ ...value, body_fat_percentage: parsed }));
           }}
           placeholder="e.g. 18"
           placeholderTextColor="#4A5D44"
           keyboardType="decimal-pad"
           className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 font-body text-base text-[#E8E4DC]"
+          {...webTextInputProps()}
         />
+        <Text className="font-body text-xs text-[#6B7568]">
+          Optional — improves TDEE, macro targets, and natural timeline projections.
+        </Text>
       </View>
 
       <View className="gap-2">
@@ -118,32 +129,6 @@ export function BiologicalPassportForm({ value, onChange }: BiologicalPassportFo
         value={value.training_days_per_week}
         onChange={(training_days_per_week) => onChange({ training_days_per_week })}
       />
-
-      <View className="gap-2">
-        <Text className="font-body text-[10px] uppercase tracking-[0.35em] text-[#6B7568]">
-          Current body fat estimate % (for timeline)
-        </Text>
-        <TextInput
-          value={
-            value.current_body_fat_estimate != null ? String(value.current_body_fat_estimate) : ''
-          }
-          onChangeText={(text) => {
-            const trimmed = text.trim();
-            if (!trimmed) {
-              onChange({ current_body_fat_estimate: null });
-              return;
-            }
-            const parsed = Number.parseFloat(trimmed);
-            onChange({
-              current_body_fat_estimate: Number.isFinite(parsed) && parsed > 0 && parsed <= 60 ? parsed : null,
-            });
-          }}
-          placeholder="e.g. 20"
-          placeholderTextColor="#4A5D44"
-          keyboardType="decimal-pad"
-          className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 font-body text-base text-[#E8E4DC]"
-        />
-      </View>
 
       <View className="gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-5">
         <Text className="font-body text-[10px] uppercase tracking-[0.35em] text-matte-gold/70">

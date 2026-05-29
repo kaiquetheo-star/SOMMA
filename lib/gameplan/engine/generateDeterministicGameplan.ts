@@ -36,6 +36,8 @@ import {
   resolveBiomechanicalPrerequisiteSlugs,
 } from '@/lib/gameplan/engine/clinicalLaws';
 import { MESOCYCLE_DAYS, WEEKLY_VOLUME_DAYS } from '@/lib/gameplan/engine/constants';
+import { buildGenerationContext } from '@/lib/gameplan/engine/generation';
+import { pruneIronBlocksInMicrocycle } from '@/lib/gameplan/engine/volumePruning';
 import { clampMesocycleWeekProfile } from '@/types/biological';
 import { buildClinicalReviewTrigger } from '@/lib/gameplan/engine/progression';
 import {
@@ -144,6 +146,10 @@ export async function generateDeterministicGameplan(
   let ironSlot = 0;
   const protocolDate = input.protocolDate ?? todayDateKey();
   const week_start_date = getWeekStartMonday(protocolDate);
+  const { ctx: generation } = buildGenerationContext({
+    protocolDate,
+    biological: input.biological,
+  });
 
   const microcycle: MicrocycleDay[] = Array.from({ length: 7 }, (_, index) => {
     const day_index = index + 1;
@@ -190,6 +196,7 @@ export async function generateDeterministicGameplan(
         input.biological.clinical_exit_interview,
         input.biological.target_archetype,
         input.glycogenDepleted ?? false,
+        generation,
       );
       ironBlockForPrereqs.order = order++;
       blocks.push(ironBlockForPrereqs);
@@ -257,7 +264,13 @@ export async function generateDeterministicGameplan(
     );
   }
 
-  const orderedMicrocycle = applyNeuroMechanicalOrderingToMicrocycle(microcycle, catalog);
+  let orderedMicrocycle = applyNeuroMechanicalOrderingToMicrocycle(microcycle, catalog);
+
+  pruneIronBlocksInMicrocycle(
+    orderedMicrocycle,
+    catalog,
+    pillarTime.available_time_iron,
+  );
 
   const todayIndex = getDayIndexForDate(protocolDate, week_start_date);
   const blocks = orderedMicrocycle.find((day) => day.day_index === todayIndex)?.blocks ?? [];

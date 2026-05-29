@@ -13,6 +13,7 @@ import type {
 import {
   DEFAULT_TRAINING_DAYS_PER_WEEK,
   initialBiologicalProfile,
+  normalizeBodyFatFields,
   type BiologicalProfile,
 } from '@/types/biological';
 import type { MicrocycleDay } from '@/types/gameplan';
@@ -226,11 +227,16 @@ export function normalizePersistedSnapshot(raw: unknown): SommaPersistedSnapshot
       : null,
   };
 
+  const user_biological_merged: BiologicalProfile = {
+    ...user_biological,
+    ...normalizeBodyFatFields(user_biological),
+  };
+
   return {
     user_environment,
     user_stats,
     user_foundation,
-    user_biological,
+    user_biological: user_biological_merged,
     weeklyMicrocycle: weeklyMicrocycle?.length ? weeklyMicrocycle : null,
     protocolDate,
     weekStartDate,

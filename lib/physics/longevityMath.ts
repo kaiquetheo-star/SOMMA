@@ -1,4 +1,9 @@
-import { ageFromDateOfBirth, type BiologicalProfile, type TargetArchetype } from '@/types/biological';
+import {
+  ageFromDateOfBirth,
+  getBodyFatPercentage,
+  type BiologicalProfile,
+  type TargetArchetype,
+} from '@/types/biological';
 
 export interface NaturalTargetTimeline {
   archetype: TargetArchetype;
@@ -60,11 +65,11 @@ function estimateTrainingYears(age: number | null, trainingDaysPerWeek: number |
 export function calculateNaturalTargetTimeline(
   profile: BiologicalProfile,
 ): NaturalTargetTimeline | null {
-  const { target_archetype, current_body_fat_estimate, weight_kg, height_cm, date_of_birth, training_days_per_week } = profile;
+  const { target_archetype, weight_kg, height_cm, date_of_birth, training_days_per_week } = profile;
 
   if (!target_archetype || weight_kg == null || weight_kg <= 0) return null;
 
-  const currentBf = current_body_fat_estimate ?? profile.body_fat_percentage;
+  const currentBf = getBodyFatPercentage(profile);
   if (currentBf == null || currentBf <= 0 || currentBf > 60) return null;
 
   const targetBf = ARCHETYPE_TARGET_BF[target_archetype];

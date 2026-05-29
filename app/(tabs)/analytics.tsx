@@ -19,6 +19,7 @@ import { useSommaStore } from '@/store/useSommaStore';
 import {
   initialBiologicalProfile,
   isBiologicalProfileComplete,
+  normalizeBodyFatFields,
   type BiologicalProfile,
 } from '@/types/biological';
 
@@ -58,6 +59,7 @@ export default function AnalyticsScreen() {
       const normalized: BiologicalProfile = {
         ...draft,
         current_injuries: draft.current_injuries?.trim() || null,
+        ...normalizeBodyFatFields(draft),
       };
       setUserBiological(normalized);
 
