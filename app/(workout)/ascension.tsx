@@ -13,8 +13,10 @@ import { completionFromParams } from '@/hooks/useWorkoutNavigation';
 import { useSommaStore } from '@/store/useSommaStore';
 
 const FLARE_DURATION_MS = 3000;
+/** Guaranteed return to Daily Command — independent of background sync */
+const NAV_DELAY_MS = 800;
 
-/** The Ascension Flare — 3s lock, background sync, always return to Sanctuary */
+/** The Ascension Flare — brief lock, background sync, always return to Sanctuary */
 export default function AscensionFlareScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{
@@ -31,7 +33,8 @@ export default function AscensionFlareScreen() {
   const completeWorkout = useSommaStore((state) => state.completeWorkout);
 
   const [statusLine, setStatusLine] = useState('Sealing your session');
-  const hasRunRef = useRef(false);
+  const routerRef = useRef(router);
+  routerRef.current = router;
 
   const glowOpacity = useSharedValue(0);
   const glowScale = useSharedValue(0.85);
@@ -42,9 +45,6 @@ export default function AscensionFlareScreen() {
   }, []);
 
   useEffect(() => {
-    if (hasRunRef.current) return;
-    hasRunRef.current = true;
-
     glowOpacity.value = withTiming(1, {
       duration: FLARE_DURATION_MS,
       easing: Easing.out(Easing.cubic),
@@ -53,27 +53,41 @@ export default function AscensionFlareScreen() {
       duration: FLARE_DURATION_MS,
       easing: Easing.out(Easing.cubic),
     });
+  }, [glowOpacity, glowScale]);
 
-    const exitTimer = setTimeout(() => {
-      router.replace('/(tabs)/home');
-    }, FLARE_DURATION_MS);
+  useEffect(() => {
+    const navTimer = setTimeout(() => {
+      try {
+        routerRef.current.replace('/(tabs)/home');
+      } catch {
+        routerRef.current.push('/(tabs)/home');
+      }
+    }, NAV_DELAY_MS);
+
+    return () => clearTimeout(navTimer);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
 
     void (async () => {
       try {
-        setStatusLine('Integrating…');
+        if (!cancelled) setStatusLine('Integrating…');
         const completion = completionFromParams(params);
         if (completion) {
           await completeWorkout(completion);
         }
       } catch {
-        setStatusLine('Saved locally · sync pending');
+        if (!cancelled) setStatusLine('Saved locally · sync pending');
       }
     })();
 
     return () => {
-      clearTimeout(exitTimer);
+      cancelled = true;
     };
-  }, [completeWorkout, glowOpacity, glowScale, params, router]);
+    // Mount-once: route params and store action are fixed for this transition screen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const glowStyle = useAnimatedStyle(() => ({
     opacity: glowOpacity.value * 0.2,
