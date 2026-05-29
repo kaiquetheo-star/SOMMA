@@ -1,5 +1,6 @@
 // CLINICAL ENGINE: DETERMINISTIC ONLY. NO RANDOMNESS ALLOWED. IF INPUTS ARE CONSTANT, OUTPUT MUST BE CONSTANT.
 import type { TargetArchetype, TrainingExperienceLevel } from '@/types/biological';
+import type { LibraryExercise } from '@/types/catalog';
 
 export interface DeterministicGenerationContext {
   protocolDate: string;
@@ -136,4 +137,71 @@ export function reorderBlueprintSlotsForArchetype<T extends { slotId: string }>(
   });
 
   return copy;
+}
+
+export type PullOrientation = 'vertical_pull' | 'horizontal_pull';
+
+/** Chest / pec isolation fly — must never appear on pull or leg days */
+export function isChestIsolationFly(row: { slug: string; name: string; primary_muscle?: string | null }): boolean {
+  const blob = `${row.slug} ${row.name} ${row.primary_muscle ?? ''}`.toLowerCase();
+  if (!/\bfly\b|flye|cable_fly|pec.fly|chest.fly/.test(blob)) return false;
+  if (/rear|reverse|delt|shoulder|face.pull/.test(blob)) return false;
+  return /chest|pec|fly/.test(blob);
+}
+
+export function classifyPullOrientation(row: {
+  slug: string;
+  name: string;
+  primary_muscle?: string | null;
+  movement_pattern?: string | null;
+}): PullOrientation | null {
+  const blob = `${row.slug} ${row.name}`.toLowerCase();
+  if (
+    /pulldown|pull[- ]?down|pull[- ]?up|chin[- ]?up|lat.pulldown|assisted.pull/.test(blob)
+  ) {
+    return 'vertical_pull';
+  }
+  if (/\brow\b|bent.over|seated.cable.row|inverted.row|t.bar|meadows.row|pendlay/.test(blob)) {
+    return 'horizontal_pull';
+  }
+  const muscle = (row.primary_muscle ?? '').toLowerCase();
+  if (muscle.includes('lat') && row.movement_pattern === 'pull') return 'vertical_pull';
+  if ((muscle.includes('back') || muscle.includes('mid_back')) && row.movement_pattern === 'pull') {
+    return 'horizontal_pull';
+  }
+  return null;
+}
+
+export function exerciseAllowedOnIronDay(
+  row: { slug: string; name: string; primary_muscle?: string | null },
+  dayKey: string,
+): boolean {
+  if (isChestIsolationFly(row) && dayKey !== 'push') return false;
+  return true;
+}
+
+export function filterPoolForPullCollision(
+  pool: LibraryExercise[],
+  slotId: string,
+  selectedOrientations: readonly PullOrientation[],
+): LibraryExercise[] {
+  const hasVertical = selectedOrientations.includes('vertical_pull');
+
+  return pool.filter((row) => {
+    const orientation = classifyPullOrientation(row);
+
+    if (slotId === 'back_horizontal') {
+      if (orientation === 'vertical_pull') return false;
+      if (orientation === 'horizontal_pull') return true;
+      return /\brow\b/i.test(row.name) || /\brow\b/i.test(row.slug);
+    }
+
+    if (slotId === 'back_vertical') {
+      if (orientation === 'horizontal_pull') return false;
+      return orientation === 'vertical_pull' || orientation == null;
+    }
+
+    if (hasVertical && orientation === 'vertical_pull') return false;
+    return true;
+  });
 }

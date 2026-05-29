@@ -1,14 +1,11 @@
 import { useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, Text, View } from 'react-native';
 
 import { ExerciseCueCard } from '@/components/iron/ExerciseCueCard';
 import { RirSelector } from '@/components/iron/RirSelector';
-import { TargetLoadBanner } from '@/components/iron/TargetLoadBanner';
 import { RestTimerOverlay } from '@/components/iron/RestTimerOverlay';
 import { ValueStepper } from '@/components/iron/ValueStepper';
-import { CommandCenterShell } from '@/components/command-center/CommandCenterShell';
-import { InstructionPanel } from '@/components/command-center/InstructionPanel';
 import { LoadingFallback } from '@/components/routing/LoadingFallback';
 import { WorkoutShell } from '@/components/workout/WorkoutShell';
 import {
@@ -24,11 +21,10 @@ import {
   getExerciseById,
   type LibraryExercise,
 } from '@/lib/catalog/library';
+import { unlockRestTimerAudio } from '@/lib/audio/restTimerChime';
 import { resolveIronExerciseView } from '@/lib/iron/resolveExercise';
-import { resolvePrimaryInstruction } from '@/lib/iron/instructionCues';
 import { hapticSetLogged } from '@/lib/haptics';
-import { formatExerciseProgressionHint } from '@/lib/physics/loadTelemetry';
-import { getTargetWeightFromLogs, targetWeightFromPassport } from '@/lib/physics/rmCalculator';
+import { targetWeightFromPassport } from '@/lib/physics/rmCalculator';
 import type { IronExerciseBiomechanics } from '@/types/catalog';
 import type { IronExercisePrescription } from '@/types/gameplan';
 import type { IronSetLog } from '@/types/performance';
@@ -41,7 +37,31 @@ interface PendingSetCapture {
   reps: number;
 }
 
+interface ExerciseDraft {
+  weight: number;
+  reps: number;
+  logs: IronSetLog[];
+  currentSet: number;
+  phase: IronPhase;
+  pendingSet: PendingSetCapture | null;
+  pendingReportedRir: number | null;
+  restBeforeSet: number;
+}
+
 const DEFAULT_REST_SECONDS = 90;
+
+function draftKey(index: number, exerciseId: string): string {
+  return `${index}:${exerciseId}`;
+}
+
+function lastLoggedWeightFromSession(
+  exerciseId: string,
+  sessionLogs: { exercise_id: string; sets: IronSetLog[] }[],
+): number | null {
+  const entry = sessionLogs.find((row) => row.exercise_id === exerciseId);
+  const lastSet = entry?.sets[entry.sets.length - 1];
+  return lastSet?.weight_kg != null && lastSet.weight_kg > 0 ? lastSet.weight_kg : null;
+}
 
 function biomechanicsFromLibrary(library: LibraryExercise | null): IronExerciseBiomechanics | null {
   if (!library?.primary_muscle && library?.cns_fatigue_cost == null) return null;
@@ -77,14 +97,12 @@ function stubPrescriptionFromTemplate(
 }
 
 export default function IronModeScreen() {
-  const performanceLogs = useSommaStore((state) => state.performance_logs);
   const { blockId, title } = useLocalSearchParams<{ blockId?: string; title?: string }>();
   useRequireDailyScan({ blockId, title, pillar: 'iron' });
   const { activeBlock, isReady, waitingForBlock } = useWorkoutBlockReady(blockId);
   const { finishBlock } = useWorkoutNavigation();
   const equipment = useSommaStore((state) => state.user_environment.available_equipment);
   const userBiological = useSommaStore((state) => state.user_biological);
-  const goalIron = useSommaStore((state) => state.user_biological.goal_iron);
   const appendIronSession = useSommaStore((state) => state.appendIronSession);
   const logIronSet = useSommaStore((state) => state.logIronSet);
 
@@ -107,7 +125,8 @@ export default function IronModeScreen() {
   const [allExerciseLogs, setAllExerciseLogs] = useState<
     { exercise_id: string; exercise_name: string; sets: IronSetLog[] }[]
   >([]);
-  const [e1rmTargetWeight, setE1rmTargetWeight] = useState<number | null>(null);
+  const exerciseDraftsRef = useRef<Record<string, ExerciseDraft>>({});
+  const activeExerciseKeyRef = useRef<string | null>(null);
 
   const resolvedBlockId = blockId ?? 'block-main-iron';
   const prescriptions = activeBlock?.iron?.exercises ?? [];
@@ -158,85 +177,77 @@ export default function IronModeScreen() {
   );
   const totalSets = exercise?.target_sets ?? 4;
   const activePrescription = prescriptions[exerciseIndex];
-  const prescriptionIsPassportBaseline =
-    activePrescription?.progression_note?.includes('Passport baseline') ?? false;
 
   const prescribedTargetKg = useMemo(() => {
     const raw = prescriptions.length ? activePrescription?.target_weight_kg : null;
     return raw != null && raw > 0 ? raw : null;
   }, [prescriptions.length, activePrescription?.target_weight_kg]);
 
-  const passportTargetKg = useMemo(() => {
-    if (!exercise) return null;
-    return targetWeightFromPassport(userBiological, activeLibrary ?? {
-      id: exercise.exercise_id,
-      name: exercise.name,
-    });
-  }, [
-    activeLibrary,
-    exercise,
-    userBiological,
-  ]);
-
-  const targetLoadKg = e1rmTargetWeight ?? prescribedTargetKg ?? passportTargetKg;
-  const isBodyweight = (targetLoadKg ?? exercise?.target_weight_kg ?? weight) <= 0;
-  const loadHint = useMemo(() => {
-    if (!exercise?.exercise_id) return null;
-    return formatExerciseProgressionHint(
-      performanceLogs,
-      exercise.exercise_id,
-      exercise.target_rir,
-    );
-  }, [performanceLogs, exercise?.exercise_id, exercise?.target_rir]);
-
-  const targetLoadSource: 'prescription' | 'e1rm' | 'passport' | undefined = e1rmTargetWeight
-    ? 'e1rm'
-    : prescribedTargetKg && !prescriptionIsPassportBaseline
-      ? 'prescription'
-      : prescribedTargetKg || passportTargetKg
-        ? 'passport'
-        : undefined;
-
-  useEffect(() => {
-    if (!exercise?.exercise_id) {
-      setE1rmTargetWeight(null);
-      return;
-    }
-
-    const resolved = getTargetWeightFromLogs(
-      performanceLogs,
-      exercise.exercise_id,
-      exercise.target_reps,
-      exercise.target_rir,
-      goalIron,
-    );
-    setE1rmTargetWeight(resolved);
-  }, [
-    performanceLogs,
-    exercise?.exercise_id,
-    exercise?.target_reps,
-    exercise?.target_rir,
-    goalIron,
-  ]);
+  const isBodyweight = weight <= 0;
+  const exerciseComplete = logs.length >= totalSets;
 
   useEffect(() => {
     if (!exercise) return;
-    setWeight(prescribedTargetKg ?? exercise.target_weight_kg);
-    setReps(exercise.target_reps);
-    setCurrentSet(1);
-    setLogs([]);
-    setPhase('lifting');
-    setPendingSet(null);
-    setPendingReportedRir(null);
-    setRestBeforeSet(0);
-  }, [exercise?.exercise_id, exerciseIndex, prescribedTargetKg]);
+    const key = draftKey(exerciseIndex, exercise.exercise_id);
+    const prevKey = activeExerciseKeyRef.current;
 
-  useEffect(() => {
-    if (targetLoadKg == null || targetLoadKg <= 0 || logs.length > 0 || phase !== 'lifting') {
+    if (prevKey !== key) {
+      activeExerciseKeyRef.current = key;
+      const saved = exerciseDraftsRef.current[key];
+      if (saved) {
+        setWeight(saved.weight);
+        setReps(saved.reps);
+        setLogs(saved.logs);
+        setCurrentSet(saved.currentSet);
+        setPhase(saved.phase);
+        setPendingSet(saved.pendingSet);
+        setPendingReportedRir(saved.pendingReportedRir);
+        setRestBeforeSet(saved.restBeforeSet);
+        return;
+      }
+
+      const sessionWeight = lastLoggedWeightFromSession(exercise.exercise_id, allExerciseLogs);
+      const baseline =
+        sessionWeight ??
+        (prescribedTargetKg != null && prescribedTargetKg > 0
+          ? prescribedTargetKg
+          : exercise.target_weight_kg);
+
+      setWeight(baseline);
+      setReps(exercise.target_reps);
+      setCurrentSet(1);
+      setLogs([]);
+      setPhase('lifting');
+      setPendingSet(null);
+      setPendingReportedRir(null);
+      setRestBeforeSet(0);
       return;
     }
-    setWeight(targetLoadKg);
-  }, [targetLoadKg, logs.length, phase]);
+
+    exerciseDraftsRef.current[key] = {
+      weight,
+      reps,
+      logs,
+      currentSet,
+      phase,
+      pendingSet,
+      pendingReportedRir,
+      restBeforeSet,
+    };
+  }, [
+    allExerciseLogs,
+    currentSet,
+    exercise,
+    exerciseIndex,
+    logs,
+    pendingReportedRir,
+    pendingSet,
+    phase,
+    prescribedTargetKg,
+    reps,
+    restBeforeSet,
+    weight,
+  ]);
 
   useEffect(() => {
     let mounted = true;
@@ -346,6 +357,7 @@ export default function IronModeScreen() {
 
   const handleConfirmRir = () => {
     if (pendingReportedRir == null) return;
+    unlockRestTimerAudio();
     void commitSetWithRir(pendingReportedRir);
   };
 
@@ -399,9 +411,9 @@ export default function IronModeScreen() {
     });
   };
 
-  const canLogSet = phase === 'lifting';
+  const canLogSet = phase === 'lifting' && !exerciseComplete;
   const inRirGate = phase === 'rir_gate' && pendingSet != null;
-  const canCompleteExercise = phase === 'done' && logs.length >= totalSets;
+  const canCompleteExercise = exerciseComplete;
   const isLastExercise = exerciseIndex >= exerciseQueue.length - 1;
   const canCompleteRitual = canCompleteExercise && isLastExercise;
   const canAdvanceExercise = canCompleteExercise && !isLastExercise;
@@ -468,9 +480,6 @@ export default function IronModeScreen() {
             const itemCanAdapt =
               Boolean(queuedExercise.alternative_exercise_id) &&
               queuedExercise.alternative_exercise_id !== queuedExercise.exercise_id;
-            const primaryInstruction = resolvePrimaryInstruction(queuedExercise.instructions);
-            const instructionExcludeKeys = primaryInstruction ? [primaryInstruction.key] : [];
-
             const cardClass = `gap-3 rounded-2xl border px-4 py-4 ${
               isActive
                 ? 'border-matte-gold/35 bg-matte-gold/[0.06]'
@@ -510,27 +519,24 @@ export default function IronModeScreen() {
 
             return (
               <View className={cardClass}>
-                <CommandCenterShell
-                    pillarLabel="Iron · Command"
-                    title={queuedExercise.name}
-                    meta={`Movement ${index + 1}/${exerciseQueue.length} · Set ${Math.min(currentSet, totalSets)}/${totalSets}${phase === 'done' ? ' · Ready to advance' : ''}`}
-                  >
-                    <InstructionPanel instructions={queuedExercise.instructions ?? {}} />
+                <View className="gap-1">
+                  <Text className="font-body text-[10px] uppercase tracking-[0.32em] text-[#6B7568]">
+                    Movement {index + 1}/{exerciseQueue.length}
+                  </Text>
+                  <Text className="font-display-bold text-2xl leading-8 text-[#E8E4DC]">
+                    {queuedExercise.name}
+                  </Text>
+                  <Text className="font-body text-[10px] uppercase tracking-[0.28em] text-matte-gold/80">
+                    Set {Math.min(currentSet, totalSets)}/{totalSets}
+                    {exerciseComplete ? ' · Complete' : ''}
+                  </Text>
+                </View>
 
-                    <TargetLoadBanner
-                      targetKg={targetLoadKg}
-                      repRange={queuedExercise.target_rep_range}
-                      source={targetLoadSource}
-                      loadHint={isActive ? loadHint : null}
-                    />
-
-                    <ExerciseCueCard
-                      instructions={queuedExercise.instructions ?? {}}
-                      progressionNote={queuedExercise.progression_note}
-                      biomechanics={biomechanicsFromLibrary(queuedLibrary)}
-                      excludeKeys={instructionExcludeKeys}
-                    />
-                </CommandCenterShell>
+                <ExerciseCueCard
+                  instructions={queuedExercise.instructions ?? {}}
+                  progressionNote={queuedExercise.progression_note}
+                  biomechanics={biomechanicsFromLibrary(queuedLibrary)}
+                />
 
                 <View className="flex-row justify-end">
                       <Pressable
@@ -564,7 +570,7 @@ export default function IronModeScreen() {
                   min={0}
                   max={300}
                   onChange={setWeight}
-                  disabled={!canLogSet}
+                  disabled={!canLogSet || exerciseComplete}
                   allowDirectInput
                 />
 
@@ -575,7 +581,7 @@ export default function IronModeScreen() {
                   min={1}
                   max={50}
                   onChange={setReps}
-                  disabled={!canLogSet}
+                  disabled={!canLogSet || exerciseComplete}
                   allowDirectInput
                 />
 
@@ -638,6 +644,14 @@ export default function IronModeScreen() {
                 Confirm set {currentSet}
               </Text>
             </Pressable>
+          </View>
+        ) : null}
+
+        {exerciseComplete && !inRirGate && !isActive ? (
+          <View className="absolute bottom-0 left-0 right-0 overflow-hidden rounded-2xl border border-matte-gold bg-matte-gold px-8 py-5">
+            <Text className="text-center font-display-bold text-sm uppercase tracking-[0.35em] text-obsidian">
+              Exercise completed
+            </Text>
           </View>
         ) : null}
 

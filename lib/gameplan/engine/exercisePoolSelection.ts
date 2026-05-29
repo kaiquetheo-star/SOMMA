@@ -2,9 +2,13 @@
 import {
   archetypeSlugScore,
   buildDeterministicSeed,
+  classifyPullOrientation,
   createSeededRng,
+  exerciseAllowedOnIronDay,
+  filterPoolForPullCollision,
   reorderBlueprintSlotsForArchetype,
   type DeterministicGenerationContext,
+  type PullOrientation,
 } from '@/lib/gameplan/engine/generation';
 import type { IronDayBlueprintKey } from '@/lib/gameplan/engine/goldStandardBlueprint';
 import type { LibraryExercise, MovementPattern } from '@/types/catalog';
@@ -33,7 +37,7 @@ export const PATTERN_POOL_BLUEPRINT: Record<IronDayBlueprintKey, readonly Patter
   pull: [
     { slotId: 'back_vertical', patterns: ['pull'], musclePattern: /lat|back|pulldown|pull.up/i },
     { slotId: 'back_horizontal', patterns: ['pull'], musclePattern: /back|row|lat/i },
-    { slotId: 'rear_delt', patterns: ['isolation', 'pull'], musclePattern: /rear|delt|fly|face/i, isolation: true },
+    { slotId: 'rear_delt', patterns: ['isolation', 'pull'], musclePattern: /rear|face.pull|reverse.*fly|dumbbell.reverse/i, isolation: true },
     { slotId: 'biceps_iso_a', patterns: ['isolation'], musclePattern: /bicep|curl/i, isolation: true },
     { slotId: 'biceps_iso_b', patterns: ['isolation'], musclePattern: /bicep|curl|brachialis/i, isolation: true },
     { slotId: 'core', patterns: ['isolation'], musclePattern: /core|ab|abs/i, isolation: true },
@@ -129,15 +133,32 @@ function filterPool(
   equipment: EquipmentTag[],
   blocked: string[],
   usedIds: Set<string>,
+  dayKey: IronDayBlueprintKey,
+  selectedPullOrientations: readonly PullOrientation[],
 ): LibraryExercise[] {
-  return catalog.filter((row) => {
+  const base = catalog.filter((row) => {
     if (usedIds.has(row.id)) return false;
     if (!isEligible(row, equipment, blocked)) return false;
+    if (!exerciseAllowedOnIronDay(row, dayKey)) return false;
     if (!rowMatchesPattern(row, slot.patterns)) return false;
     if (!rowMatchesMuscle(row, slot.musclePattern)) return false;
     if (!rowMatchesIsolationKind(row, slot.isolation)) return false;
     return true;
   });
+
+  if (dayKey !== 'pull') return base;
+  return filterPoolForPullCollision(base, slot.slotId, selectedPullOrientations);
+}
+
+function applyDayGuards(
+  pool: LibraryExercise[],
+  dayKey: IronDayBlueprintKey,
+  slot: PatternPoolSlot,
+  selectedPullOrientations: readonly PullOrientation[],
+): LibraryExercise[] {
+  const allowed = pool.filter((row) => exerciseAllowedOnIronDay(row, dayKey));
+  if (dayKey !== 'pull') return allowed;
+  return filterPoolForPullCollision(allowed, slot.slotId, selectedPullOrientations);
 }
 
 function broadenPool(
@@ -147,26 +168,48 @@ function broadenPool(
   equipment: EquipmentTag[],
   blocked: string[],
   usedIds: Set<string>,
+  selectedPullOrientations: readonly PullOrientation[],
 ): LibraryExercise[] {
   const stages: Array<() => LibraryExercise[]> = [
-    () => filterPool(catalog, slot, equipment, blocked, usedIds),
+    () => filterPool(catalog, slot, equipment, blocked, usedIds, dayKey, selectedPullOrientations),
     () =>
-      catalog.filter((row) => {
-        if (usedIds.has(row.id) || !isEligible(row, equipment, blocked)) return false;
-        return rowMatchesPattern(row, slot.patterns);
-      }),
+      applyDayGuards(
+        catalog.filter((row) => {
+          if (usedIds.has(row.id) || !isEligible(row, equipment, blocked)) return false;
+          return rowMatchesPattern(row, slot.patterns);
+        }),
+        dayKey,
+        slot,
+        selectedPullOrientations,
+      ),
     () =>
-      catalog.filter((row) => {
-        if (usedIds.has(row.id) || !isEligible(row, equipment, blocked)) return false;
-        return rowMatchesMuscle(row, slot.musclePattern);
-      }),
+      applyDayGuards(
+        catalog.filter((row) => {
+          if (usedIds.has(row.id) || !isEligible(row, equipment, blocked)) return false;
+          return rowMatchesMuscle(row, slot.musclePattern);
+        }),
+        dayKey,
+        slot,
+        selectedPullOrientations,
+      ),
     () =>
-      catalog.filter((row) => {
-        if (usedIds.has(row.id) || !isEligible(row, equipment, blocked)) return false;
-        const pattern = normalizePattern(row.movement_pattern);
-        return DAY_PATTERN_BIAS[dayKey].includes(pattern);
-      }),
-    () => catalog.filter((row) => !usedIds.has(row.id) && isEligible(row, equipment, blocked)),
+      applyDayGuards(
+        catalog.filter((row) => {
+          if (usedIds.has(row.id) || !isEligible(row, equipment, blocked)) return false;
+          const pattern = normalizePattern(row.movement_pattern);
+          return DAY_PATTERN_BIAS[dayKey].includes(pattern);
+        }),
+        dayKey,
+        slot,
+        selectedPullOrientations,
+      ),
+    () =>
+      applyDayGuards(
+        catalog.filter((row) => !usedIds.has(row.id) && isEligible(row, equipment, blocked)),
+        dayKey,
+        slot,
+        selectedPullOrientations,
+      ),
   ];
 
   for (const stage of stages) {
@@ -213,13 +256,28 @@ export function selectExercisesFromPatternPools(
 
   const usedIds = new Set<string>();
   const selected: string[] = [];
+  const selectedPullOrientations: PullOrientation[] = [];
 
   slots.forEach((slot, slotIndex) => {
-    const pool = broadenPool(catalog, slot, dayKey, equipment, blockedJointProfiles, usedIds);
+    const pool = broadenPool(
+      catalog,
+      slot,
+      dayKey,
+      equipment,
+      blockedJointProfiles,
+      usedIds,
+      selectedPullOrientations,
+    );
     const pick = pickSeededFromPool(pool, generation, slotIndex);
     if (!pick) return;
     selected.push(pick.id);
     usedIds.add(pick.id);
+    if (dayKey === 'pull') {
+      const orientation = classifyPullOrientation(pick);
+      if (orientation && !selectedPullOrientations.includes(orientation)) {
+        selectedPullOrientations.push(orientation);
+      }
+    }
   });
 
   return selected.slice(0, targetCount);
