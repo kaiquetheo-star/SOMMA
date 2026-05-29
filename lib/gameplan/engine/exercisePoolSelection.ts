@@ -127,6 +127,10 @@ function rowMatchesIsolationKind(row: LibraryExercise, isolation?: boolean): boo
   return isolation ? isIso : !isIso || pattern !== 'isolation';
 }
 
+function appliesPullCollisionGuard(dayKey: IronDayBlueprintKey): boolean {
+  return dayKey === 'pull' || dayKey === 'upper' || dayKey === 'full';
+}
+
 function filterPool(
   catalog: LibraryExercise[],
   slot: PatternPoolSlot,
@@ -146,7 +150,7 @@ function filterPool(
     return true;
   });
 
-  if (dayKey !== 'pull') return base;
+  if (!appliesPullCollisionGuard(dayKey)) return base;
   return filterPoolForPullCollision(base, slot.slotId, selectedPullOrientations);
 }
 
@@ -157,7 +161,7 @@ function applyDayGuards(
   selectedPullOrientations: readonly PullOrientation[],
 ): LibraryExercise[] {
   const allowed = pool.filter((row) => exerciseAllowedOnIronDay(row, dayKey));
-  if (dayKey !== 'pull') return allowed;
+  if (!appliesPullCollisionGuard(dayKey)) return allowed;
   return filterPoolForPullCollision(allowed, slot.slotId, selectedPullOrientations);
 }
 
@@ -272,7 +276,7 @@ export function selectExercisesFromPatternPools(
     if (!pick) return;
     selected.push(pick.id);
     usedIds.add(pick.id);
-    if (dayKey === 'pull') {
+    if (appliesPullCollisionGuard(dayKey)) {
       const orientation = classifyPullOrientation(pick);
       if (orientation && !selectedPullOrientations.includes(orientation)) {
         selectedPullOrientations.push(orientation);

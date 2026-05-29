@@ -145,7 +145,7 @@ export type PullOrientation = 'vertical_pull' | 'horizontal_pull';
 export function isChestIsolationFly(row: { slug: string; name: string; primary_muscle?: string | null }): boolean {
   const blob = `${row.slug} ${row.name} ${row.primary_muscle ?? ''}`.toLowerCase();
   if (!/\bfly\b|flye|cable_fly|pec.fly|chest.fly/.test(blob)) return false;
-  if (/rear|reverse|delt|shoulder|face.pull/.test(blob)) return false;
+  if (/rear|reverse|face.pull|lateral/.test(blob)) return false;
   return /chest|pec|fly/.test(blob);
 }
 
@@ -176,7 +176,7 @@ export function exerciseAllowedOnIronDay(
   row: { slug: string; name: string; primary_muscle?: string | null },
   dayKey: string,
 ): boolean {
-  if (isChestIsolationFly(row) && dayKey !== 'push') return false;
+  if (isChestIsolationFly(row) && !['push', 'upper', 'full'].includes(dayKey)) return false;
   return true;
 }
 

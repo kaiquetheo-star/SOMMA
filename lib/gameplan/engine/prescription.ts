@@ -283,7 +283,7 @@ function prescribeIronExercise(
       targetRir = 4;
     } else if (progression === 'load' && last.rpe_score <= 8) {
       targetWeight = Math.round(last.weight_used * 1.025 * 10) / 10;
-      targetReps = Math.min(15, (last.reps_completed ?? targetReps) + 1);
+      targetReps = Math.max(6, (meta?.default_reps ?? 10) - 2);
     } else if (progression === 'volume') {
       targetReps = Math.min(15, targetReps + 1);
     }
@@ -536,6 +536,15 @@ export function buildCombatBlock(
     }));
   }
 
+  if (rounds_structure.length > 0) {
+    const lastIndex = rounds_structure.length - 1;
+    rounds_structure[lastIndex] = {
+      ...rounds_structure[lastIndex]!,
+      tactical_focus: 'burnout',
+      coach_intent: 'HIIT finisher — controlled burnout, hands home on exit.',
+    };
+  }
+
   const rounds: CombatRoundPrescription[] = [];
   for (const segment of rounds_structure) {
     for (let roundIndex = segment.round_start; roundIndex <= segment.round_end; roundIndex += 1) {
@@ -553,12 +562,17 @@ export function buildCombatBlock(
 
   const combat: CombatBlockPrescription = sortCombatPrescription({ rounds_structure, rounds });
 
+  const computedDurationMinutes = Math.max(
+    1,
+    Math.ceil(rounds.reduce((sum, round) => sum + round.work_seconds + round.rest_seconds, 0) / 60),
+  );
+
   return {
     id: blockId,
     pillar: 'combat',
     title: 'Blood & Bone · HIIT Finisher',
     subtitle: `${rounds.length} rounds · tactical periodization`,
-    duration_minutes: Math.min(pillarTime.available_time_combat, 25),
+    duration_minutes: Math.min(pillarTime.available_time_combat, computedDurationMinutes),
     order,
     status: 'pending',
     combat,

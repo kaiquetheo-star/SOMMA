@@ -46,7 +46,14 @@ export function focusLabelForIronSlot(trainingDaysPerWeek: number, slot: number)
   const rotation =
     MICROCYCLE_FOCUS_ROTATIONS[clampTrainingDaysPerWeek(trainingDaysPerWeek)] ??
     MICROCYCLE_FOCUS_ROTATIONS[4]!;
-  return rotation[slot % rotation.length]!;
+  const ironLabels = rotation.filter(
+    (label) => label.startsWith('Iron:') && !label.includes('Combat:'),
+  );
+  if (ironLabels.length > 0) {
+    return ironLabels[slot % ironLabels.length]!;
+  }
+  const withoutCombat = rotation.filter((label) => !label.includes('Combat:'));
+  return withoutCombat[slot % withoutCombat.length] ?? 'Iron: Full Body';
 }
 
 export function deriveActiveTrainingDays(pillarFreq: PillarFrequency): number {
