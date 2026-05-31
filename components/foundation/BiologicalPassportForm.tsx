@@ -85,7 +85,7 @@ export function BiologicalPassportForm({ value, onChange }: BiologicalPassportFo
           {...webTextInputProps()}
         />
         <Text className="font-body text-xs text-[#6B7568]">
-          Optional — improves TDEE, macro targets, and natural timeline projections.
+          Optional — refines natural timeline projections and load calibration context.
         </Text>
       </View>
 

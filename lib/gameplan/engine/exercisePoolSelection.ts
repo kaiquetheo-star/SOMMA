@@ -76,14 +76,9 @@ export const PATTERN_POOL_BLUEPRINT: Record<IronDayBlueprintKey, readonly Patter
   ],
 };
 
-const DAY_PATTERN_BIAS: Record<IronDayBlueprintKey, MovementPattern[]> = {
-  push: ['push', 'isolation'],
-  pull: ['pull', 'isolation'],
-  legs: ['squat', 'hinge', 'lunge', 'isolation'],
-  upper: ['push', 'pull', 'isolation'],
-  lower: ['squat', 'hinge', 'lunge', 'isolation'],
-  full: ['push', 'pull', 'squat', 'hinge', 'lunge', 'carry', 'isolation'],
-};
+function appliesPullCollisionGuard(dayKey: IronDayBlueprintKey): boolean {
+  return dayKey === 'pull' || dayKey === 'upper' || dayKey === 'full';
+}
 
 function normalizePattern(value: string | null | undefined): MovementPattern {
   if (!value) return 'isolation';
@@ -127,10 +122,6 @@ function rowMatchesIsolationKind(row: LibraryExercise, isolation?: boolean): boo
   return isolation ? isIso : !isIso || pattern !== 'isolation';
 }
 
-function appliesPullCollisionGuard(dayKey: IronDayBlueprintKey): boolean {
-  return dayKey === 'pull' || dayKey === 'upper' || dayKey === 'full';
-}
-
 function filterPool(
   catalog: LibraryExercise[],
   slot: PatternPoolSlot,
@@ -152,76 +143,6 @@ function filterPool(
 
   if (!appliesPullCollisionGuard(dayKey)) return base;
   return filterPoolForPullCollision(base, slot.slotId, selectedPullOrientations);
-}
-
-function applyDayGuards(
-  pool: LibraryExercise[],
-  dayKey: IronDayBlueprintKey,
-  slot: PatternPoolSlot,
-  selectedPullOrientations: readonly PullOrientation[],
-): LibraryExercise[] {
-  const allowed = pool.filter((row) => exerciseAllowedOnIronDay(row, dayKey));
-  if (!appliesPullCollisionGuard(dayKey)) return allowed;
-  return filterPoolForPullCollision(allowed, slot.slotId, selectedPullOrientations);
-}
-
-function broadenPool(
-  catalog: LibraryExercise[],
-  slot: PatternPoolSlot,
-  dayKey: IronDayBlueprintKey,
-  equipment: EquipmentTag[],
-  blocked: string[],
-  usedIds: Set<string>,
-  selectedPullOrientations: readonly PullOrientation[],
-): LibraryExercise[] {
-  const stages: Array<() => LibraryExercise[]> = [
-    () => filterPool(catalog, slot, equipment, blocked, usedIds, dayKey, selectedPullOrientations),
-    () =>
-      applyDayGuards(
-        catalog.filter((row) => {
-          if (usedIds.has(row.id) || !isEligible(row, equipment, blocked)) return false;
-          return rowMatchesPattern(row, slot.patterns);
-        }),
-        dayKey,
-        slot,
-        selectedPullOrientations,
-      ),
-    () =>
-      applyDayGuards(
-        catalog.filter((row) => {
-          if (usedIds.has(row.id) || !isEligible(row, equipment, blocked)) return false;
-          return rowMatchesMuscle(row, slot.musclePattern);
-        }),
-        dayKey,
-        slot,
-        selectedPullOrientations,
-      ),
-    () =>
-      applyDayGuards(
-        catalog.filter((row) => {
-          if (usedIds.has(row.id) || !isEligible(row, equipment, blocked)) return false;
-          const pattern = normalizePattern(row.movement_pattern);
-          return DAY_PATTERN_BIAS[dayKey].includes(pattern);
-        }),
-        dayKey,
-        slot,
-        selectedPullOrientations,
-      ),
-    () =>
-      applyDayGuards(
-        catalog.filter((row) => !usedIds.has(row.id) && isEligible(row, equipment, blocked)),
-        dayKey,
-        slot,
-        selectedPullOrientations,
-      ),
-  ];
-
-  for (const stage of stages) {
-    const pool = stage();
-    if (pool.length > 0) return pool;
-  }
-
-  return [];
 }
 
 export function pickSeededFromPool(
@@ -263,19 +184,21 @@ export function selectExercisesFromPatternPools(
   const selectedPullOrientations: PullOrientation[] = [];
 
   slots.forEach((slot, slotIndex) => {
-    const pool = broadenPool(
+    const pool = filterPool(
       catalog,
       slot,
-      dayKey,
       equipment,
       blockedJointProfiles,
       usedIds,
+      dayKey,
       selectedPullOrientations,
     );
     const pick = pickSeededFromPool(pool, generation, slotIndex);
     if (!pick) return;
+
     selected.push(pick.id);
     usedIds.add(pick.id);
+
     if (appliesPullCollisionGuard(dayKey)) {
       const orientation = classifyPullOrientation(pick);
       if (orientation && !selectedPullOrientations.includes(orientation)) {
@@ -284,5 +207,5 @@ export function selectExercisesFromPatternPools(
     }
   });
 
-  return selected.slice(0, targetCount);
+  return selected;
 }

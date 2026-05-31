@@ -4,6 +4,7 @@ import type {
   LibraryFlowSpiritSession,
   MovementPattern,
 } from '@/types/catalog';
+import { normalizePrimaryMuscle } from '@/lib/catalog/primaryMuscle';
 
 function iron(
   slug: string,
@@ -31,7 +32,7 @@ function iron(
     default_sets: 4,
     default_reps: movementPattern === 'isolation' ? 12 : 8,
     movement_pattern: movementPattern,
-    primary_muscle: primaryMuscle,
+    primary_muscle: normalizePrimaryMuscle(primaryMuscle) ?? primaryMuscle,
     synergist_muscles: [],
     cns_fatigue_cost: cns,
     joint_stress_profile: null,
@@ -74,17 +75,17 @@ const BUNDLED_EXERCISES: LibraryExercise[] = [
   iron('pendlay_row', 'Pendlay Row', 'back', 'pull'),
   iron('dumbbell_row', 'Single-Arm Dumbbell Row', 'back', 'pull', ['dumbbells', 'full_gym']),
   iron('chest_supported_row', 'Chest-Supported Row', 'back', 'pull', ['full_gym', 'dumbbells']),
-  iron('cable_bar_lateral_pulldown', 'Lat Pulldown', 'lats', 'pull', ['full_gym']),
-  iron('lat_pulldown', 'Wide-Grip Lat Pulldown', 'lats', 'pull', ['full_gym']),
-  iron('pull_up', 'Pull-Up', 'lats', 'pull', ['bodyweight', 'pull_up_bar', 'full_gym'], { cns: 4 }),
-  iron('chin_up', 'Chin-Up', 'lats', 'pull', ['bodyweight', 'pull_up_bar', 'full_gym'], { cns: 4 }),
+  iron('cable_bar_lateral_pulldown', 'Lat Pulldown', 'back', 'pull', ['full_gym']),
+  iron('lat_pulldown', 'Wide-Grip Lat Pulldown', 'back', 'pull', ['full_gym']),
+  iron('pull_up', 'Pull-Up', 'back', 'pull', ['bodyweight', 'pull_up_bar', 'full_gym'], { cns: 4 }),
+  iron('chin_up', 'Chin-Up', 'back', 'pull', ['bodyweight', 'pull_up_bar', 'full_gym'], { cns: 4 }),
   iron('seated_cable_row', 'Seated Cable Row', 'back', 'pull', ['full_gym']),
   iron('t_bar_row', 'T-Bar Row', 'back', 'pull', ['barbell', 'full_gym'], { cns: 4 }),
 
   // —— Pull / isolations ——
-  iron('reverse_dumbbell_fly', 'Reverse Dumbbell Fly', 'rear delts', 'isolation', ['dumbbells', 'full_gym']),
-  iron('dumbbell_reverse_fly', 'Dumbbell Reverse Fly', 'rear delts', 'isolation', ['dumbbells']),
-  iron('face_pull', 'Cable Face Pull', 'rear delts', 'isolation', ['full_gym']),
+  iron('reverse_dumbbell_fly', 'Reverse Dumbbell Fly', 'rear delt', 'isolation', ['dumbbells', 'full_gym']),
+  iron('dumbbell_reverse_fly', 'Dumbbell Reverse Fly', 'rear delt', 'isolation', ['dumbbells']),
+  iron('face_pull', 'Cable Face Pull', 'rear delt', 'isolation', ['full_gym']),
   iron('barbell_curl', 'Barbell Curl', 'biceps', 'isolation', ['barbell', 'full_gym']),
   iron('ez_bar_curl', 'EZ-Bar Curl', 'biceps', 'isolation', ['barbell', 'full_gym']),
   iron('hammer_curl', 'Hammer Curl', 'biceps', 'isolation', ['dumbbells', 'full_gym']),
@@ -109,14 +110,14 @@ const BUNDLED_EXERCISES: LibraryExercise[] = [
   iron('romanian_deadlift', 'Romanian Deadlift', 'hamstrings', 'hinge'),
   iron('trap_bar_deadlift', 'Trap-Bar Deadlift', 'hamstrings', 'hinge', ['barbell', 'full_gym'], { cns: 5 }),
   iron('hip_thrust', 'Barbell Hip Thrust', 'glutes', 'hinge', ['barbell', 'full_gym'], { cns: 4 }),
-  iron('back_extension', '45° Back Extension', 'lower back', 'hinge', ['full_gym', 'bodyweight'], { cns: 2 }),
+  iron('back_extension', '45° Back Extension', 'back', 'hinge', ['full_gym', 'bodyweight'], { cns: 2 }),
   iron('leg_curl', 'Lying Leg Curl', 'hamstrings', 'isolation', ['full_gym'], { stretch: true }),
   iron('seated_leg_curl', 'Seated Leg Curl', 'hamstrings', 'isolation', ['full_gym'], { stretch: true }),
 
   // —— Calves / carry ——
   iron('barbell_seated_calf_raise', 'Seated Calf Raise', 'calves', 'isolation', ['full_gym', 'barbell']),
   iron('standing_calf_raise', 'Standing Calf Raise', 'calves', 'isolation', ['bodyweight', 'full_gym']),
-  iron('farmers_walk', 'Farmer Carry', 'traps', 'carry', ['dumbbells', 'kettlebell', 'full_gym'], { cns: 3 }),
+  iron('farmers_walk', 'Farmer Carry', 'back', 'carry', ['dumbbells', 'kettlebell', 'full_gym'], { cns: 3 }),
   iron('suitcase_carry', 'Suitcase Carry', 'core', 'carry', ['dumbbells', 'kettlebell', 'full_gym'], { cns: 2 }),
 
   // —— Core / mobility ——
@@ -126,7 +127,7 @@ const BUNDLED_EXERCISES: LibraryExercise[] = [
   iron('pallof_press', 'Pallof Press', 'core', 'isolation', ['full_gym']),
   iron('plank', 'Plank Hold', 'core', 'isolation', ['bodyweight'], { cns: 1 }),
   iron('dead_bug', 'Dead Bug', 'core', 'isolation', ['bodyweight'], { cns: 1 }),
-  iron('squat_malasana', 'Malasana Squat', 'hips', 'squat', ['bodyweight'], { cns: 1 }),
+  iron('squat_malasana', 'Malasana Squat', 'glutes', 'squat', ['bodyweight'], { cns: 1 }),
   iron('sphinx', 'Sphinx Pose', 'chest', 'isolation', ['bodyweight'], { cns: 1 }),
 ];
 

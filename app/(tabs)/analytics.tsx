@@ -30,8 +30,6 @@ export default function AnalyticsScreen() {
   const setUserBiological = useSommaStore((state) => state.setUserBiological);
   const resetStore = useSommaStore((state) => state.resetStore);
   const performanceLogs = useSommaStore((state) => state.performance_logs);
-  const nutritionStatus = useSommaStore((state) => state.nutritionStatus);
-  const nutritionStatusHistory = useSommaStore((state) => state.nutritionStatusHistory);
 
   const [draft, setDraft] = useState<BiologicalProfile>(storedBiological);
   const [saving, setSaving] = useState(false);
@@ -103,11 +101,7 @@ export default function AnalyticsScreen() {
         </Text>
 
         <View className="mt-8 gap-8">
-            <BiologicalPassportSummary
-              profile={draft}
-              nutritionStatus={nutritionStatus}
-              nutritionStatusHistory={nutritionStatusHistory}
-            />
+            <BiologicalPassportSummary profile={draft} />
 
             <LoadTelemetryStrip
               performanceLogs={performanceLogs}

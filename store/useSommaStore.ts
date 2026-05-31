@@ -5,7 +5,6 @@ import { sommaPersistStorage } from '@/lib/storage/persistStorage';
 
 import { fetchDailyGameplan } from '@/lib/gameplan/fetchDailyGameplan';
 import { isGameplanFetchError } from '@/lib/gameplan/gameplanErrors';
-import { isGlycogenDepleted, type NutritionStatus } from '@/lib/physics/nutritionMath';
 import { isProtocolDateStale } from '@/lib/gameplan/generateStubGameplan';
 import { normalizePersistedSnapshot, type SommaPersistedSnapshot } from '@/lib/local/backup';
 import { recalibrateFromPerformanceQueue } from '@/lib/local/recalibrate';
@@ -207,15 +206,9 @@ interface SommaState {
   /** Daily readiness scan (Clinical Law II) — calendar date when last completed */
   readinessScanDate: string | null;
   subjectiveReadiness: number | null;
-  /** Metabolic Steering — daily nutrition self-report */
-  nutritionStatusDate: string | null;
-  nutritionStatus: NutritionStatus | null;
-  /** Rolling log of recent nutrition statuses for glycogen depletion detection */
-  nutritionStatusHistory: { date: string; status: NutritionStatus }[];
   setSelectedDayIndex: (dayIndex: number) => void;
   needsDailyReadinessScan: () => boolean;
   applySubjectiveReadiness: (score: number) => void;
-  applyNutritionStatus: (status: NutritionStatus) => void;
   submitClinicalExitInterview: (interview: ClinicalExitInterview) => Promise<void>;
   getClinicalReviewTrigger: () => ReturnType<typeof buildClinicalReviewTrigger>;
   performance_logs: PerformanceLogEntry[];
@@ -305,9 +298,6 @@ export const useSommaStore = create<SommaState>()(
       selectedDayIndex: getTodayDayIndex(),
       readinessScanDate: null,
       subjectiveReadiness: null,
-      nutritionStatusDate: null,
-      nutritionStatus: null,
-      nutritionStatusHistory: [],
       performance_logs: [],
       performanceQueue: [],
       performance_syncing: false,
@@ -372,20 +362,6 @@ export const useSommaStore = create<SommaState>()(
         });
       },
 
-      applyNutritionStatus: (status) => {
-        const today = new Date().toISOString().slice(0, 10);
-        set((state) => {
-          const history = [...state.nutritionStatusHistory.filter((h) => h.date !== today), { date: today, status }]
-            .sort((a, b) => a.date.localeCompare(b.date))
-            .slice(-7);
-          return {
-            nutritionStatus: status,
-            nutritionStatusDate: today,
-            nutritionStatusHistory: history,
-          };
-        });
-      },
-
       getClinicalReviewTrigger: () => {
         const state = get();
         return buildClinicalReviewTrigger(
@@ -443,7 +419,6 @@ export const useSommaStore = create<SommaState>()(
         set({ gameplan_loading: true, gameplan_error: null });
 
         try {
-          const recentNutrition = state.nutritionStatusHistory.map((h) => h.status);
           const result = await fetchDailyGameplan({
             focus,
             equipment: state.user_environment.available_equipment,
@@ -451,7 +426,6 @@ export const useSommaStore = create<SommaState>()(
             biological: state.user_biological,
             userStats: state.user_stats,
             performanceLogs: state.performance_logs,
-            glycogenDepleted: isGlycogenDepleted(recentNutrition),
           });
 
           set({
@@ -770,9 +744,6 @@ export const useSommaStore = create<SommaState>()(
           selectedDayIndex: getTodayDayIndex(),
           readinessScanDate: null,
           subjectiveReadiness: null,
-          nutritionStatusDate: null,
-          nutritionStatus: null,
-          nutritionStatusHistory: [],
           performance_logs: [],
           performanceQueue: [],
           performance_syncing: false,
@@ -831,9 +802,6 @@ export const useSommaStore = create<SommaState>()(
         selectedDayIndex: state.selectedDayIndex,
         readinessScanDate: state.readinessScanDate,
         subjectiveReadiness: state.subjectiveReadiness,
-        nutritionStatusDate: state.nutritionStatusDate,
-        nutritionStatus: state.nutritionStatus,
-        nutritionStatusHistory: state.nutritionStatusHistory,
         performance_logs: state.performance_logs,
         performanceQueue: state.performanceQueue,
         lastWorkoutSummary: state.lastWorkoutSummary,

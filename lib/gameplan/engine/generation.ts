@@ -1,4 +1,5 @@
 // CLINICAL ENGINE: DETERMINISTIC ONLY. NO RANDOMNESS ALLOWED. IF INPUTS ARE CONSTANT, OUTPUT MUST BE CONSTANT.
+import { normalizePrimaryMuscle } from '@/lib/catalog/primaryMuscle';
 import type { TargetArchetype, TrainingExperienceLevel } from '@/types/biological';
 import type { LibraryExercise } from '@/types/catalog';
 
@@ -141,6 +142,29 @@ export function reorderBlueprintSlotsForArchetype<T extends { slotId: string }>(
 
 export type PullOrientation = 'vertical_pull' | 'horizontal_pull';
 
+/** Hard split firewall — zero cross-contamination between training days */
+export const ALLOWED_MUSCLES_PER_SPLIT: Record<string, readonly string[]> = {
+  push: ['chest', 'shoulders', 'triceps', 'core'],
+  pull: ['back', 'biceps', 'rear delt', 'core'],
+  legs: ['quads', 'hamstrings', 'calves', 'glutes', 'core'],
+  upper: ['chest', 'back', 'shoulders', 'biceps', 'triceps', 'core'],
+  lower: ['quads', 'hamstrings', 'calves', 'glutes', 'core'],
+  full: [
+    'chest',
+    'back',
+    'quads',
+    'hamstrings',
+    'calves',
+    'glutes',
+    'shoulders',
+    'biceps',
+    'triceps',
+    'core',
+  ],
+};
+
+export { normalizePrimaryMuscle } from '@/lib/catalog/primaryMuscle';
+
 /** Chest / pec isolation fly — must never appear on pull or leg days */
 export function isChestIsolationFly(row: { slug: string; name: string; primary_muscle?: string | null }): boolean {
   const blob = `${row.slug} ${row.name} ${row.primary_muscle ?? ''}`.toLowerCase();
@@ -176,6 +200,12 @@ export function exerciseAllowedOnIronDay(
   row: { slug: string; name: string; primary_muscle?: string | null },
   dayKey: string,
 ): boolean {
+  const allowed = ALLOWED_MUSCLES_PER_SPLIT[dayKey];
+  if (!allowed) return false;
+
+  const muscle = normalizePrimaryMuscle(row.primary_muscle);
+  if (!muscle || !allowed.includes(muscle)) return false;
+
   if (isChestIsolationFly(row) && !['push', 'upper', 'full'].includes(dayKey)) return false;
   return true;
 }

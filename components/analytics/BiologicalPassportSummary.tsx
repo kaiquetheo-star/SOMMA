@@ -9,12 +9,9 @@ import {
   TARGET_ARCHETYPE_OPTIONS,
 } from '@/types/biological';
 import { calculateNaturalTargetTimeline } from '@/lib/physics/longevityMath';
-import { calculateMacroTargets, formatMacroLine, isGlycogenDepleted, type NutritionStatus } from '@/lib/physics/nutritionMath';
 
 interface BiologicalPassportSummaryProps {
   profile: BiologicalProfile;
-  nutritionStatus?: NutritionStatus | null;
-  nutritionStatusHistory?: { date: string; status: NutritionStatus }[];
 }
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
@@ -31,18 +28,13 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
 }
 
 /** Read-only biological snapshot for Analytics tab */
-export function BiologicalPassportSummary({ profile, nutritionStatus, nutritionStatusHistory }: BiologicalPassportSummaryProps) {
+export function BiologicalPassportSummary({ profile }: BiologicalPassportSummaryProps) {
   const age = ageFromDateOfBirth(profile.date_of_birth);
   const complete = isBiologicalProfileComplete(profile);
   const timeline = calculateNaturalTargetTimeline(profile);
-  const macros = calculateMacroTargets(profile);
   const archetypeLabel = profile.target_archetype
     ? TARGET_ARCHETYPE_OPTIONS.find((o) => o.id === profile.target_archetype)?.label ?? null
     : null;
-  const recentStatuses = (nutritionStatusHistory ?? []).map((h) => h.status);
-  const glycogenFlag = isGlycogenDepleted(recentStatuses);
-  const statusLabel = nutritionStatus ?? 'NOT LOGGED';
-  const bufferLabel = glycogenFlag ? 'CNS SHIELD ACTIVE' : 'GLYCOGEN BUFFER SECURE';
 
   return (
     <View className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] px-5">
@@ -52,7 +44,7 @@ export function BiologicalPassportSummary({ profile, nutritionStatus, nutritionS
 
       {!complete ? (
         <Text className="py-4 font-body text-sm leading-6 text-[#8A9488]">
-          Passport incomplete — fill required fields below to unlock full AI calibration.
+          Passport incomplete — fill required fields below to unlock full calibration.
         </Text>
       ) : null}
 
@@ -115,17 +107,6 @@ export function BiologicalPassportSummary({ profile, nutritionStatus, nutritionS
         <View className="border-t border-white/5 py-4">
           <Text className="font-display-bold text-base text-[#E8E4DC]">
             {timeline.summary}
-          </Text>
-        </View>
-      ) : null}
-
-      {macros ? (
-        <View className="border-t border-white/5 py-4 gap-2">
-          <Text className="font-body-medium text-[11px] uppercase tracking-[0.25em] text-[#E8E4DC]">
-            NUTRITION · {formatMacroLine(macros)}
-          </Text>
-          <Text className="font-body text-[10px] uppercase tracking-[0.3em] text-[#6B7568]">
-            STATUS: {statusLabel} · {bufferLabel}
           </Text>
         </View>
       ) : null}

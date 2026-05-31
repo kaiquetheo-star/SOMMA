@@ -44,7 +44,6 @@ import { maxIronExercisesForMinutes, pruneIronExercisesForTimeBudget } from '@/l
 import { adjustTargetWeightForMonth2 } from '@/lib/gameplan/engine/progression';
 import type { ClinicalExitInterview } from '@/types/clinical';
 import type { TargetArchetype } from '@/types/biological';
-import { glycogenMrvClampFactor } from '@/lib/physics/nutritionMath';
 import type { EnginePerformanceRow } from '@/lib/gameplan/engine/performanceLogs';
 import type { LibraryCombatCombo, LibraryExercise, LibraryFlowSpiritSession } from '@/types/catalog';
 import type {
@@ -351,7 +350,6 @@ export function buildIronBlock(
   mesocycleWeek = 1,
   clinicalReview: ClinicalExitInterview | null = null,
   targetArchetype: TargetArchetype | null = null,
-  glycogenDepleted = false,
   generation: DeterministicGenerationContext,
 ): GameplanBlock {
   const isDeload = isDeloadMesocycleWeek(mesocycleWeek);
@@ -361,7 +359,6 @@ export function buildIronBlock(
     targetIronExerciseCount(sessionMinutes, goalIron) + archetypeExerciseCountDelta(targetArchetype);
   targetCount = Math.min(timeCap, Math.max(2, targetCount));
   if (isDeload) targetCount = Math.min(targetCount, 4);
-  const mrvClamp = glycogenMrvClampFactor(glycogenDepleted);
 
   let routineIds = selectExercisesForSplit(
     focusLabel,
@@ -411,13 +408,6 @@ export function buildIronBlock(
   );
   if (isDeload) {
     exercises = exercises.map((row) => applyDeloadToIronExercise(row));
-  }
-
-  if (mrvClamp < 1) {
-    exercises = exercises.map((row) => ({
-      ...row,
-      target_sets: Math.max(2, Math.round(row.target_sets * mrvClamp)),
-    }));
   }
 
   exercises = sortIronExercises(exercises, catalog, prerequisiteSlugs);

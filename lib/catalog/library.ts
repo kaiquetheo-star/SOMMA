@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { normalizePrimaryMuscle } from '@/lib/catalog/primaryMuscle';
 import { LOCAL_FIRST_MODE } from '@/lib/config';
 import {
   getBundledCombat,
@@ -110,7 +111,9 @@ function mapExerciseRow(row: Record<string, unknown>): LibraryExercise {
     movement_pattern:
       typeof row.movement_pattern === 'string' ? row.movement_pattern : null,
     primary_muscle:
-      typeof row.primary_muscle === 'string' ? row.primary_muscle : null,
+      typeof row.primary_muscle === 'string'
+        ? normalizePrimaryMuscle(row.primary_muscle)
+        : null,
     synergist_muscles: Array.isArray(row.synergist_muscles)
       ? row.synergist_muscles.map(String)
       : [],
