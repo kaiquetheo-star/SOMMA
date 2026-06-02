@@ -30,6 +30,11 @@ export interface BiologicalProfile {
   available_time_iron: number | null;
   available_time_combat: number | null;
   available_time_spirit: number | null;
+  /**
+   * Iron mastery tier (1–5). 5 = elite (Mr. Olympia), 1 = beginner.
+   * Used by the deterministic iron engine to filter overly-basic movements and improve rotation quality.
+   */
+  iron_mastery: 1 | 2 | 3 | 4 | 5 | null;
   /** Pillar blocks per 7-day microcycle (0–7 each) */
   frequency_iron: number | null;
   frequency_combat: number | null;
@@ -116,6 +121,7 @@ export const initialBiologicalProfile: BiologicalProfile = {
   available_time_iron: DEFAULT_AVAILABLE_TIME_IRON,
   available_time_combat: DEFAULT_AVAILABLE_TIME_COMBAT,
   available_time_spirit: DEFAULT_AVAILABLE_TIME_SPIRIT,
+  iron_mastery: null,
   frequency_iron: DEFAULT_FREQUENCY_IRON,
   frequency_combat: DEFAULT_FREQUENCY_COMBAT,
   frequency_spirit: DEFAULT_FREQUENCY_SPIRIT,

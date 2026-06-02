@@ -13,17 +13,23 @@ import {
 } from '@/lib/gameplan/engine/periodization';
 import {
   analyzeHealerRecovery48h,
-  applyIronRoutineAutoregulation,
   buildCombatBlock,
-  buildIronBlock,
   buildSpiritBlock,
-  detectIronAutoregulation,
   type PillarTimeBudget,
 } from '@/lib/gameplan/engine/prescription';
 import {
+  buildIronGameplanBlock,
+  generateIronMicrocycle,
+  type IronDayBlock,
+} from '@/lib/gameplan/engine/iron/generateIronMicrocycle';
+import {
+  applyIronRoutineAutoregulation,
+  buildIronBlock,
+  detectIronAutoregulation,
+} from '@/lib/gameplan/engine/legacy/ironPrescriptionLegacy';
+import {
   filterIronLogsLastDays,
   flattenPerformanceLogs,
-  type EnginePerformanceRow,
 } from '@/lib/gameplan/engine/performanceLogs';
 import {
   computeTrainingLoadSnapshot,
@@ -87,6 +93,10 @@ function countPillarBlocks(microcycle: MicrocycleDay[], pillar: 'iron' | 'combat
   );
 }
 
+function usesHeuristicIronEngine(frequencyIron: number): boolean {
+  return frequencyIron === 6;
+}
+
 /**
  * Local Head Coach — $0 API. Builds a 7-day microcycle from catalog + passport + logs.
  */
@@ -137,13 +147,31 @@ export async function generateDeterministicGameplan(
 
   const healer = analyzeHealerRecovery48h(flatLogs, catalog, input.userStats.spirit_essence);
 
-  const ironDays = new Set(spreadPillarDayIndices(pillarFreq.frequency_iron));
+  const ironDayIndices = spreadPillarDayIndices(pillarFreq.frequency_iron).sort((a, b) => a - b);
   const combatDays = new Set(spreadPillarDayIndices(pillarFreq.frequency_combat));
   const spiritDays = new Set(spreadPillarDayIndices(pillarFreq.frequency_spirit));
 
-  let ironSlot = 0;
   const protocolDate = input.protocolDate ?? todayDateKey();
   const week_start_date = getWeekStartMonday(protocolDate);
+
+  let ironByDayIndex = new Map<number, IronDayBlock>();
+  if (usesHeuristicIronEngine(pillarFreq.frequency_iron)) {
+    const ironMicrocycle = generateIronMicrocycle({
+      libraryExercises: catalog,
+      biological: input.biological,
+      equipment: input.equipment,
+      logs7d: ironLogs7d,
+      logs21d: ironLogs3w,
+      ironDayIndices,
+      weekStartDate: week_start_date,
+      blockedJointProfiles: autoreg.blocked_joint_profiles,
+      goalIron: input.biological.goal_iron,
+      availableMinutes: pillarTime.available_time_iron,
+    });
+    ironByDayIndex = new Map(ironMicrocycle.map((day) => [day.dayIndex, day]));
+  }
+
+  let ironSlot = 0;
   const { ctx: generation } = buildGenerationContext({
     protocolDate,
     biological: input.biological,
@@ -151,7 +179,7 @@ export async function generateDeterministicGameplan(
 
   const microcycle: MicrocycleDay[] = Array.from({ length: 7 }, (_, index) => {
     const day_index = index + 1;
-    const wantsIron = ironDays.has(day_index);
+    const wantsIron = ironDayIndices.includes(day_index);
     const wantsCombat = combatDays.has(day_index);
     const wantsSpirit = spiritDays.has(day_index);
     const active = wantsIron || wantsCombat || wantsSpirit;
@@ -167,7 +195,8 @@ export async function generateDeterministicGameplan(
     }
 
     const focusLabel = wantsIron
-      ? focusLabelForIronSlot(trainingDaysPerWeek || pillarFreq.frequency_iron || 4, ironSlot++)
+      ? ironByDayIndex.get(day_index)?.focusLabel ??
+        focusLabelForIronSlot(trainingDaysPerWeek || pillarFreq.frequency_iron || 4, ironSlot++)
       : 'Hybrid: Combat + Spirit';
 
     const blocks: GameplanBlock[] = [];
@@ -176,27 +205,38 @@ export async function generateDeterministicGameplan(
     let ironBlockForPrereqs: GameplanBlock | null = null;
 
     if (wantsIron) {
-      ironBlockForPrereqs = buildIronBlock(
-        `block-d${day_index}-iron`,
-        focusLabel,
-        focusLabel,
-        order,
-        catalog,
-        input.equipment,
-        baseRoutine,
-        ironLogs3w,
-        ironLogs7d,
-        autoreg,
-        input.biological.goal_iron,
-        pillarTime,
-        input.biological,
-        mesocycleWeek,
-        input.biological.clinical_exit_interview,
-        input.biological.target_archetype,
-        generation,
-      );
-      ironBlockForPrereqs.order = order++;
+      const heuristicDay = ironByDayIndex.get(day_index);
+      if (heuristicDay) {
+        ironBlockForPrereqs = buildIronGameplanBlock(
+          heuristicDay,
+          `block-d${day_index}-iron`,
+          order,
+          catalog,
+          pillarTime.available_time_iron,
+        );
+      } else {
+        ironBlockForPrereqs = buildIronBlock(
+          `block-d${day_index}-iron`,
+          focusLabel,
+          focusLabel,
+          order,
+          catalog,
+          input.equipment,
+          baseRoutine,
+          ironLogs3w,
+          ironLogs7d,
+          autoreg,
+          input.biological.goal_iron,
+          pillarTime,
+          input.biological,
+          mesocycleWeek,
+          input.biological.clinical_exit_interview,
+          input.biological.target_archetype,
+          generation,
+        );
+      }
       blocks.push(ironBlockForPrereqs);
+      order += 1;
     }
 
     if (wantsCombat) {
