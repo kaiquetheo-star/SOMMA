@@ -232,6 +232,28 @@ interface IronExercisePrescription {
   execution_technique: IronExecutionTechnique;
 }
 
+const MAX_FINISHER_OR_ISOLATION_SETS = 4;
+const MAX_REASONABLE_SETS_PER_EXERCISE = 8;
+
+function capIronTargetSets(
+  requestedSets: number,
+  meta: LibraryExercise | undefined,
+  technique?: IronExecutionTechnique,
+): number {
+  const safeSets = Number.isFinite(requestedSets) ? Math.max(1, Math.round(requestedSets)) : 1;
+  const isIsolationOrFinisher =
+    safeSets > MAX_REASONABLE_SETS_PER_EXERCISE ||
+    meta?.movement_pattern === 'isolation' ||
+    technique === 'Myo-Reps' ||
+    /face_pull|leg_extension|leg_curl|lying_leg_curl|curl|raise|fly|pushdown|extension|pec_deck|calf/i.test(
+      `${meta?.slug ?? ''} ${meta?.name ?? ''}`,
+    );
+
+  return isIsolationOrFinisher
+    ? Math.min(safeSets, MAX_FINISHER_OR_ISOLATION_SETS)
+    : Math.min(safeSets, MAX_REASONABLE_SETS_PER_EXERCISE);
+}
+
 interface WeeklyMuscleVolumeRow {
   primary_muscle: string;
   working_sets_7d: number;
@@ -1420,6 +1442,7 @@ function prescribeIronExercise(
     autoreg,
   );
   sets = volumeCap.sets;
+  sets = capIronTargetSets(sets, meta, technique);
 
   const notes = [note, volumeCap.volumeNote].filter(Boolean).join(' · ');
   const restSeconds = computeRestSecondsFromCns(meta?.cns_fatigue_cost ?? null);
@@ -2262,6 +2285,7 @@ function sanitizeBlueprint(
             autoreg,
           );
           targetSets = volumeCap.sets;
+          targetSets = capIronTargetSets(targetSets, meta, technique);
           const progressionNote = [
             typeof row.progression_note === 'string' ? row.progression_note : 'Validated overload',
             volumeCap.volumeNote,

@@ -8,7 +8,10 @@ import { isGameplanFetchError } from '@/lib/gameplan/gameplanErrors';
 import { isProtocolDateStale } from '@/lib/gameplan/generateStubGameplan';
 import { normalizePersistedSnapshot, type SommaPersistedSnapshot } from '@/lib/local/backup';
 import { recalibrateFromPerformanceQueue } from '@/lib/local/recalibrate';
-import { isDegenerateMicrocycle } from '@/lib/gameplan/microcycleValidation';
+import {
+  isDegenerateMicrocycle,
+  sanitizeMicrocycleIronVolume,
+} from '@/lib/gameplan/microcycleValidation';
 import { getMicrocycleDay, getTodayDayIndex } from '@/lib/gameplan/microcycleWeek';
 import { applyReadinessAutoregulationToMicrocycle } from '@/lib/gameplan/engine/clinicalLaws';
 import {
@@ -75,8 +78,9 @@ export interface UserFoundation {
 }
 
 function applyGameplanToState(gameplan: DailyGameplan, source: SommaState['gameplan_source']) {
+  const weeklyMicrocycle = sanitizeMicrocycleIronVolume(gameplan.microcycle);
   return {
-    weeklyMicrocycle: gameplan.microcycle,
+    weeklyMicrocycle,
     protocolDate: gameplan.date,
     weekStartDate: gameplan.week_start_date ?? null,
     protocolGeneratedAt: gameplan.generated_at,
@@ -798,7 +802,7 @@ export const useSommaStore = create<SommaState>()(
         if (!state.weeklyMicrocycle) {
           const legacyPlan = legacy.currentGameplan ?? legacy.daily_gameplan;
           if (legacyPlan?.microcycle?.length) {
-            state.weeklyMicrocycle = legacyPlan.microcycle;
+            state.weeklyMicrocycle = sanitizeMicrocycleIronVolume(legacyPlan.microcycle);
             state.protocolDate = legacyPlan.date;
             state.weekStartDate = legacyPlan.week_start_date ?? null;
             state.protocolGeneratedAt = legacyPlan.generated_at;
@@ -821,6 +825,10 @@ export const useSommaStore = create<SommaState>()(
 
         const expectedTraining =
           state.user_biological.training_days_per_week ?? DEFAULT_TRAINING_DAYS_PER_WEEK;
+        if (state.weeklyMicrocycle) {
+          state.weeklyMicrocycle = sanitizeMicrocycleIronVolume(state.weeklyMicrocycle);
+        }
+
         if (
           state.weeklyMicrocycle &&
           isDegenerateMicrocycle(state.weeklyMicrocycle, expectedTraining)

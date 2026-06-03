@@ -42,8 +42,14 @@ import { pruneIronBlocksInMicrocycle } from '@/lib/gameplan/engine/volumePruning
 import { clampMesocycleWeekProfile } from '@/types/biological';
 import { buildClinicalReviewTrigger } from '@/lib/gameplan/engine/progression';
 import { fetchLibraryExercises } from '@/lib/catalog/library';
+import { sanitizeMicrocycleIronVolume } from '@/lib/gameplan/microcycleValidation';
 import type { BiologicalProfile } from '@/types/biological';
-import type { DailyGameplan, GameplanBlock, MicrocycleDay } from '@/types/gameplan';
+import type {
+  DailyGameplan,
+  GameplanBlock,
+  IronExercisePrescription,
+  MicrocycleDay,
+} from '@/types/gameplan';
 import type { PerformanceLogEntry } from '@/types/performance';
 import type { EquipmentTag, FocusPreference, UserStats } from '@/store/useSommaStore';
 
@@ -97,6 +103,136 @@ function totalTrainingDuration(day: MicrocycleDay): number {
   return day.blocks
     .filter((block) => block.pillar === 'iron')
     .reduce((sum, block) => sum + block.duration_minutes, 0);
+}
+
+function restSecondsFromCns(cns: number | null): number {
+  const cost = cns ?? 3;
+  if (cost >= 5) return 180;
+  if (cost >= 4) return 150;
+  if (cost >= 3) return 105;
+  if (cost >= 2) return 75;
+  return 60;
+}
+
+function isMinimumViableCandidate(
+  exercise: Awaited<ReturnType<typeof fetchLibraryExercises>>[number],
+  equipment: EquipmentTag[],
+  blockedJointProfiles: readonly string[],
+): boolean {
+  if (!equipmentMatches(exercise, equipment)) return false;
+  if (exercise.joint_stress_profile && blockedJointProfiles.includes(exercise.joint_stress_profile)) return false;
+  if (exercise.primary_muscle === 'obliques' || exercise.primary_muscle === 'core') return false;
+  return exercise.movement_pattern != null;
+}
+
+function candidateScoreForFocus(
+  exercise: Awaited<ReturnType<typeof fetchLibraryExercises>>[number],
+  focusLabel: string,
+): number {
+  const focus = focusLabel.toLowerCase();
+  let score = 0;
+  if (focus.includes('push') && exercise.movement_pattern === 'push') score += 100;
+  if (focus.includes('pull') && exercise.movement_pattern === 'pull') score += 100;
+  if (
+    (focus.includes('leg') || focus.includes('quad') || focus.includes('posterior')) &&
+    (exercise.movement_pattern === 'squat' ||
+      exercise.movement_pattern === 'hinge' ||
+      exercise.movement_pattern === 'lunge')
+  ) {
+    score += 100;
+  }
+  if (exercise.movement_pattern === 'isolation') score -= 25;
+  score -= (exercise.cns_fatigue_cost ?? 3) * 5;
+  return score;
+}
+
+function buildMinimumViableIronExercises(
+  catalog: Awaited<ReturnType<typeof fetchLibraryExercises>>,
+  equipment: EquipmentTag[],
+  blockedJointProfiles: readonly string[],
+  focusLabel: string,
+): IronExercisePrescription[] {
+  return catalog
+    .filter((exercise) => isMinimumViableCandidate(exercise, equipment, blockedJointProfiles))
+    .sort((a, b) => {
+      const scoreDelta = candidateScoreForFocus(b, focusLabel) - candidateScoreForFocus(a, focusLabel);
+      if (scoreDelta !== 0) return scoreDelta;
+      return a.slug.localeCompare(b.slug);
+    })
+    .slice(0, 2)
+    .map((exercise) => ({
+      exercise_id: exercise.id,
+      slug: exercise.slug,
+      display_name: exercise.name,
+      target_sets: 2,
+      target_reps: exercise.default_reps ?? 10,
+      target_rep_range: `${Math.max(6, (exercise.default_reps ?? 10) - 2)}-${exercise.default_reps ?? 10} @ 3 RIR`,
+      target_rir: 3,
+      target_weight_kg: null,
+      rest_seconds: restSecondsFromCns(exercise.cns_fatigue_cost),
+      alternative_exercise_id: null,
+      progression_note: 'Minimum viable deload fallback: MRV/CNS relaxed to avoid an empty training day.',
+      execution_technique: 'Standard',
+    }));
+}
+
+function injectMinimumViableIronWorkouts(
+  microcycle: MicrocycleDay[],
+  catalog: Awaited<ReturnType<typeof fetchLibraryExercises>>,
+  equipment: EquipmentTag[],
+  blockedJointProfiles: readonly string[],
+): MicrocycleDay[] {
+  return microcycle.map((day) => {
+    if (day.is_rest_day) return day;
+    const blocks = day.blocks.map((block) => {
+      if (block.pillar !== 'iron' || (block.iron?.exercises?.length ?? 0) > 0) return block;
+
+      const exercises = buildMinimumViableIronExercises(
+        catalog,
+        equipment,
+        blockedJointProfiles,
+        day.focus_label,
+      );
+      if (exercises.length === 0) return block;
+
+      return {
+        ...block,
+        subtitle: exercises.map((exercise) => exercise.display_name).filter(Boolean).join(' · '),
+        iron: {
+          routine_id: block.iron?.routine_id ?? `iron_${block.id}`,
+          exercises,
+        },
+      };
+    });
+
+    const hasIron = blocks.some((block) => block.pillar === 'iron');
+    if (hasIron) return { ...day, blocks };
+
+    const exercises = buildMinimumViableIronExercises(
+      catalog,
+      equipment,
+      blockedJointProfiles,
+      day.focus_label,
+    );
+    if (exercises.length === 0) return { ...day, blocks };
+
+    return {
+      ...day,
+      blocks: [
+        {
+          id: `block-d${day.day_index}-iron`,
+          pillar: 'iron',
+          title: day.focus_label,
+          subtitle: exercises.map((exercise) => exercise.display_name).filter(Boolean).join(' · '),
+          duration_minutes: 20,
+          order: 0,
+          status: 'pending',
+          iron: { routine_id: `iron_block-d${day.day_index}-iron`, exercises },
+        },
+        ...blocks,
+      ],
+    };
+  });
 }
 
 function appendNutritionTargets(
@@ -285,6 +421,13 @@ export async function generateDeterministicGameplan(
     pillarTime.available_time_iron,
   );
 
+  orderedMicrocycle = injectMinimumViableIronWorkouts(
+    orderedMicrocycle,
+    catalog,
+    input.equipment,
+    autoreg.blocked_joint_profiles,
+  );
+
   orderedMicrocycle = injectRecoveryProtocols(
     orderedMicrocycle,
     {
@@ -294,6 +437,7 @@ export async function generateDeterministicGameplan(
     input.biological,
   );
 
+  orderedMicrocycle = sanitizeMicrocycleIronVolume(orderedMicrocycle);
   orderedMicrocycle = appendNutritionTargets(orderedMicrocycle, input.biological);
 
   const todayIndex = getDayIndexForDate(protocolDate, week_start_date);

@@ -58,6 +58,9 @@ export interface IronAutoregulationState {
   swaps_applied: { from_exercise_id: string; to_exercise_id: string; reason: string }[];
 }
 
+const MAX_FINISHER_OR_ISOLATION_SETS = 4;
+const MAX_REASONABLE_SETS_PER_EXERCISE = 8;
+
 export interface MesocycleExerciseSummary {
   exercise_id: string;
   progression_recommendation: 'maintain' | 'load' | 'volume' | 'deload';
@@ -118,6 +121,25 @@ function computeRestSecondsFromCns(cns: number | null): number {
   if (cost >= 3) return 105;
   if (cost >= 2) return 75;
   return 60;
+}
+
+function capIronTargetSets(
+  requestedSets: number,
+  meta: LibraryExercise | undefined,
+  technique?: IronExecutionTechnique,
+): number {
+  const safeSets = Number.isFinite(requestedSets) ? Math.max(1, Math.round(requestedSets)) : 1;
+  const isIsolationOrFinisher =
+    safeSets > MAX_REASONABLE_SETS_PER_EXERCISE ||
+    meta?.movement_pattern === 'isolation' ||
+    technique === 'Myo-Reps' ||
+    /face_pull|leg_extension|leg_curl|lying_leg_curl|curl|raise|fly|pushdown|extension|pec_deck|calf/i.test(
+      `${meta?.slug ?? ''} ${meta?.name ?? ''}`,
+    );
+
+  return isIsolationOrFinisher
+    ? Math.min(safeSets, MAX_FINISHER_OR_ISOLATION_SETS)
+    : Math.min(safeSets, MAX_REASONABLE_SETS_PER_EXERCISE);
 }
 
 function toPerformanceSamples(logs: EnginePerformanceRow[]): PerformanceLogSample[] {
@@ -298,6 +320,8 @@ function prescribeIronExercise(
   } else if (progression === 'load' && cns <= 2 && !autoreg.high_stress_mode) {
     technique = 'Myo-Reps';
   }
+
+  sets = capIronTargetSets(sets, meta, technique);
 
   return {
     exercise_id: exerciseId,

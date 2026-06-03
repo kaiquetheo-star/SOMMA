@@ -3,7 +3,10 @@ import {
   getDayIndexForDate,
   getWeekStartMonday,
 } from '@/lib/gameplan/microcycleWeek';
-import { isDegenerateMicrocycle } from '@/lib/gameplan/microcycleValidation';
+import {
+  isDegenerateMicrocycle,
+  sanitizeMicrocycleIronVolume,
+} from '@/lib/gameplan/microcycleValidation';
 import type {
   DailyGameplan,
   GameplanBlock,
@@ -213,7 +216,7 @@ export function parseDailyGameplanPayload(payload: unknown): DailyGameplan | nul
 
     if (parsedDays.length === 0) return null;
 
-    const microcycle = normalizeMicrocycle(parsedDays, week_start_date);
+    const microcycle = sanitizeMicrocycleIronVolume(normalizeMicrocycle(parsedDays, week_start_date));
     const expectedTraining =
       training_days_per_week ??
       (typeof record.training_days_per_week === 'number'

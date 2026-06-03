@@ -1,7 +1,10 @@
 import * as DocumentPicker from 'expo-document-picker';
 
 import { isProtocolDateStale } from '@/lib/gameplan/generateStubGameplan';
-import { isDegenerateMicrocycle } from '@/lib/gameplan/microcycleValidation';
+import {
+  isDegenerateMicrocycle,
+  sanitizeMicrocycleIronVolume,
+} from '@/lib/gameplan/microcycleValidation';
 import { getTodayDayIndex } from '@/lib/gameplan/microcycleWeek';
 import type {
   EquipmentTag,
@@ -166,6 +169,10 @@ export function normalizePersistedSnapshot(raw: unknown): SommaPersistedSnapshot
     weeklyMicrocycle = legacyPlan.microcycle;
     protocolDate = legacyPlan.date ?? protocolDate;
     protocolGeneratedAt = legacyPlan.generated_at ?? protocolGeneratedAt;
+  }
+
+  if (weeklyMicrocycle?.length) {
+    weeklyMicrocycle = sanitizeMicrocycleIronVolume(weeklyMicrocycle);
   }
 
   if (!selectedDayIndex) {

@@ -1,11 +1,87 @@
 import type { MicrocycleDay } from '@/types/gameplan';
 
+const MAX_FINISHER_OR_ISOLATION_SETS = 4;
+const MAX_REASONABLE_SETS_PER_EXERCISE = 8;
+
 export interface MicrocycleHealth {
   trainingDayCount: number;
   trainingDaysWithBlocks: number;
   restDayCount: number;
   allRest: boolean;
   meetsTrainingQuota: boolean;
+}
+
+function normalizedToken(value: string | null | undefined): string {
+  return (value ?? '').toLowerCase().replace(/[\s-]+/g, '_');
+}
+
+function isIsolationOrFinisherLike(exercise: {
+  slug?: string;
+  display_name?: string;
+  execution_technique?: string;
+  target_sets: number;
+  rest_seconds?: number;
+}): boolean {
+  const slug = normalizedToken(exercise.slug);
+  const name = normalizedToken(exercise.display_name);
+  const technique = normalizedToken(exercise.execution_technique);
+
+  return (
+    exercise.target_sets > MAX_REASONABLE_SETS_PER_EXERCISE ||
+    technique.includes('myo') ||
+    slug.includes('finisher') ||
+    name.includes('finisher') ||
+    /face_pull|leg_extension|leg_curl|lying_leg_curl|curl|raise|fly|pushdown|extension|pec_deck|calf/.test(slug) ||
+    /face_pull|leg_extension|leg_curl|lying_leg_curl|curl|raise|fly|pushdown|extension|pec_deck|calf/.test(name)
+  );
+}
+
+function sanitizeTargetSets(exercise: {
+  slug?: string;
+  display_name?: string;
+  execution_technique?: string;
+  target_sets: number;
+  rest_seconds?: number;
+}): number {
+  const requested = Number(exercise.target_sets);
+  const safe = Number.isFinite(requested) ? Math.max(1, Math.round(requested)) : 1;
+  if (isIsolationOrFinisherLike({ ...exercise, target_sets: safe })) {
+    return Math.min(safe, MAX_FINISHER_OR_ISOLATION_SETS);
+  }
+  return Math.min(safe, MAX_REASONABLE_SETS_PER_EXERCISE);
+}
+
+export function sanitizeMicrocycleIronVolume(microcycle: MicrocycleDay[]): MicrocycleDay[] {
+  return microcycle.map((day) => ({
+    ...day,
+    blocks: (day.blocks ?? []).map((block) => {
+      if (block.pillar !== 'iron' || !block.iron) return block;
+      const exercises = (block.iron.exercises ?? []).map((exercise) => ({
+        ...exercise,
+        target_sets: sanitizeTargetSets(exercise),
+      }));
+      return {
+        ...block,
+        iron: {
+          ...block.iron,
+          exercises,
+        },
+      };
+    }),
+  }));
+}
+
+function hasRunnableTrainingBlock(day: MicrocycleDay): boolean {
+  return (day.blocks ?? []).some((block) => {
+    if (block.pillar !== 'iron') return true;
+    return (block.iron?.exercises ?? []).length > 0;
+  });
+}
+
+function hasEmptyIronWorkout(day: MicrocycleDay): boolean {
+  if (day.is_rest_day) return false;
+  const ironBlocks = (day.blocks ?? []).filter((block) => block.pillar === 'iron');
+  return ironBlocks.length === 0 || ironBlocks.some((block) => (block.iron?.exercises ?? []).length === 0);
 }
 
 /** Count active vs rest days and whether the week matches expected training frequency. */
@@ -17,7 +93,7 @@ export function assessMicrocycleHealth(
 
   const trainingDays = microcycle.filter((day) => !day.is_rest_day);
   const trainingDayCount = trainingDays.length;
-  const trainingDaysWithBlocks = trainingDays.filter((day) => day.blocks.length > 0).length;
+  const trainingDaysWithBlocks = trainingDays.filter(hasRunnableTrainingBlock).length;
   const restDayCount = microcycle.length - trainingDayCount;
   const allRest = trainingDayCount === 0;
 
@@ -45,5 +121,5 @@ export function isDegenerateMicrocycle(
 ): boolean {
   const health = assessMicrocycleHealth(microcycle, expectedTrainingDaysPerWeek);
   if (!health) return true;
-  return health.allRest || !health.meetsTrainingQuota;
+  return health.allRest || !health.meetsTrainingQuota || microcycle!.some(hasEmptyIronWorkout);
 }
