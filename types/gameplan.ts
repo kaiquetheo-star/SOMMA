@@ -12,7 +12,14 @@ export type IronExecutionTechnique =
   | 'Slow Eccentric (4s)'
   | 'Drop Set'
   | 'Cluster Sets'
+  | 'DROP_SET'
+  | 'REST_PAUSE'
+  | 'PRE_EXHAUST'
+  | 'BI_SET_ANTAGONIST'
+  | 'BI_SET_SAME_MUSCLE'
   | (string & {});
+
+export type LoadingProtocol = 'bodyweight' | 'weighted' | 'assisted';
 
 export interface IronExercisePrescription {
   exercise_id: string;
@@ -33,6 +40,8 @@ export interface IronExercisePrescription {
   alternative_exercise_id?: string | null;
   progression_note?: string;
   execution_technique?: IronExecutionTechnique;
+  loading_protocol?: LoadingProtocol;
+  superset_id?: string;
   /** Regra 4.1: eccentric, stretch pause, concentric, peak contraction. */
   tempo?: ExerciseTempo;
   /** Regra 4.2: Text-Only Elite biomechanical cue payload. */

@@ -1,8 +1,10 @@
 import type {
   CatalogExercise,
+  IntensityTechnique,
   LibraryExercise,
   MovementPattern,
 } from '@/types/catalog';
+import { IntensityTechnique as Technique } from '@/types/catalog';
 import { enrichExerciseWithCues } from '@/lib/catalog/biomechanicalMapper';
 import { normalizePrimaryMuscle } from '@/lib/catalog/primaryMuscle';
 
@@ -12,7 +14,12 @@ function iron(
   primaryMuscle: string,
   movementPattern: MovementPattern,
   equipment: string[] = ['barbell', 'dumbbells', 'full_gym'],
-  options?: { cns?: number; stretch?: boolean },
+  options?: {
+    cns?: number;
+    stretch?: boolean;
+    intensity?: IntensityTechnique[];
+    requiresLoading?: boolean;
+  },
 ): LibraryExercise {
   const cns =
     options?.cns ??
@@ -37,6 +44,12 @@ function iron(
     cns_fatigue_cost: cns,
     joint_stress_profile: null,
     stretch_mediated_hypertrophy: options?.stretch ?? /fly|pullover|curl/.test(slug),
+    intensity_compatibility:
+      options?.intensity ??
+      (movementPattern === 'isolation'
+        ? [Technique.MYO_REPS, Technique.DROP_SET, Technique.BI_SET_SAME_MUSCLE]
+        : [Technique.STANDARD]),
+    requires_loading: options?.requiresLoading ?? false,
   };
 }
 
@@ -47,8 +60,13 @@ const BUNDLED_EXERCISES: LibraryExercise[] = [
   iron('barbell_incline_bench_press', 'Barbell Incline Bench Press', 'chest', 'push'),
   iron('dumbbell_incline_press', 'Dumbbell Incline Press', 'chest', 'push', ['dumbbells', 'full_gym']),
   iron('decline_barbell_bench', 'Decline Barbell Bench Press', 'chest', 'push'),
-  iron('machine_chest_press', 'Machine Chest Press', 'chest', 'push', ['full_gym']),
-  iron('push_up', 'Push-Up', 'chest', 'push', ['bodyweight', 'full_gym'], { cns: 2 }),
+  iron('machine_chest_press', 'Machine Chest Press', 'chest', 'push', ['full_gym'], {
+    intensity: [Technique.REST_PAUSE],
+  }),
+  iron('push_up', 'Push-Up', 'chest', 'push', ['bodyweight', 'full_gym'], {
+    cns: 2,
+    requiresLoading: true,
+  }),
 
   // —— Push / shoulders ——
   iron('barbell_overhead_press', 'Barbell Overhead Press', 'shoulders', 'push'),
@@ -58,9 +76,18 @@ const BUNDLED_EXERCISES: LibraryExercise[] = [
   iron('landmine_press', 'Landmine Press', 'shoulders', 'push', ['barbell', 'full_gym'], { cns: 3 }),
 
   // —— Push / isolations ——
-  iron('cable_fly', 'Cable Fly', 'chest', 'isolation', ['full_gym'], { stretch: true }),
-  iron('dumbbell_fly', 'Dumbbell Fly', 'chest', 'isolation', ['dumbbells', 'full_gym'], { stretch: true }),
-  iron('pec_deck', 'Pec Deck Fly', 'chest', 'isolation', ['full_gym'], { stretch: true }),
+  iron('cable_fly', 'Cable Fly', 'chest', 'isolation', ['full_gym'], {
+    stretch: true,
+    intensity: [Technique.DROP_SET, Technique.PRE_EXHAUST, Technique.MYO_REPS],
+  }),
+  iron('dumbbell_fly', 'Dumbbell Fly', 'chest', 'isolation', ['dumbbells', 'full_gym'], {
+    stretch: true,
+    intensity: [Technique.DROP_SET, Technique.PRE_EXHAUST, Technique.MYO_REPS],
+  }),
+  iron('pec_deck', 'Pec Deck Fly', 'chest', 'isolation', ['full_gym'], {
+    stretch: true,
+    intensity: [Technique.DROP_SET, Technique.PRE_EXHAUST, Technique.MYO_REPS],
+  }),
   iron('lateral_raise', 'Lateral Raise', 'shoulders', 'isolation', ['dumbbells', 'full_gym']),
   iron('cable_lateral_raise', 'Cable Lateral Raise', 'shoulders', 'isolation', ['full_gym']),
   iron('front_raise', 'Front Raise', 'shoulders', 'isolation', ['dumbbells', 'full_gym']),
@@ -77,8 +104,16 @@ const BUNDLED_EXERCISES: LibraryExercise[] = [
   iron('chest_supported_row', 'Chest-Supported Row', 'back', 'pull', ['full_gym', 'dumbbells']),
   iron('cable_bar_lateral_pulldown', 'Lat Pulldown', 'back', 'pull', ['full_gym']),
   iron('lat_pulldown', 'Wide-Grip Lat Pulldown', 'back', 'pull', ['full_gym']),
-  iron('pull_up', 'Pull-Up', 'back', 'pull', ['bodyweight', 'pull_up_bar', 'full_gym'], { cns: 4 }),
-  iron('chin_up', 'Chin-Up', 'back', 'pull', ['bodyweight', 'pull_up_bar', 'full_gym'], { cns: 4 }),
+  iron('pull_up', 'Pull-Up', 'back', 'pull', ['bodyweight', 'pull_up_bar', 'full_gym'], {
+    cns: 4,
+    intensity: [Technique.REST_PAUSE],
+    requiresLoading: true,
+  }),
+  iron('chin_up', 'Chin-Up', 'back', 'pull', ['bodyweight', 'pull_up_bar', 'full_gym'], {
+    cns: 4,
+    intensity: [Technique.REST_PAUSE],
+    requiresLoading: true,
+  }),
   iron('seated_cable_row', 'Seated Cable Row', 'back', 'pull', ['full_gym']),
   iron('t_bar_row', 'T-Bar Row', 'back', 'pull', ['barbell', 'full_gym'], { cns: 4 }),
 
@@ -99,11 +134,19 @@ const BUNDLED_EXERCISES: LibraryExercise[] = [
   iron('barbell_squat', 'Barbell Back Squat', 'quads', 'squat'),
   iron('front_squat', 'Front Squat', 'quads', 'squat', ['barbell', 'full_gym'], { cns: 5 }),
   iron('goblet_squat', 'Goblet Squat', 'quads', 'squat', ['dumbbells', 'kettlebell', 'full_gym'], { cns: 3 }),
-  iron('leg_press', 'Leg Press', 'quads', 'squat', ['full_gym'], { cns: 4 }),
-  iron('hack_squat', 'Hack Squat', 'quads', 'squat', ['full_gym'], { cns: 4 }),
+  iron('leg_press', 'Leg Press', 'quads', 'squat', ['full_gym'], {
+    cns: 4,
+    intensity: [Technique.REST_PAUSE],
+  }),
+  iron('hack_squat', 'Hack Squat', 'quads', 'squat', ['full_gym'], {
+    cns: 4,
+    intensity: [Technique.REST_PAUSE],
+  }),
   iron('bulgarian_split_squat', 'Bulgarian Split Squat', 'quads', 'lunge', ['dumbbells', 'full_gym'], { cns: 4 }),
   iron('walking_lunge', 'Walking Lunge', 'quads', 'lunge', ['dumbbells', 'bodyweight', 'full_gym'], { cns: 3 }),
-  iron('leg_extension', 'Leg Extension', 'quads', 'isolation', ['full_gym']),
+  iron('leg_extension', 'Leg Extension', 'quads', 'isolation', ['full_gym'], {
+    intensity: [Technique.DROP_SET, Technique.PRE_EXHAUST, Technique.BI_SET_SAME_MUSCLE],
+  }),
 
   // —— Hinge / posterior ——
   iron('conventional_deadlift', 'Conventional Deadlift', 'hamstrings', 'hinge'),

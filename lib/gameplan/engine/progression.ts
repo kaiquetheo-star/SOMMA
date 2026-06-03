@@ -1,33 +1,21 @@
 // CLINICAL ENGINE: DETERMINISTIC ONLY. NO RANDOMNESS ALLOWED. IF INPUTS ARE CONSTANT, OUTPUT MUST BE CONSTANT.
 
-import { DELOAD_MESOCYCLE_WEEK, clampMesocycleWeek } from '@/lib/gameplan/engine/clinicalLaws';
 import type { ClinicalExitInterview, ClinicalReviewTrigger } from '@/types/clinical';
 
 export const CLINICAL_REVIEW_TRIGGER_TYPE = 'clinical_exit_interview' as const;
 
-/** End-of-Month Review — fires at mesocycle week 4 until interview is submitted */
-export function buildClinicalReviewTrigger(
-  mesocycleWeek: number | null | undefined,
-  interviewSubmitted: boolean,
-): ClinicalReviewTrigger | null {
+/** Legacy hook retained for callers; automatic progression no longer uses manual week fields. */
+export function buildClinicalReviewTrigger(_unused: unknown, interviewSubmitted: boolean): ClinicalReviewTrigger | null {
   if (interviewSubmitted) return null;
-  if (clampMesocycleWeek(mesocycleWeek) !== DELOAD_MESOCYCLE_WEEK) return null;
+  return null;
 
-  return {
-    type: CLINICAL_REVIEW_TRIGGER_TYPE,
-    mesocycle_week: DELOAD_MESOCYCLE_WEEK,
-    required: true,
-    title: 'Clinical Exit Interview',
-    description:
-      'Month 1 complete. Submit average RPE, perceived fatigue, and current 1RM estimates to calibrate Month 2 loads.',
-  };
 }
 
 export function isMesocycleMonthComplete(
-  mesocycleWeek: number | null | undefined,
+  _unused: unknown,
   interview: ClinicalExitInterview | null | undefined,
 ): boolean {
-  return clampMesocycleWeek(mesocycleWeek) === DELOAD_MESOCYCLE_WEEK && interview != null;
+  return interview != null;
 }
 
 /**

@@ -6,7 +6,6 @@ import {
   type BiologicalProfile,
   getBodyFatPercentage,
   isBiologicalProfileComplete,
-  TARGET_ARCHETYPE_OPTIONS,
 } from '@/types/biological';
 import { calculateNaturalTargetTimeline } from '@/lib/physics/longevityMath';
 
@@ -32,9 +31,6 @@ export function BiologicalPassportSummary({ profile }: BiologicalPassportSummary
   const age = ageFromDateOfBirth(profile.date_of_birth);
   const complete = isBiologicalProfileComplete(profile);
   const timeline = calculateNaturalTargetTimeline(profile);
-  const archetypeLabel = profile.target_archetype
-    ? TARGET_ARCHETYPE_OPTIONS.find((o) => o.id === profile.target_archetype)?.label ?? null
-    : null;
 
   return (
     <View className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] px-5">
@@ -80,10 +76,6 @@ export function BiologicalPassportSummary({ profile }: BiologicalPassportSummary
         label="Training frequency"
         value={formatTrainingDaysPerWeek(profile.training_days_per_week)}
       />
-      <SummaryRow
-        label="Shape archetype"
-        value={archetypeLabel ?? '—'}
-      />
       <View className="border-t border-white/5 py-3">
         <Text className="font-body text-[10px] uppercase tracking-[0.3em] text-[#6B7568]">
           Injuries & limits
@@ -95,10 +87,10 @@ export function BiologicalPassportSummary({ profile }: BiologicalPassportSummary
 
       <View className="border-t border-white/5 py-3">
         <Text className="font-body text-[10px] uppercase tracking-[0.3em] text-[#6B7568]">
-          Coaching goals
+          Coaching target
         </Text>
-        <SummaryRow label="Iron" value={profile.goal_iron?.trim() || '—'} />
-        <SummaryRow label="Nutrition" value={profile.nutrition_goal?.trim() || '—'} />
+        <SummaryRow label="Iron" value="Hypertrophy" />
+        <SummaryRow label="Nutrition" value="Hypertrophy support" />
       </View>
 
       {timeline ? (

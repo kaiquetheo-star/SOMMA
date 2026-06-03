@@ -103,7 +103,6 @@ function buildConstraints(
       masteryFromExperience(input.biological.experience_level),
     available_time_minutes: input.availableMinutes,
     weekStartDate: input.weekStartDate,
-    targetArchetype: input.biological.target_archetype,
   };
 }
 

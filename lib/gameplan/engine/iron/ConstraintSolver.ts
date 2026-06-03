@@ -49,6 +49,17 @@ const TOO_BASIC_FOR_ADVANCED = new Set([
   'lat_pulldown',
 ]);
 
+function solverDebugEnabled(): boolean {
+  return typeof process !== 'undefined' && process.env.SOMMA_SOLVER_DEBUG === '1';
+}
+
+function logCandidateRejection(slot: SolverSlot, exercise: CatalogExercise, reason: string): void {
+  if (!solverDebugEnabled()) return;
+  console.log(
+    `[SOMMA][ConstraintSolver] Rejeitado: ${exercise.name} (${exercise.slug}) | Slot: ${slot.slotId} | Motivo: ${reason}`,
+  );
+}
+
 const AXIAL_LOAD_SLUGS = new Set([
   'barbell_back_squat',
   'conventional_deadlift',
@@ -119,7 +130,7 @@ function equipmentSubsetAllowed(
 ): boolean {
   if (available.length === 0) return false;
   if (exercise.equipment_required.length === 0) return true;
-  return exercise.equipment_required.every((tag) => available.includes(tag as EquipmentTag));
+  return exercise.equipment_required.some((tag) => available.includes(tag as EquipmentTag));
 }
 
 function jointProfileAllowed(
@@ -322,37 +333,83 @@ function collectCandidates(
     ]);
 
     // Regra 4 / anti-duplicata: exact repeats are blocked deterministically.
-    if (usedExerciseIds.has(exercise.id)) continue;
-    if (!matchesMovementPattern(exercise, slot.requiredPatterns)) continue;
-    if (!matchesPrimaryMuscleHint(exercise, slot.primaryMuscleHint)) continue;
-    if (!matchesIsolationSlot(exercise, slot.isolationOnly)) continue;
+    if (usedExerciseIds.has(exercise.id)) {
+      logCandidateRejection(slot, exercise, 'exercício já usado no microciclo');
+      continue;
+    }
+    if (!matchesMovementPattern(exercise, slot.requiredPatterns)) {
+      logCandidateRejection(slot, exercise, `padrão ${exercise.movement_pattern} não atende ${slot.requiredPatterns.join('/')}`);
+      continue;
+    }
+    if (!matchesPrimaryMuscleHint(exercise, slot.primaryMuscleHint)) {
+      logCandidateRejection(slot, exercise, `músculo ${exercise.primary_muscle} não atende hint ${slot.primaryMuscleHint ?? 'n/a'}`);
+      continue;
+    }
+    if (!matchesIsolationSlot(exercise, slot.isolationOnly)) {
+      logCandidateRejection(slot, exercise, 'slot exige isolamento');
+      continue;
+    }
     if (!options.ignoreMastery && constraints.iron_mastery >= 4) {
-      if (TOO_BASIC_FOR_ADVANCED.has(exercise.slug)) continue;
+      if (TOO_BASIC_FOR_ADVANCED.has(exercise.slug)) {
+        logCandidateRejection(slot, exercise, 'exercício básico demais para atleta avançado');
+        continue;
+      }
       // Elite athletes still use "basic" isolations as finishers; filter only for non-isolation compounds/patterns.
-      if (exercise.movement_pattern !== 'isolation' && exercise.complexity_level <= 2) continue;
+      if (exercise.movement_pattern !== 'isolation' && exercise.complexity_level <= 2) {
+        logCandidateRejection(slot, exercise, `complexidade ${exercise.complexity_level} baixa para mastery ${constraints.iron_mastery}`);
+        continue;
+      }
     }
     // Regra 4 hard filter: required equipment must be fully available.
-    if (!equipmentSubsetAllowed(exercise, constraints.available_equipment ?? constraints.equipment)) continue;
-    if (!jointProfileAllowed(exercise, constraints.blockedJointProfiles)) continue;
+    if (!equipmentSubsetAllowed(exercise, constraints.available_equipment ?? constraints.equipment)) {
+      logCandidateRejection(
+        slot,
+        exercise,
+        `equipamento incompatível; requer um de [${exercise.equipment_required.join(', ')}]`,
+      );
+      continue;
+    }
+    if (!jointProfileAllowed(exercise, constraints.blockedJointProfiles)) {
+      logCandidateRejection(slot, exercise, `perfil articular bloqueado: ${exercise.joint_stress_profile}`);
+      continue;
+    }
 
     // Regra 1.3: deterministic waist-protection blacklist.
-    if (isXFrameBlacklisted(exercise) || isLoadedObliqueExercise(exercise)) continue;
+    if (isXFrameBlacklisted(exercise) || isLoadedObliqueExercise(exercise)) {
+      logCandidateRejection(slot, exercise, 'blacklist X-Frame/oblíquo carregado');
+      continue;
+    }
 
     // Regra 2.4: HIIT before legs blocks high-fatigue lower-body patterns.
-    if (isHiitLegConflictExercise(day, exercise, constraints)) continue;
+    if (isHiitLegConflictExercise(day, exercise, constraints)) {
+      logCandidateRejection(slot, exercise, 'conflito de pernas após HIIT');
+      continue;
+    }
 
     // Regra 2.2/2.3: recovery mode keeps only low-CNS, low-impact options.
     if (
       (tracker.isRecoveryMode || state.isRecoveryMode) &&
       (exercise.cns_fatigue_cost > 2 || isAxialLoadExercise(exercise) || isLumbarShearExercise(exercise))
     ) {
+      logCandidateRejection(slot, exercise, 'recovery mode bloqueia CNS alto/axial/lumbar shear');
       continue;
     }
 
     const setsToAdd = slot.defaultSets;
-    if (!options.ignoreMrv && !tracker.canAddSets(exercise, setsToAdd).allowed) continue;
+    const volumeCheck = tracker.canAddSets(exercise, setsToAdd);
+    if (!options.ignoreMrv && !volumeCheck.allowed) {
+      logCandidateRejection(slot, exercise, volumeCheck.reason ?? 'MRV_HARD atingido');
+      continue;
+    }
 
-    if (!options.ignoreCnsBudget && state.sessionCnsAccum + exercise.cns_fatigue_cost > constraints.maxSessionCns) continue;
+    if (!options.ignoreCnsBudget && state.sessionCnsAccum + exercise.cns_fatigue_cost > constraints.maxSessionCns) {
+      logCandidateRejection(
+        slot,
+        exercise,
+        `CNS Fatigue Cost muito alto (${state.sessionCnsAccum} + ${exercise.cns_fatigue_cost} > ${constraints.maxSessionCns})`,
+      );
+      continue;
+    }
 
     candidates.push(exercise);
   }

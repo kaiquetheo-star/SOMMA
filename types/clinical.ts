@@ -9,7 +9,6 @@ export interface ClinicalExitInterview {
 /** JSON trigger surfaced to UI when mesocycle week 4 requires review */
 export interface ClinicalReviewTrigger {
   type: 'clinical_exit_interview';
-  mesocycle_week: 4;
   required: true;
   title: string;
   description: string;

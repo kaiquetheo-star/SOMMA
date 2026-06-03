@@ -137,7 +137,6 @@ function defaultConstraints(overrides: Partial<SolverConstraints> = {}): SolverC
     iron_mastery: 3,
     available_time_minutes: 5,
     weekStartDate: '2026-05-26',
-    targetArchetype: null,
     ...overrides,
   };
 }

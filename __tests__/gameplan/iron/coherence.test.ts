@@ -146,7 +146,6 @@ function defaultConstraints(weekStartDate = '2026-05-26'): SolverConstraints {
     iron_mastery: 3,
     available_time_minutes: 60,
     weekStartDate,
-    targetArchetype: null,
   };
 }
 

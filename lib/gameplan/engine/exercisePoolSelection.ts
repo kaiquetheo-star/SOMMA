@@ -156,8 +156,8 @@ export function pickSeededFromPool(
   const rng = createSeededRng(slotSeed);
 
   const ranked = [...pool].sort((a, b) => {
-    const scoreA = archetypeSlugScore(a.slug, generation.targetArchetype) + rng() * 0.01;
-    const scoreB = archetypeSlugScore(b.slug, generation.targetArchetype) + rng() * 0.01;
+    const scoreA = archetypeSlugScore(a.slug) + rng() * 0.01;
+    const scoreB = archetypeSlugScore(b.slug) + rng() * 0.01;
     return scoreB - scoreA;
   });
 
@@ -173,10 +173,7 @@ export function selectExercisesFromPatternPools(
   generation: DeterministicGenerationContext,
 ): string[] {
   const blueprint = PATTERN_POOL_BLUEPRINT[dayKey] ?? PATTERN_POOL_BLUEPRINT.full;
-  const biasedSlots = reorderBlueprintSlotsForArchetype(
-    [...blueprint],
-    generation.targetArchetype,
-  );
+  const biasedSlots = reorderBlueprintSlotsForArchetype([...blueprint], null);
   const slots = biasedSlots.slice(0, Math.max(1, targetCount));
 
   const usedIds = new Set<string>();

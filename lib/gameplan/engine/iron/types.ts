@@ -1,8 +1,12 @@
 import type { IronMovementPattern } from '@/lib/gameplan/engine/iron/taxonomy/movementPatterns';
-import type { ExerciseCueCard, ExerciseTempo, JointStressProfile } from '@/types/catalog';
+import type {
+  ExerciseCueCard,
+  ExerciseTempo,
+  IntensityTechnique as CatalogIntensityTechnique,
+  JointStressProfile,
+} from '@/types/catalog';
 import type { EnginePerformanceRow } from '@/lib/gameplan/engine/performanceLogs';
 import type { EquipmentTag } from '@/store/useSommaStore';
-import type { TargetArchetype } from '@/types/biological';
 import type { DailyIronFocus } from '@/lib/gameplan/engine/iron/dupLogic';
 
 export type SplitDayKey = 'push' | 'pull' | 'legs';
@@ -44,6 +48,8 @@ export interface CatalogExercise {
   default_sets: number;
   default_reps: number;
   stretch_mediated_hypertrophy: boolean;
+  intensity_compatibility?: readonly CatalogIntensityTechnique[];
+  requires_loading?: boolean;
   selection_score: number;
   tempo: ExerciseTempo;
   cue_card: ExerciseCueCard;
@@ -89,7 +95,6 @@ export interface SolverConstraints {
   /** Intended session duration (minutes). Used for finishers + coherence autocorrect. */
   available_time_minutes: number;
   weekStartDate: string;
-  targetArchetype: TargetArchetype | null;
   previousDayWasHiit?: boolean;
   usedExerciseIds?: ReadonlySet<string>;
   dailyIronFocus?: DailyIronFocus;

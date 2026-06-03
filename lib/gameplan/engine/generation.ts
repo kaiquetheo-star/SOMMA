@@ -1,11 +1,10 @@
 // CLINICAL ENGINE: DETERMINISTIC ONLY. NO RANDOMNESS ALLOWED. IF INPUTS ARE CONSTANT, OUTPUT MUST BE CONSTANT.
 import { normalizePrimaryMuscle } from '@/lib/catalog/primaryMuscle';
-import type { TargetArchetype, TrainingExperienceLevel } from '@/types/biological';
+import type { TrainingExperienceLevel } from '@/types/biological';
 import type { LibraryExercise } from '@/types/catalog';
 
 export interface DeterministicGenerationContext {
   protocolDate: string;
-  targetArchetype: TargetArchetype | null;
   experienceLevel: TrainingExperienceLevel | null;
 }
 
@@ -20,13 +19,11 @@ export function hashStringToSeed(input: string): number {
 }
 
 /**
- * Composite seed: date + archetype + experience.
- * Changing passport goals changes the movement pool draw immediately.
+ * Composite seed: date + fixed sustainable hypertrophy mode + experience.
  */
 export function buildDeterministicSeed(ctx: DeterministicGenerationContext): number {
-  const archetype = ctx.targetArchetype ?? 'UNSET';
   const experience = ctx.experienceLevel ?? 'unset';
-  return hashStringToSeed(`${ctx.protocolDate}|${archetype}|${experience}`);
+  return hashStringToSeed(`${ctx.protocolDate}|SUSTAINABLE_X_FRAME_HYPERTROPHY|${experience}`);
 }
 
 /** Mulberry32 — deterministic PRNG from seed */
@@ -44,47 +41,33 @@ export function createSeededRng(seed: number): () => number {
 export function buildGenerationContext(input: {
   protocolDate: string;
   biological: {
-    target_archetype: TargetArchetype | null;
     experience_level: TrainingExperienceLevel | null;
   };
 }): { ctx: DeterministicGenerationContext; seed: number; rng: () => number } {
   const ctx: DeterministicGenerationContext = {
     protocolDate: input.protocolDate,
-    targetArchetype: input.biological.target_archetype,
     experienceLevel: input.biological.experience_level,
   };
   const seed = buildDeterministicSeed(ctx);
   return { ctx, seed, rng: createSeededRng(seed) };
 }
 
-const POWERBUILDER_SLUG_BOOST =
-  /squat|deadlift|bench|row|overhead|press|rdl|romanian|hip.thrust|leg.press/i;
-const AESTHETIC_SLUG_BOOST =
+const X_FRAME_SLUG_BOOST =
   /pulldown|lat|fly|lateral|delt|rear|face.pull|curl|pushdown|shrug/i;
 
-export function archetypeSlugScore(slug: string, archetype: TargetArchetype | null): number {
-  if (!archetype) return 0;
-  if (archetype === 'POWERBUILDER_BULK') {
-    return POWERBUILDER_SLUG_BOOST.test(slug) ? 10 : 0;
-  }
-  if (archetype === 'AESTHETIC_V_TAPER') {
-    return AESTHETIC_SLUG_BOOST.test(slug) ? 10 : 0;
-  }
-  if (archetype === 'LEAN_RECOMP') {
-    return /squat|press|row|pulldown|rdl/i.test(slug) ? 6 : 0;
-  }
-  return 0;
+export function archetypeSlugScore(slug: string, _archetype: null = null): number {
+  return X_FRAME_SLUG_BOOST.test(slug) ? 10 : 0;
 }
 
 /** Seeded ordering of gold slug alternatives within a blueprint slot */
 export function orderGoldSlugsForArchetype(
   goldSlugs: readonly string[],
-  archetype: TargetArchetype | null,
+  _archetype: null,
   rng: () => number,
 ): string[] {
   return [...goldSlugs].sort((a, b) => {
-    const scoreA = archetypeSlugScore(a, archetype) + rng() * 0.001;
-    const scoreB = archetypeSlugScore(b, archetype) + rng() * 0.001;
+    const scoreA = archetypeSlugScore(a) + rng() * 0.001;
+    const scoreB = archetypeSlugScore(b) + rng() * 0.001;
     return scoreB - scoreA;
   });
 }
@@ -105,13 +88,11 @@ function slotKind(slotId: string): 'compound' | 'isolation' | 'core' {
 }
 
 /**
- * Archetype reshuffles blueprint slot priority before trim:
- * - POWERBUILDER: compounds first (squat/deadlift slots rise)
- * - AESTHETIC: compounds first, then lat/delt-biased accessories
+ * Fixed sustainable hypertrophy reshuffle: compounds first, then X-Frame accessories.
  */
 export function reorderBlueprintSlotsForArchetype<T extends { slotId: string }>(
   slots: readonly T[],
-  archetype: TargetArchetype | null,
+  _archetype: null,
 ): T[] {
   const copy = [...slots];
 
@@ -122,19 +103,9 @@ export function reorderBlueprintSlotsForArchetype<T extends { slotId: string }>(
     const base = rank(kindA) - rank(kindB);
     if (base !== 0) return base;
 
-    if (archetype === 'AESTHETIC_V_TAPER') {
-      const aestheticA = /rear|lat|pull|fly|delt/i.test(a.slotId) ? 0 : 1;
-      const aestheticB = /rear|lat|pull|fly|delt/i.test(b.slotId) ? 0 : 1;
-      return aestheticA - aestheticB;
-    }
-
-    if (archetype === 'POWERBUILDER_BULK') {
-      const powerA = /quad|hinge|leg|squat|deadlift/i.test(a.slotId) ? 0 : 1;
-      const powerB = /quad|hinge|leg|squat|deadlift/i.test(b.slotId) ? 0 : 1;
-      return powerA - powerB;
-    }
-
-    return 0;
+    const xFrameA = /rear|lat|pull|fly|delt|lateral/i.test(a.slotId) ? 0 : 1;
+    const xFrameB = /rear|lat|pull|fly|delt|lateral/i.test(b.slotId) ? 0 : 1;
+    return xFrameA - xFrameB;
   });
 
   return copy;

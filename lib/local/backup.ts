@@ -17,6 +17,7 @@ import {
   DEFAULT_TRAINING_DAYS_PER_WEEK,
   initialBiologicalProfile,
   normalizeBodyFatFields,
+  withFixedBiologicalProfile,
   type BiologicalProfile,
 } from '@/types/biological';
 import type { MicrocycleDay } from '@/types/gameplan';
@@ -132,7 +133,7 @@ export function normalizePersistedSnapshot(raw: unknown): SommaPersistedSnapshot
   const payload = extractStatePayload(raw);
   if (!payload) return null;
 
-  const user_biological: BiologicalProfile = {
+  const user_biological: BiologicalProfile = withFixedBiologicalProfile({
     ...initialBiologicalProfile,
     ...(isRecord(payload.user_biological)
       ? (payload.user_biological as unknown as BiologicalProfile)
@@ -142,7 +143,7 @@ export function normalizePersistedSnapshot(raw: unknown): SommaPersistedSnapshot
         typeof payload.user_biological.training_days_per_week === 'number'
         ? payload.user_biological.training_days_per_week
         : null) ?? DEFAULT_TRAINING_DAYS_PER_WEEK,
-  };
+  });
 
   let weeklyMicrocycle: MicrocycleDay[] | null = asArray<MicrocycleDay>(payload.weeklyMicrocycle);
   if (weeklyMicrocycle.length === 0) {
@@ -226,10 +227,10 @@ export function normalizePersistedSnapshot(raw: unknown): SommaPersistedSnapshot
       : null,
   };
 
-  const user_biological_merged: BiologicalProfile = {
+  const user_biological_merged: BiologicalProfile = withFixedBiologicalProfile({
     ...user_biological,
     ...normalizeBodyFatFields(user_biological),
-  };
+  });
 
   return {
     user_environment,

@@ -39,10 +39,9 @@ import {
 import { MESOCYCLE_DAYS, WEEKLY_VOLUME_DAYS } from '@/lib/gameplan/engine/constants';
 import { buildGenerationContext } from '@/lib/gameplan/engine/generation';
 import { pruneIronBlocksInMicrocycle } from '@/lib/gameplan/engine/volumePruning';
-import { clampMesocycleWeekProfile } from '@/types/biological';
-import { buildClinicalReviewTrigger } from '@/lib/gameplan/engine/progression';
 import { fetchLibraryExercises } from '@/lib/catalog/library';
 import { sanitizeMicrocycleIronVolume } from '@/lib/gameplan/microcycleValidation';
+import { applyIntensityStrategies } from '@/lib/gameplan/engine/iron/IntensityStrategyEngine';
 import type { BiologicalProfile } from '@/types/biological';
 import type {
   DailyGameplan,
@@ -284,7 +283,6 @@ export async function generateDeterministicGameplan(
   }
 
   const pillarFreq = resolvePillarFrequencies(input.biological);
-  const mesocycleWeek = clampMesocycleWeekProfile(input.biological.mesocycle_week);
   const trainingDaysPerWeek = deriveActiveTrainingDays(pillarFreq);
   const pillarTime: PillarTimeBudget = {
     available_time_iron: input.biological.available_time_iron ?? 45,
@@ -387,9 +385,8 @@ export async function generateDeterministicGameplan(
           input.biological.goal_iron,
           pillarTime,
           input.biological,
-          mesocycleWeek,
+          1,
           input.biological.clinical_exit_interview,
-          input.biological.target_archetype,
           generation,
         );
       }
@@ -432,9 +429,16 @@ export async function generateDeterministicGameplan(
     orderedMicrocycle,
     {
       ...loadSnapshot,
-      is_deload_week: mesocycleWeek === 4 || loadSnapshot.is_deload_week === true,
+      is_deload_week: loadSnapshot.is_deload_week === true,
     },
     input.biological,
+  );
+
+  orderedMicrocycle = applyIntensityStrategies(
+    orderedMicrocycle,
+    input.biological,
+    input.performanceLogs,
+    catalog,
   );
 
   orderedMicrocycle = sanitizeMicrocycleIronVolume(orderedMicrocycle);
@@ -450,9 +454,6 @@ export async function generateDeterministicGameplan(
     microcycle: orderedMicrocycle,
     blocks,
     generated_at: new Date().toISOString(),
-    clinical_review_trigger: buildClinicalReviewTrigger(
-      input.biological.mesocycle_week,
-      input.biological.clinical_exit_interview != null,
-    ),
+    clinical_review_trigger: null,
   };
 }

@@ -13,7 +13,7 @@ export const PILLAR_OPTIONS: PillarOption[] = [
     id: 'iron',
     label: 'Iron',
     subtitle: 'Hypertrophy · bone density · progressive overload',
-    preference: { iron: 80, nutrition: 20 },
+    preference: { iron: 100, nutrition: 100 },
   },
   {
     id: 'nutrition',
@@ -37,25 +37,20 @@ export const EQUIPMENT_OPTIONS: EquipmentOption[] = [
   { id: 'full_gym', label: 'Full Gym Access' },
 ];
 
-export const FOUNDATION_STEPS = ['focus', 'biology', 'environment'] as const;
+export const FOUNDATION_STEPS = ['biology', 'environment'] as const;
 export type FoundationStep = (typeof FOUNDATION_STEPS)[number];
 
 export const FOUNDATION_STEP_META: Record<
   FoundationStep,
   { eyebrow: string; title: string; hint: string }
 > = {
-  focus: {
-    eyebrow: 'Step I · Focus',
-    title: 'Define your\ntraining focus',
-    hint: 'Choose whether Iron or nutrition will anchor your daily protocol.',
-  },
   biology: {
-    eyebrow: 'Step II · Biological Passport',
+    eyebrow: 'Step I · Biological Passport',
     title: 'Your biological\nbaseline',
-    hint: 'Weight, age, stress, and injuries shape safe volume and intensity for Iron and recovery.',
+    hint: 'Permanent data is fixed. Confirm body weight, stress, and weekly training frequency.',
   },
   environment: {
-    eyebrow: 'Step III · Environment',
+    eyebrow: 'Step II · Environment',
     title: 'What instruments\ndo you wield?',
     hint: 'Select every tool available to you today. You may recalibrate later.',
   },

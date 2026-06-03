@@ -1,17 +1,13 @@
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Text, View } from 'react-native';
 
-import { PillarGoalSelect } from '@/components/foundation/PillarGoalSelect';
-import { webTextInputProps } from '@/lib/ux/webTextInput';
 import { TrainingFrequencySelect } from '@/components/foundation/TrainingFrequencySelect';
 import { ValueStepper } from '@/components/iron/ValueStepper';
 import {
-  clampBodyFatPercent,
-  getBodyFatPercentage,
-  normalizeBodyFatFields,
-  TARGET_ARCHETYPE_OPTIONS,
+  ageFromDateOfBirth,
+  FIXED_GOAL_IRON,
+  FIXED_HEIGHT_CM,
+  FIXED_NUTRITION_GOAL,
   type BiologicalProfile,
-  type PillarGoalKey,
-  type TargetArchetype,
 } from '@/types/biological';
 
 interface BiologicalPassportFormProps {
@@ -20,23 +16,33 @@ interface BiologicalPassportFormProps {
 }
 
 export function BiologicalPassportForm({ value, onChange }: BiologicalPassportFormProps) {
+  const age = ageFromDateOfBirth(value.date_of_birth);
+
   return (
     <View className="gap-6">
-      <View className="gap-2">
-        <Text className="font-body text-[10px] uppercase tracking-[0.35em] text-[#6B7568]">
-          Date of birth
+      <View className="gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-5">
+        <Text className="font-body text-[10px] uppercase tracking-[0.35em] text-matte-gold/70">
+          Permanent profile
         </Text>
-        <TextInput
-          value={value.date_of_birth ?? ''}
-          onChangeText={(text) => onChange({ date_of_birth: text.trim() || null })}
-          placeholder="YYYY-MM-DD"
-          placeholderTextColor="#4A5D44"
-          keyboardType="numbers-and-punctuation"
-          autoCapitalize="none"
-          autoCorrect={false}
-          className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 font-body text-base text-[#E8E4DC]"
-        />
-        <Text className="font-body text-xs text-[#6B7568]">Used to calibrate age-appropriate load.</Text>
+        <View className="flex-row justify-between">
+          <Text className="font-body text-xs text-[#6B7568]">Date of birth</Text>
+          <Text className="font-body-medium text-sm text-[#E8E4DC]">
+            {value.date_of_birth} {age != null ? `(${age}y)` : ''}
+          </Text>
+        </View>
+        <View className="flex-row justify-between">
+          <Text className="font-body text-xs text-[#6B7568]">Height</Text>
+          <Text className="font-body-medium text-sm text-[#E8E4DC]">{FIXED_HEIGHT_CM} cm</Text>
+        </View>
+        <View className="flex-row justify-between">
+          <Text className="font-body text-xs text-[#6B7568]">Objective</Text>
+          <Text className="max-w-[60%] text-right font-body-medium text-sm text-[#E8E4DC]">
+            Functional Sustainable Hypertrophy
+          </Text>
+        </View>
+        <Text className="font-body text-xs leading-5 text-[#6B7568]">
+          Iron is fixed to {FIXED_GOAL_IRON}; nutrition is fixed to {FIXED_NUTRITION_GOAL}.
+        </Text>
       </View>
 
       <ValueStepper
@@ -48,71 +54,6 @@ export function BiologicalPassportForm({ value, onChange }: BiologicalPassportFo
         max={200}
         onChange={(weight_kg) => onChange({ weight_kg })}
       />
-
-      <ValueStepper
-        label="Height"
-        value={value.height_cm ?? 170}
-        unit="cm"
-        step={1}
-        min={120}
-        max={230}
-        onChange={(height_cm) => onChange({ height_cm })}
-      />
-
-      <View className="gap-2">
-        <Text className="font-body text-[10px] uppercase tracking-[0.35em] text-[#6B7568]">
-          Body fat %
-        </Text>
-        <TextInput
-          value={(() => {
-            const bf = getBodyFatPercentage(value);
-            return bf != null ? String(bf) : '';
-          })()}
-          onChangeText={(text) => {
-            const trimmed = text.trim();
-            if (!trimmed) {
-              onChange(normalizeBodyFatFields({ ...value, body_fat_percentage: null, current_body_fat_estimate: null }));
-              return;
-            }
-            const parsed = clampBodyFatPercent(Number.parseFloat(trimmed));
-            onChange(normalizeBodyFatFields({ ...value, body_fat_percentage: parsed }));
-          }}
-          placeholder="e.g. 18"
-          placeholderTextColor="#4A5D44"
-          keyboardType="decimal-pad"
-          className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 font-body text-base text-[#E8E4DC]"
-          {...webTextInputProps()}
-        />
-        <Text className="font-body text-xs text-[#6B7568]">
-          Optional — refines natural timeline projections and load calibration context.
-        </Text>
-      </View>
-
-      <View className="gap-2">
-        <Text className="font-body text-[10px] uppercase tracking-[0.35em] text-[#6B7568]">
-          Current injuries or limitations (optional)
-        </Text>
-        <TextInput
-          value={value.current_injuries ?? ''}
-          onChangeText={(text) => onChange({ current_injuries: text.length > 0 ? text : null })}
-          onBlur={() => {
-            const trimmed = value.current_injuries?.trim();
-            if (trimmed !== value.current_injuries) {
-              onChange({ current_injuries: trimmed && trimmed.length > 0 ? trimmed : null });
-            }
-          }}
-          placeholder="e.g. Left shoulder impingement — avoid overhead press"
-          placeholderTextColor="#4A5D44"
-          multiline
-          numberOfLines={3}
-          textAlignVertical="top"
-          autoCapitalize="sentences"
-          autoCorrect
-          editable
-          className="min-h-[88px] rounded-2xl border border-white/10 bg-white/5 px-4 py-4 font-body text-sm leading-6 text-[#E8E4DC]"
-          {...webTextInputProps()}
-        />
-      </View>
 
       <View className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4">
         <ValueStepper
@@ -131,58 +72,10 @@ export function BiologicalPassportForm({ value, onChange }: BiologicalPassportFo
 
       <TrainingFrequencySelect
         value={value.training_days_per_week}
-        onChange={(training_days_per_week) => onChange({ training_days_per_week })}
+        onChange={(training_days_per_week) =>
+          onChange({ training_days_per_week, frequency_iron: training_days_per_week })
+        }
       />
-
-      <View className="gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-5">
-        <Text className="font-body text-[10px] uppercase tracking-[0.35em] text-matte-gold/70">
-          Shape archetype
-        </Text>
-        <Text className="font-body text-xs leading-5 text-[#6B7568]">
-          Steers volume allocation and calculates your natural target timeline.
-        </Text>
-        {TARGET_ARCHETYPE_OPTIONS.map((option) => (
-          <Pressable
-            key={option.id}
-            onPress={() => onChange({ target_archetype: option.id as TargetArchetype })}
-            accessibilityRole="button"
-            accessibilityLabel={`Select ${option.label}`}
-            className={`rounded-xl border px-4 py-3 ${
-              value.target_archetype === option.id
-                ? 'border-matte-gold/50 bg-matte-gold/10'
-                : 'border-white/10 bg-white/[0.02] active:opacity-80'
-            }`}
-          >
-            <Text
-              className={`font-body-medium text-sm ${
-                value.target_archetype === option.id ? 'text-matte-gold' : 'text-[#E8E4DC]'
-              }`}
-            >
-              {option.label}
-            </Text>
-            <Text className="mt-1 font-body text-xs text-[#6B7568]">{option.description}</Text>
-          </Pressable>
-        ))}
-      </View>
-
-      <View className="gap-6 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-5">
-        <Text className="font-body text-[10px] uppercase tracking-[0.35em] text-matte-gold/70">
-          Coaching goals
-        </Text>
-        <Text className="font-body text-xs leading-5 text-[#6B7568]">
-          Iron drives the training engine; nutrition is reserved for the biomarker surface.
-        </Text>
-        {(['iron', 'nutrition'] as PillarGoalKey[]).map((pillar) => (
-          <PillarGoalSelect
-            key={pillar}
-            pillar={pillar}
-            value={pillar === 'iron' ? value.goal_iron : value.nutrition_goal}
-            onChange={(goal) =>
-              onChange(pillar === 'iron' ? { goal_iron: goal } : { nutrition_goal: goal })
-            }
-          />
-        ))}
-      </View>
     </View>
   );
 }

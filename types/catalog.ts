@@ -60,6 +60,16 @@ export type ExerciseTempo = [number, number, string | number, number];
 
 export type ExerciseFailureType = 'technical' | 'concentric';
 
+export enum IntensityTechnique {
+  STANDARD = 'STANDARD',
+  MYO_REPS = 'MYO_REPS',
+  DROP_SET = 'DROP_SET',
+  REST_PAUSE = 'REST_PAUSE',
+  PRE_EXHAUST = 'PRE_EXHAUST',
+  BI_SET_ANTAGONIST = 'BI_SET_ANTAGONIST',
+  BI_SET_SAME_MUSCLE = 'BI_SET_SAME_MUSCLE',
+}
+
 
 export interface ExerciseCueCard {
 
@@ -109,6 +119,14 @@ export interface IronExerciseBiomechanics {
   /** Peak tension biased toward lengthened position (stretch-mediated hypertrophy) */
 
   stretch_mediated_hypertrophy: boolean;
+
+  /** Safe advanced intensity techniques for this movement. */
+
+  intensity_compatibility?: IntensityTechnique[];
+
+  /** Bodyweight movements that should receive external loading for advanced/light athletes. */
+
+  requires_loading?: boolean;
 
 }
 

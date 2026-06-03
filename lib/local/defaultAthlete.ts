@@ -19,24 +19,22 @@ export const DEFAULT_LOCAL_EQUIPMENT: EquipmentTag[] = [
 ];
 
 export const DEFAULT_LOCAL_BIOLOGICAL: BiologicalProfile = {
-  date_of_birth: '1990-06-15',
+  date_of_birth: '1994-05-14',
   weight_kg: 82,
-  height_cm: 178,
+  height_cm: 159,
   body_fat_percentage: null,
   current_injuries: null,
   baseline_stress_level: 5,
   goal_iron: 'Hypertrophy',
   nutrition_goal: 'Hypertrophy support',
   training_days_per_week: DEFAULT_TRAINING_DAYS_PER_WEEK,
-  experience_level: 'beginner',
+  experience_level: 'advanced',
   available_time_iron: DEFAULT_AVAILABLE_TIME_IRON,
-  iron_mastery: null,
+  iron_mastery: 5,
   frequency_iron: DEFAULT_FREQUENCY_IRON,
-  mesocycle_week: 1,
   cns_fatigue_score: 0,
   clinical_exit_interview: null,
   current_body_fat_estimate: null,
-  target_archetype: null,
 };
 
 export function defaultLocalFocusPreference(): FocusPreference {

@@ -11,6 +11,7 @@ import type {
   DailyGameplan,
   GameplanBlock,
   IronBlockPrescription,
+  LoadingProtocol,
   MicrocycleDay,
   WorkoutPillar,
 } from '@/types/gameplan';
@@ -19,6 +20,10 @@ const VALID_PILLARS: WorkoutPillar[] = ['iron', 'nutrition'];
 
 function isWorkoutPillar(value: unknown): value is WorkoutPillar {
   return typeof value === 'string' && VALID_PILLARS.includes(value as WorkoutPillar);
+}
+
+function isLoadingProtocol(value: unknown): value is LoadingProtocol {
+  return value === 'bodyweight' || value === 'weighted' || value === 'assisted';
 }
 
 function parseIronPrescription(raw: unknown): IronBlockPrescription | undefined {
@@ -53,6 +58,11 @@ function parseIronPrescription(raw: unknown): IronBlockPrescription | undefined 
           typeof row.progression_note === 'string' ? row.progression_note : undefined,
         execution_technique:
           typeof row.execution_technique === 'string' ? row.execution_technique : undefined,
+        loading_protocol:
+          isLoadingProtocol(row.loading_protocol)
+            ? row.loading_protocol
+            : undefined,
+        superset_id: typeof row.superset_id === 'string' ? row.superset_id : undefined,
         rest_seconds:
           typeof row.rest_seconds === 'number'
             ? row.rest_seconds

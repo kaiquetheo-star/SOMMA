@@ -1,14 +1,12 @@
 import type { ClinicalExitInterview } from '@/types/clinical';
 
-/** Shape archetype for Natural Target Timeline steering */
-export type TargetArchetype = 'AESTHETIC_V_TAPER' | 'POWERBUILDER_BULK' | 'LEAN_RECOMP';
-export type TrainingExperienceLevel = 'beginner' | 'intermediate' | 'advanced';
-
-export const TARGET_ARCHETYPE_OPTIONS: { id: TargetArchetype; label: string; description: string }[] = [
-  { id: 'AESTHETIC_V_TAPER', label: 'Aesthetic V-Taper', description: 'Wide shoulders, narrow waist — delt/lat priority' },
-  { id: 'POWERBUILDER_BULK', label: 'Powerbuilder Bulk', description: 'Mass + strength — compound intensity baseline' },
-  { id: 'LEAN_RECOMP', label: 'Lean Recomp', description: 'Simultaneous fat loss + muscle gain — moderate deficit' },
-];
+export type TrainingExperienceLevel =
+  | 'beginner'
+  | 'intermediate'
+  | 'advanced'
+  | 'BEGINNER'
+  | 'INTERMEDIATE'
+  | 'ADVANCED';
 
 /** Biological Passport — maps to anthropometric, Iron and nutrition steering fields */
 export interface BiologicalProfile {
@@ -33,16 +31,12 @@ export interface BiologicalProfile {
   iron_mastery: 1 | 2 | 3 | 4 | 5 | null;
   /** Iron blocks per 7-day microcycle (0–7) */
   frequency_iron: number | null;
-  /** Mesocycle week 1–4; week 4 = deload (Clinical Law III) */
-  mesocycle_week: number | null;
   /** Rolling CNS fatigue 0–100 from performance sync */
   cns_fatigue_score: number | null;
   /** Month 1 exit interview — calibrates Month 2 target loads */
   clinical_exit_interview: ClinicalExitInterview | null;
   /** User-reported body fat estimate (%) for timeline calculation */
   current_body_fat_estimate: number | null;
-  /** Selected shape archetype driving volume allocation + natural timeline */
-  target_archetype: TargetArchetype | null;
   /** Regra 2/3: hormonal transition phase increases recovery and hydration caution. */
   hormonal_transition?: boolean | null;
 }
@@ -51,7 +45,11 @@ export type UserBiological = BiologicalProfile;
 
 export const PILLAR_FREQUENCY_MIN = 0;
 export const PILLAR_FREQUENCY_MAX = 7;
-export const DEFAULT_FREQUENCY_IRON = 4;
+export const FIXED_DATE_OF_BIRTH = '1994-05-14';
+export const FIXED_HEIGHT_CM = 159;
+export const FIXED_GOAL_IRON = 'Hypertrophy';
+export const FIXED_NUTRITION_GOAL = 'Hypertrophy support';
+export const DEFAULT_FREQUENCY_IRON = 6;
 
 export const TIME_BUDGET_PRESETS = [
   { id: '45', label: '45m', iron: 45 },
@@ -62,51 +60,60 @@ export const TIME_BUDGET_PRESETS = [
 
 export type TimeBudgetPresetId = (typeof TIME_BUDGET_PRESETS)[number]['id'];
 
-export const DEFAULT_AVAILABLE_TIME_IRON = 45;
+export const DEFAULT_AVAILABLE_TIME_IRON = 90;
 
 export const TRAINING_DAYS_MIN = 1;
 export const TRAINING_DAYS_MAX = 7;
-export const DEFAULT_TRAINING_DAYS_PER_WEEK = 4;
-
-export const PILLAR_GOAL_PRESETS = {
-  iron: [
-    'Hypertrophy',
-    'Strength',
-    'Powerbuilding',
-    'Maintenance',
-    'Rehab / joint-safe',
-  ],
-  nutrition: [
-    'Hypertrophy support',
-    'Lean recomposition',
-    'Maintenance',
-    'Digestive consistency',
-  ],
-} as const;
-
-export type PillarGoalKey = keyof typeof PILLAR_GOAL_PRESETS;
+export const DEFAULT_TRAINING_DAYS_PER_WEEK = 6;
 
 export const initialBiologicalProfile: BiologicalProfile = {
-  date_of_birth: null,
+  date_of_birth: FIXED_DATE_OF_BIRTH,
   weight_kg: null,
-  height_cm: null,
+  height_cm: FIXED_HEIGHT_CM,
   body_fat_percentage: null,
   current_injuries: null,
   baseline_stress_level: null,
-  goal_iron: null,
-  nutrition_goal: null,
+  goal_iron: FIXED_GOAL_IRON,
+  nutrition_goal: FIXED_NUTRITION_GOAL,
   training_days_per_week: DEFAULT_TRAINING_DAYS_PER_WEEK,
-  experience_level: null,
+  experience_level: 'advanced',
   available_time_iron: DEFAULT_AVAILABLE_TIME_IRON,
-  iron_mastery: null,
+  iron_mastery: 5,
   frequency_iron: DEFAULT_FREQUENCY_IRON,
-  mesocycle_week: 1,
   cns_fatigue_score: 0,
   clinical_exit_interview: null,
   current_body_fat_estimate: null,
-  target_archetype: null,
   hormonal_transition: false,
 };
+
+export function withFixedBiologicalProfile(
+  profile: Partial<BiologicalProfile> | null | undefined,
+): BiologicalProfile {
+  const trainingDays =
+    profile?.training_days_per_week ?? profile?.frequency_iron ?? DEFAULT_TRAINING_DAYS_PER_WEEK;
+  return {
+    date_of_birth: FIXED_DATE_OF_BIRTH,
+    weight_kg: profile?.weight_kg ?? initialBiologicalProfile.weight_kg,
+    height_cm: FIXED_HEIGHT_CM,
+    body_fat_percentage: profile?.body_fat_percentage ?? initialBiologicalProfile.body_fat_percentage,
+    current_injuries: profile?.current_injuries ?? initialBiologicalProfile.current_injuries,
+    baseline_stress_level:
+      profile?.baseline_stress_level ?? initialBiologicalProfile.baseline_stress_level,
+    goal_iron: FIXED_GOAL_IRON,
+    nutrition_goal: FIXED_NUTRITION_GOAL,
+    available_time_iron: profile?.available_time_iron ?? DEFAULT_AVAILABLE_TIME_IRON,
+    training_days_per_week: trainingDays,
+    frequency_iron: profile?.frequency_iron ?? trainingDays,
+    experience_level: profile?.experience_level ?? initialBiologicalProfile.experience_level,
+    iron_mastery: profile?.iron_mastery ?? initialBiologicalProfile.iron_mastery,
+    cns_fatigue_score: profile?.cns_fatigue_score ?? initialBiologicalProfile.cns_fatigue_score,
+    clinical_exit_interview:
+      profile?.clinical_exit_interview ?? initialBiologicalProfile.clinical_exit_interview,
+    current_body_fat_estimate:
+      profile?.current_body_fat_estimate ?? initialBiologicalProfile.current_body_fat_estimate,
+    hormonal_transition: profile?.hormonal_transition ?? initialBiologicalProfile.hormonal_transition,
+  };
+}
 
 /** Valid body fat % for passport and physics (0–60). */
 export function clampBodyFatPercent(value: number | null | undefined): number | null {
@@ -131,11 +138,6 @@ export function normalizeBodyFatFields(
     body_fat_percentage: unified,
     current_body_fat_estimate: unified,
   };
-}
-
-export function clampMesocycleWeekProfile(value: number | null | undefined): number {
-  if (value == null || !Number.isFinite(value)) return 1;
-  return Math.min(4, Math.max(1, Math.round(value)));
 }
 
 export function clampCnsFatigueProfile(value: number | null | undefined): number {

@@ -158,6 +158,8 @@ function toCatalogExercise(row: LibraryExercise): CatalogExercise | null {
     default_sets: row.default_sets,
     default_reps: row.default_reps,
     stretch_mediated_hypertrophy: row.stretch_mediated_hypertrophy,
+    intensity_compatibility: row.intensity_compatibility,
+    requires_loading: row.requires_loading,
     selection_score: enriched.selection_score,
     tempo: enriched.tempo,
     cue_card: enriched.cue_card,

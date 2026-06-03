@@ -14,10 +14,6 @@ import {
 } from '@/lib/gameplan/microcycleValidation';
 import { getMicrocycleDay, getTodayDayIndex } from '@/lib/gameplan/microcycleWeek';
 import { applyReadinessAutoregulationToMicrocycle } from '@/lib/gameplan/engine/clinicalLaws';
-import {
-  buildClinicalReviewTrigger,
-  nextMesocycleWeekAfterReview,
-} from '@/lib/gameplan/engine/progression';
 import type { ClinicalExitInterview } from '@/types/clinical';
 import { fetchLibraryExercises } from '@/lib/catalog/library';
 import { buildWorkoutSessionSummary } from '@/lib/workout/buildSessionSummary';
@@ -27,6 +23,7 @@ import {
   initialBiologicalProfile,
   isBiologicalProfileComplete,
   normalizeBodyFatFields,
+  withFixedBiologicalProfile,
 } from '@/types/biological';
 import type {
   DailyGameplan,
@@ -207,7 +204,7 @@ interface SommaState {
   needsDailyReadinessScan: () => boolean;
   applySubjectiveReadiness: (score: number) => void;
   submitClinicalExitInterview: (interview: ClinicalExitInterview) => Promise<void>;
-  getClinicalReviewTrigger: () => ReturnType<typeof buildClinicalReviewTrigger>;
+  getClinicalReviewTrigger: () => null;
   performance_logs: PerformanceLogEntry[];
   performanceQueue: PerformanceQueueItem[];
   performance_syncing: boolean;
@@ -283,7 +280,7 @@ export const useSommaStore = create<SommaState>()(
       user_environment: initialEnvironment,
       user_stats: initialStats,
       user_foundation: initialFoundation,
-      user_biological: { ...initialBiologicalProfile },
+      user_biological: withFixedBiologicalProfile(initialBiologicalProfile),
       weeklyMicrocycle: null,
       protocolDate: null,
       weekStartDate: null,
@@ -320,7 +317,11 @@ export const useSommaStore = create<SommaState>()(
 
       setUserBiological: (patch) =>
         set((state) => {
-          const merged = { ...state.user_biological, ...patch, ...normalizeBodyFatFields({ ...state.user_biological, ...patch }) };
+          const merged = withFixedBiologicalProfile({
+            ...state.user_biological,
+            ...patch,
+            ...normalizeBodyFatFields({ ...state.user_biological, ...patch }),
+          });
           return { user_biological: merged };
         }),
 
@@ -355,20 +356,13 @@ export const useSommaStore = create<SommaState>()(
         });
       },
 
-      getClinicalReviewTrigger: () => {
-        const state = get();
-        return buildClinicalReviewTrigger(
-          state.user_biological.mesocycle_week,
-          state.user_biological.clinical_exit_interview != null,
-        );
-      },
+      getClinicalReviewTrigger: () => null,
 
       submitClinicalExitInterview: async (interview) => {
         set((state) => ({
           user_biological: {
             ...state.user_biological,
             clinical_exit_interview: interview,
-            mesocycle_week: nextMesocycleWeekAfterReview(),
           },
         }));
 
@@ -658,7 +652,7 @@ export const useSommaStore = create<SommaState>()(
             focus_preference,
             foundation_completed_at: new Date().toISOString(),
           },
-          user_biological: { ...biological },
+          user_biological: withFixedBiologicalProfile(biological),
           user_environment: {
             available_equipment,
             updated_at: new Date().toISOString(),
@@ -682,7 +676,7 @@ export const useSommaStore = create<SommaState>()(
             foundation_completed_at:
               state.user_foundation.foundation_completed_at ?? new Date().toISOString(),
           },
-          user_biological: { ...biological },
+          user_biological: withFixedBiologicalProfile(biological),
           user_environment: {
             available_equipment,
             updated_at: new Date().toISOString(),
@@ -695,7 +689,7 @@ export const useSommaStore = create<SommaState>()(
           user_environment: { ...initialEnvironment },
           user_stats: { ...initialStats },
           user_foundation: { ...initialFoundation },
-          user_biological: { ...initialBiologicalProfile },
+          user_biological: withFixedBiologicalProfile(initialBiologicalProfile),
           weeklyMicrocycle: null,
           protocolDate: null,
           weekStartDate: null,
@@ -774,10 +768,9 @@ export const useSommaStore = create<SommaState>()(
           return;
         }
         if (!state.user_biological) {
-          state.user_biological = { ...initialBiologicalProfile };
+          state.user_biological = withFixedBiologicalProfile(initialBiologicalProfile);
         } else {
-          state.user_biological = {
-            ...initialBiologicalProfile,
+          state.user_biological = withFixedBiologicalProfile({
             ...state.user_biological,
             ...normalizeBodyFatFields({
               ...initialBiologicalProfile,
@@ -785,7 +778,7 @@ export const useSommaStore = create<SommaState>()(
             }),
             training_days_per_week:
               state.user_biological.training_days_per_week ?? DEFAULT_TRAINING_DAYS_PER_WEEK,
-          };
+          });
         }
         const legacy = state as SommaState & {
           currentGameplan?: DailyGameplan | null;

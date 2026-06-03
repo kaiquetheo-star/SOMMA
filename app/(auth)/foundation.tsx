@@ -11,13 +11,18 @@ import {
   EQUIPMENT_OPTIONS,
   FOUNDATION_STEP_META,
   FOUNDATION_STEPS,
-  PILLAR_OPTIONS,
-  type FoundationStep,
 } from '@/constants/foundation';
 import type { BiologicalProfile } from '@/types/biological';
-import { initialBiologicalProfile, isBiologicalProfileComplete } from '@/types/biological';
-import type { EquipmentTag, FocusPreference, PillarId } from '@/store/useSommaStore';
+import {
+  FIXED_GOAL_IRON,
+  FIXED_NUTRITION_GOAL,
+  initialBiologicalProfile,
+  isBiologicalProfileComplete,
+} from '@/types/biological';
+import type { EquipmentTag, FocusPreference } from '@/store/useSommaStore';
 import { useSommaStore } from '@/store/useSommaStore';
+
+const FIXED_FOCUS_PREFERENCE: FocusPreference = { iron: 100, nutrition: 100 };
 
 export default function FoundationScanScreen() {
   const router = useRouter();
@@ -25,10 +30,8 @@ export default function FoundationScanScreen() {
   const fetchDailyGameplanAsync = useSommaStore((state) => state.fetchDailyGameplanAsync);
 
   const [stepIndex, setStepIndex] = useState(0);
-  const [selectedPillarId, setSelectedPillarId] = useState<PillarId | null>(null);
-  const [selectedPreference, setSelectedPreference] = useState<FocusPreference | null>(null);
   const [biological, setBiological] = useState<BiologicalProfile>({ ...initialBiologicalProfile });
-  const [selectedEquipment, setSelectedEquipment] = useState<EquipmentTag[]>([]);
+  const [selectedEquipment, setSelectedEquipment] = useState<EquipmentTag[]>(['full_gym']);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -37,11 +40,7 @@ export default function FoundationScanScreen() {
   const isLastStep = stepIndex === FOUNDATION_STEPS.length - 1;
 
   const canAdvance =
-    currentStep === 'focus'
-      ? selectedPreference !== null
-      : currentStep === 'biology'
-        ? isBiologicalProfileComplete(biological)
-        : selectedEquipment.length > 0;
+    currentStep === 'biology' ? isBiologicalProfileComplete(biological) : selectedEquipment.length > 0;
 
   const patchBiological = useCallback((patch: Partial<BiologicalProfile>) => {
     setBiological((prev) => ({ ...prev, ...patch }));
@@ -61,16 +60,22 @@ export default function FoundationScanScreen() {
       return;
     }
 
-    if (!selectedPreference) return;
-
     setIsSaving(true);
     setSaveError(null);
 
     try {
+      const fixedBiological: BiologicalProfile = {
+        ...initialBiologicalProfile,
+        ...biological,
+        goal_iron: FIXED_GOAL_IRON,
+        nutrition_goal: FIXED_NUTRITION_GOAL,
+        frequency_iron: biological.training_days_per_week ?? initialBiologicalProfile.frequency_iron,
+      };
+
       completeFoundationScan({
-        focus_preference: selectedPreference,
+        focus_preference: FIXED_FOCUS_PREFERENCE,
         available_equipment: selectedEquipment,
-        biological,
+        biological: fixedBiological,
       });
 
       await fetchDailyGameplanAsync({ forceRefresh: true });
@@ -94,22 +99,6 @@ export default function FoundationScanScreen() {
   };
 
   const renderStepContent = () => {
-    if (currentStep === 'focus') {
-      return PILLAR_OPTIONS.map((option) => (
-        <SelectionTile
-          key={option.id}
-          label={option.label}
-          subtitle={option.subtitle}
-          selected={selectedPillarId === option.id}
-          onPress={() => {
-            setSelectedPillarId(option.id);
-            setSelectedPreference(option.preference);
-          }}
-          accessibilityLabel={`Select ${option.label} focus`}
-        />
-      ));
-    }
-
     if (currentStep === 'biology') {
       return <BiologicalPassportForm value={biological} onChange={patchBiological} />;
     }

@@ -59,6 +59,7 @@ function roundDownToPlateIncrement(value: number): number {
 }
 
 type ColdStartLiftCategory = 'bench' | 'squat' | 'deadlift' | 'compound' | 'isolation' | 'bodyweight';
+type NormalizedTrainingExperienceLevel = 'beginner' | 'intermediate' | 'advanced';
 
 interface PassportLoadExerciseMeta {
   id?: string;
@@ -69,7 +70,7 @@ interface PassportLoadExerciseMeta {
 }
 
 const BODYWEIGHT_MULTIPLIERS: Record<
-  TrainingExperienceLevel,
+  NormalizedTrainingExperienceLevel,
   Record<ColdStartLiftCategory, number>
 > = {
   beginner: {
@@ -100,8 +101,10 @@ const BODYWEIGHT_MULTIPLIERS: Record<
 
 function resolveExperienceLevel(
   value: TrainingExperienceLevel | string | null | undefined,
-): TrainingExperienceLevel {
-  return value === 'intermediate' || value === 'advanced' ? value : 'beginner';
+): NormalizedTrainingExperienceLevel {
+  const normalized = (value ?? 'beginner').toLowerCase();
+  if (normalized === 'intermediate' || normalized === 'advanced') return normalized;
+  return 'beginner';
 }
 
 function classifyColdStartLift(exercise: PassportLoadExerciseMeta): ColdStartLiftCategory {

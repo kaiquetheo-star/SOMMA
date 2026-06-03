@@ -36,7 +36,6 @@ import type { DeterministicGenerationContext } from '@/lib/gameplan/engine/gener
 import { maxIronExercisesForMinutes, pruneIronExercisesForTimeBudget } from '@/lib/gameplan/engine/volumePruning';
 import { adjustTargetWeightForMonth2 } from '@/lib/gameplan/engine/progression';
 import type { ClinicalExitInterview } from '@/types/clinical';
-import type { TargetArchetype } from '@/types/biological';
 import type { EnginePerformanceRow } from '@/lib/gameplan/engine/performanceLogs';
 import type { LibraryExercise } from '@/types/catalog';
 import type {
@@ -249,14 +248,13 @@ function prescribeIronExercise(
   goalIron: string | null,
   biological: BiologicalProfile,
   clinicalReview: ClinicalExitInterview | null = null,
-  targetArchetype: TargetArchetype | null = null,
 ): IronExercisePrescription {
   const meta = catalog.find((row) => row.id === exerciseId);
   const last = ironLogs3w.find((log) => log.exercise_id === exerciseId);
   const progression = mesocycle?.progression_recommendation ?? 'maintain';
   const samples = toPerformanceSamples(ironLogs3w);
 
-  const rirDelta = archetypeRirDelta(targetArchetype);
+  const rirDelta = archetypeRirDelta(null);
   let targetRir = autoreg.poor_recovery ? 3 : Math.max(1, 2 + rirDelta);
   if (progression === 'deload') targetRir = 4;
   let targetReps = meta?.default_reps ?? 10;
@@ -293,7 +291,7 @@ function prescribeIronExercise(
   const hi = meta?.default_reps ?? 10;
   const lo = Math.max(6, hi - 2);
   let sets = meta?.default_sets ?? 4;
-  const archetypeBonus = archetypeVolumeCapAdjustment(targetArchetype, meta?.primary_muscle ?? null);
+  const archetypeBonus = archetypeVolumeCapAdjustment(null, meta?.primary_muscle ?? null);
   if (archetypeBonus > 0) {
     sets = Math.min(sets + 1, 6);
   }
@@ -353,14 +351,13 @@ export function buildIronBlock(
   biological: BiologicalProfile,
   mesocycleWeek = 1,
   clinicalReview: ClinicalExitInterview | null = null,
-  targetArchetype: TargetArchetype | null = null,
   generation: DeterministicGenerationContext,
 ): GameplanBlock {
   const isDeload = isDeloadMesocycleWeek(mesocycleWeek);
   const sessionMinutes = pillarTime.available_time_iron;
   const { cap: timeCap } = maxIronExercisesForMinutes(sessionMinutes);
   let targetCount =
-    targetIronExerciseCount(sessionMinutes, goalIron) + archetypeExerciseCountDelta(targetArchetype);
+    targetIronExerciseCount(sessionMinutes, goalIron) + archetypeExerciseCountDelta(null);
   targetCount = Math.min(timeCap, Math.max(2, targetCount));
   if (isDeload) targetCount = Math.min(targetCount, 4);
 
@@ -407,7 +404,6 @@ export function buildIronBlock(
       goalIron,
       biological,
       clinicalReview,
-      targetArchetype,
     ),
   );
   if (isDeload) {

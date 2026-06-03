@@ -3,9 +3,12 @@ import {
   clampPillarTimeMinutes,
   clampPillarFrequency,
   clampCnsFatigueProfile,
-  clampMesocycleWeekProfile,
   DEFAULT_AVAILABLE_TIME_IRON,
   DEFAULT_FREQUENCY_IRON,
+  FIXED_DATE_OF_BIRTH,
+  FIXED_GOAL_IRON,
+  FIXED_HEIGHT_CM,
+  FIXED_NUTRITION_GOAL,
   deriveTrainingDaysFromFrequencies,
   isBiologicalProfileComplete,
 } from '@/types/biological';
@@ -19,7 +22,7 @@ import { useSommaStore } from '@/store/useSommaStore';
 import { getSupabase } from '@/lib/supabase/client';
 
 const PROFILE_BIOLOGY_SELECT =
-  'focus_preference, date_of_birth, weight_kg, height_cm, body_fat_percentage, current_injuries, baseline_stress_level, training_days_per_week, goal_iron, available_time_iron, frequency_iron, mesocycle_week, cns_fatigue_score';
+  'focus_preference, weight_kg, body_fat_percentage, current_injuries, baseline_stress_level, training_days_per_week, available_time_iron, frequency_iron, cns_fatigue_score';
 
 /** Ensures the Supabase client has a JWT before PostgREST calls (avoids opaque 401s). */
 async function requireAuthenticatedUserId(expectedUserId?: string): Promise<string> {
@@ -48,29 +51,24 @@ async function requireAuthenticatedUserId(expectedUserId?: string): Promise<stri
 function mapProfileBiology(row: Record<string, unknown> | null): BiologicalProfile {
   if (!row) {
     return {
-      date_of_birth: null,
+      date_of_birth: FIXED_DATE_OF_BIRTH,
       weight_kg: null,
-      height_cm: null,
+      height_cm: FIXED_HEIGHT_CM,
       body_fat_percentage: null,
       current_injuries: null,
       baseline_stress_level: null,
-      goal_iron: null,
-      nutrition_goal: null,
+      goal_iron: FIXED_GOAL_IRON,
+      nutrition_goal: FIXED_NUTRITION_GOAL,
       training_days_per_week: null,
-      experience_level: null,
+      experience_level: 'advanced',
       available_time_iron: null,
-      iron_mastery: null,
+      iron_mastery: 5,
       frequency_iron: null,
-      mesocycle_week: null,
       cns_fatigue_score: null,
       clinical_exit_interview: null,
       current_body_fat_estimate: null,
-      target_archetype: null,
     };
   }
-
-  const goalText = (key: string) =>
-    typeof row[key] === 'string' && row[key].trim() ? row[key].trim() : null;
 
   const trainingDaysRaw = row.training_days_per_week;
   const training_days_per_week =
@@ -79,17 +77,17 @@ function mapProfileBiology(row: Record<string, unknown> | null): BiologicalProfi
       : null;
 
   return {
-    date_of_birth: typeof row.date_of_birth === 'string' ? row.date_of_birth : null,
+    date_of_birth: FIXED_DATE_OF_BIRTH,
     weight_kg: row.weight_kg != null ? Number(row.weight_kg) : null,
-    height_cm: row.height_cm != null ? Number(row.height_cm) : null,
+    height_cm: FIXED_HEIGHT_CM,
     body_fat_percentage:
       row.body_fat_percentage != null ? Number(row.body_fat_percentage) : null,
     current_injuries:
       typeof row.current_injuries === 'string' ? row.current_injuries : null,
     baseline_stress_level:
       row.baseline_stress_level != null ? Number(row.baseline_stress_level) : null,
-    goal_iron: goalText('goal_iron'),
-    nutrition_goal: goalText('nutrition_goal'),
+    goal_iron: FIXED_GOAL_IRON,
+    nutrition_goal: FIXED_NUTRITION_GOAL,
     training_days_per_week: Number.isFinite(training_days_per_week)
       ? training_days_per_week
       : null,
@@ -98,7 +96,7 @@ function mapProfileBiology(row: Record<string, unknown> | null): BiologicalProfi
       row.experience_level === 'intermediate' ||
       row.experience_level === 'advanced'
         ? row.experience_level
-        : null,
+        : 'advanced',
     available_time_iron: clampPillarTimeMinutes(
       row.available_time_iron != null ? Number(row.available_time_iron) : null,
       15,
@@ -112,13 +110,10 @@ function mapProfileBiology(row: Record<string, unknown> | null): BiologicalProfi
       row.iron_mastery === 4 ||
       row.iron_mastery === 5
         ? row.iron_mastery
-        : null,
+        : 5,
     frequency_iron: clampPillarFrequency(
       row.frequency_iron != null ? Number(row.frequency_iron) : null,
       DEFAULT_FREQUENCY_IRON,
-    ),
-    mesocycle_week: clampMesocycleWeekProfile(
-      row.mesocycle_week != null ? Number(row.mesocycle_week) : null,
     ),
     cns_fatigue_score: clampCnsFatigueProfile(
       row.cns_fatigue_score != null ? Number(row.cns_fatigue_score) : null,
@@ -126,11 +121,6 @@ function mapProfileBiology(row: Record<string, unknown> | null): BiologicalProfi
     clinical_exit_interview: null,
     current_body_fat_estimate:
       row.current_body_fat_estimate != null ? Number(row.current_body_fat_estimate) : null,
-    target_archetype:
-      typeof row.target_archetype === 'string' &&
-      ['AESTHETIC_V_TAPER', 'POWERBUILDER_BULK', 'LEAN_RECOMP'].includes(row.target_archetype)
-        ? (row.target_archetype as BiologicalProfile['target_archetype'])
-        : null,
   };
 }
 
@@ -245,17 +235,16 @@ export async function syncFoundationToSupabase(
     supabase.from('profiles').upsert({
       id: authedUserId,
       focus_preference: payload.focus_preference,
-      date_of_birth: payload.biological.date_of_birth,
+      date_of_birth: FIXED_DATE_OF_BIRTH,
       weight_kg: payload.biological.weight_kg,
-      height_cm: payload.biological.height_cm,
+      height_cm: FIXED_HEIGHT_CM,
       body_fat_percentage: payload.biological.body_fat_percentage,
       current_injuries: payload.biological.current_injuries,
       baseline_stress_level: payload.biological.baseline_stress_level,
-      goal_iron: payload.biological.goal_iron,
+      goal_iron: FIXED_GOAL_IRON,
       training_days_per_week: payload.biological.training_days_per_week,
       available_time_iron: payload.biological.available_time_iron,
       frequency_iron: payload.biological.frequency_iron,
-      mesocycle_week: payload.biological.mesocycle_week,
       cns_fatigue_score: payload.biological.cns_fatigue_score,
     }),
     supabase.from('user_environment').upsert({
@@ -287,13 +276,13 @@ export async function upsertBiologicalPassport(
 
   const { error } = await supabase.from('profiles').upsert({
     id: authedUserId,
-    date_of_birth: biological.date_of_birth,
+    date_of_birth: FIXED_DATE_OF_BIRTH,
     weight_kg: biological.weight_kg,
-    height_cm: biological.height_cm,
+    height_cm: FIXED_HEIGHT_CM,
     body_fat_percentage: biological.body_fat_percentage,
     current_injuries: biological.current_injuries,
     baseline_stress_level: biological.baseline_stress_level,
-    goal_iron: biological.goal_iron,
+    goal_iron: FIXED_GOAL_IRON,
     training_days_per_week: biological.training_days_per_week,
     available_time_iron: biological.available_time_iron,
     frequency_iron: biological.frequency_iron,
