@@ -17,7 +17,7 @@ export function useRequireDailyScan(params: {
     if (!needsScan || !params.blockId || !params.pillar) return;
 
     const pillar = params.pillar as GameplanBlock['pillar'];
-    if (!['iron', 'combat', 'spirit'].includes(pillar)) return;
+    if (pillar !== 'iron') return;
 
     router.replace({
       pathname: '/(workout)/daily_scan',

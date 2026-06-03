@@ -17,8 +17,8 @@ const STATUS_STYLES = {
 
 const PILLAR_ACCENT: Record<GameplanBlock['pillar'], string> = {
   iron: 'text-[#E8E4DC]',
-  combat: 'text-dark-copper',
-  spirit: 'text-matte-gold',
+  nutrition: 'text-matte-gold',
+  spirit: 'text-[#B7C7B0]',
 };
 
 /** Glassmorphism ritual block — Daily Command (FSD 3.2) */

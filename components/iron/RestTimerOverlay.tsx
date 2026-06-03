@@ -1,11 +1,15 @@
 import { Pressable, Text, View } from 'react-native';
 
-import { formatTimer } from '@/constants/combat';
-
 interface RestTimerOverlayProps {
   remaining: number;
   total: number;
   onSkip: () => void;
+}
+
+function formatTimer(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
 export function RestTimerOverlay({ remaining, total, onSkip }: RestTimerOverlayProps) {

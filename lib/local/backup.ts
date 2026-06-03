@@ -200,21 +200,13 @@ export function normalizePersistedSnapshot(raw: unknown): SommaPersistedSnapshot
   };
 
   const user_stats: UserStats = {
-    body_essence:
-      isRecord(payload.user_stats) && typeof payload.user_stats.body_essence === 'number'
-        ? payload.user_stats.body_essence
+    iron_sessions_completed:
+      isRecord(payload.user_stats) && typeof payload.user_stats.iron_sessions_completed === 'number'
+        ? payload.user_stats.iron_sessions_completed
         : 0,
-    mind_essence:
-      isRecord(payload.user_stats) && typeof payload.user_stats.mind_essence === 'number'
-        ? payload.user_stats.mind_essence
-        : 0,
-    spirit_essence:
-      isRecord(payload.user_stats) && typeof payload.user_stats.spirit_essence === 'number'
-        ? payload.user_stats.spirit_essence
-        : 0,
-    combat_mastery:
-      isRecord(payload.user_stats) && typeof payload.user_stats.combat_mastery === 'number'
-        ? payload.user_stats.combat_mastery
+    nutrition_checkins_completed:
+      isRecord(payload.user_stats) && typeof payload.user_stats.nutrition_checkins_completed === 'number'
+        ? payload.user_stats.nutrition_checkins_completed
         : 0,
   };
 

@@ -59,7 +59,6 @@ const PUSH_CHEST_FOCUS: readonly SolverSlot[] = [
   { slotId: 'chest_compound_b', day: 'push', requiredPatterns: ['push'], primaryMuscleHint: 'upper_chest', defaultSets: 4 },
   { slotId: 'chest_iso', day: 'push', requiredPatterns: ['isolation'], primaryMuscleHint: 'chest', isolationOnly: true, defaultSets: 3 },
   { slotId: 'overhead_press', day: 'push', requiredPatterns: ['push'], primaryMuscleHint: 'front_delts', defaultSets: 3 },
-  { slotId: 'shoulder_lateral', day: 'push', requiredPatterns: ['isolation'], primaryMuscleHint: 'side_delts', isolationOnly: true, defaultSets: 3 },
   { slotId: 'triceps_a', day: 'push', requiredPatterns: ['isolation'], primaryMuscleHint: 'triceps', isolationOnly: true, defaultSets: 3 },
 ];
 
@@ -98,6 +97,7 @@ const LEGS_QUAD_FOCUS: readonly SolverSlot[] = [
 
 const LEGS_POSTERIOR_FOCUS: readonly SolverSlot[] = [
   { slotId: 'hinge_primary', day: 'legs', requiredPatterns: ['hinge'], primaryMuscleHint: 'hamstrings', defaultSets: 4 },
+  { slotId: 'unilateral_stability', day: 'legs', requiredPatterns: ['lunge'], primaryMuscleHint: 'quads', defaultSets: 3 },
   { slotId: 'glute_hinge', day: 'legs', requiredPatterns: ['hinge'], primaryMuscleHint: 'glutes', defaultSets: 3 },
   { slotId: 'hamstring_curl', day: 'legs', requiredPatterns: ['isolation'], primaryMuscleHint: 'hamstrings', isolationOnly: true, defaultSets: 4 },
   { slotId: 'calves', day: 'legs', requiredPatterns: ['isolation'], primaryMuscleHint: 'calves', isolationOnly: true, defaultSets: 4 },

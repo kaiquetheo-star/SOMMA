@@ -143,6 +143,8 @@ function defaultConstraints(weekStartDate = '2026-05-26'): SolverConstraints {
     equipment: ['full_gym', 'barbell', 'dumbbells'] as EquipmentTag[],
     blockedJointProfiles: [],
     maxSessionCns: 15,
+    iron_mastery: 3,
+    available_time_minutes: 60,
     weekStartDate,
     targetArchetype: null,
   };
@@ -185,7 +187,7 @@ describe('validateMicrocycleCoherence', () => {
 
     const lateralSlug = draft
       .find((day) => day.day === 'push')
-      ?.picks.find((pick) => pick.slotId === 'shoulder_lateral');
+      ?.picks.find((pick) => pick.slotId === 'shoulder_lateral' || pick.slotId.includes('shoulder_3d_extra'));
 
     const rearSlug = draft
       .find((day) => day.day === 'pull')

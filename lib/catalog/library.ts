@@ -2,25 +2,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { normalizePrimaryMuscle } from '@/lib/catalog/primaryMuscle';
 import { LOCAL_FIRST_MODE } from '@/lib/config';
+import { getBundledExercises } from '@/lib/catalog/bundledCatalog';
+import { enrichExerciseWithCues } from '@/lib/catalog/biomechanicalMapper';
+import type { GameplanBlock } from '@/types/gameplan';
 import {
-  getBundledCombat,
-  getBundledExercises,
-  getBundledFlowSpirit,
-} from '@/lib/catalog/bundledCatalog';
-import { findSpiritSessionByTempoId } from '@/lib/breathwork/fromCatalog';
-import { COMBAT_TACTICAL_FOCUS_LABELS, type GameplanBlock } from '@/types/gameplan';
-import {
-  type LibraryCombatCombo,
   type LibraryExercise,
-  type LibraryFlowSpiritSession,
 } from '@/types/catalog';
 
 export type {
   IronExerciseBiomechanics,
   JointStressProfile,
-  LibraryCombatCombo,
   LibraryExercise,
-  LibraryFlowSpiritSession,
   MovementPattern,
 } from '@/types/catalog';
 export { formatCnsFatigueCost, formatJointStress } from '@/types/catalog';
@@ -28,21 +20,11 @@ export { formatCnsFatigueCost, formatJointStress } from '@/types/catalog';
 const LIBRARY_EXERCISE_SELECT =
   'id, slug, name, biomechanical_instructions, equipment_required, default_sets, default_reps, movement_pattern, primary_muscle, synergist_muscles, cns_fatigue_cost, joint_stress_profile, stretch_mediated_hypertrophy';
 
-const LIBRARY_COMBAT_SELECT =
-  'id, slug, combo_name, sequence, complexity_level, tactical_focus';
-
-const LIBRARY_FLOW_SPIRIT_SELECT =
-  'id, slug, pillar, session_name, description, duration_minutes, tempo_profile, complexity_level, target_recovery_zones, complexity_tier, is_dynamic_flow, default_hold_seconds';
-
 const CACHE_KEYS = {
   exercises: 'somma-cache-library-exercises-v4',
-  combat: 'somma-cache-library-combat-v4',
-  flowSpirit: 'somma-cache-library-flow-spirit-v4',
 } as const;
 
 const CACHE_TTL_MS = 1000 * 60 * 60 * 12;
-
-import type { CombatTacticalFocus } from '@/types/gameplan';
 
 interface CacheEnvelope<T> {
   fetched_at: string;
@@ -50,8 +32,6 @@ interface CacheEnvelope<T> {
 }
 
 let memoryExercises: LibraryExercise[] | null = null;
-let memoryCombat: LibraryCombatCombo[] | null = null;
-let memoryFlowSpirit: LibraryFlowSpiritSession[] | null = null;
 
 function isFresh(fetchedAt: string): boolean {
   const ts = Date.parse(fetchedAt);
@@ -98,7 +78,7 @@ function mapExerciseRow(row: Record<string, unknown>): LibraryExercise {
         ? Number(cnsRaw)
         : null;
 
-  return {
+  return enrichExerciseWithCues({
     id: String(row.id),
     slug: String(row.slug),
     name: String(row.name),
@@ -122,70 +102,11 @@ function mapExerciseRow(row: Record<string, unknown>): LibraryExercise {
     joint_stress_profile:
       typeof row.joint_stress_profile === 'string' ? row.joint_stress_profile : null,
     stretch_mediated_hypertrophy: row.stretch_mediated_hypertrophy === true,
-  };
-}
-
-const VALID_TACTICAL_FOCUS = new Set<CombatTacticalFocus>([
-  'footwork_range',
-  'power_inside',
-  'defense_counter',
-  'burnout',
-]);
-
-function mapCombatRow(row: Record<string, unknown>): LibraryCombatCombo {
-  const sequence = Array.isArray(row.sequence)
-    ? row.sequence.map(String)
-    : [];
-  const focusRaw = row.tactical_focus;
-  const tactical_focus =
-    typeof focusRaw === 'string' && VALID_TACTICAL_FOCUS.has(focusRaw as CombatTacticalFocus)
-      ? (focusRaw as CombatTacticalFocus)
-      : 'footwork_range';
-
-  return {
-    id: String(row.id),
-    slug: String(row.slug),
-    combo_name: String(row.combo_name),
-    sequence,
-    complexity_level:
-      typeof row.complexity_level === 'number' ? row.complexity_level : 5,
-    tactical_focus,
-  };
-}
-
-function mapFlowSpiritRow(row: Record<string, unknown>): LibraryFlowSpiritSession {
-  const tierRaw = row.complexity_tier ?? row.complexity_level;
-  const tier =
-    typeof tierRaw === 'number'
-      ? Math.min(3, Math.max(1, Math.round(tierRaw > 3 ? Math.ceil(tierRaw / 3) : tierRaw)))
-      : 2;
-
-  return {
-    id: String(row.id),
-    slug: String(row.slug),
-    pillar: row.pillar === 'flow' ? 'flow' : 'spirit',
-    session_name: String(row.session_name),
-    description: typeof row.description === 'string' ? row.description : null,
-    duration_minutes:
-      typeof row.duration_minutes === 'number' ? row.duration_minutes : 15,
-    tempo_profile:
-      row.tempo_profile && typeof row.tempo_profile === 'object'
-        ? (row.tempo_profile as Record<string, unknown>)
-        : {},
-    complexity_level:
-      typeof row.complexity_level === 'number' ? row.complexity_level : 3,
-    target_recovery_zones: Array.isArray(row.target_recovery_zones)
-      ? row.target_recovery_zones.map(String)
-      : [],
-    complexity_tier: tier,
-    is_dynamic_flow: row.is_dynamic_flow === true,
-    default_hold_seconds:
-      typeof row.default_hold_seconds === 'number' ? row.default_hold_seconds : 45,
-  };
+  });
 }
 
 async function fetchTable<T>(
-  table: 'library_exercises' | 'library_combat' | 'library_flow_spirit',
+  table: 'library_exercises',
   cacheKey: string,
   select: string,
   mapper: (row: Record<string, unknown>) => T,
@@ -194,12 +115,7 @@ async function fetchTable<T>(
   if (memoryRef.current?.length) return memoryRef.current;
 
   if (LOCAL_FIRST_MODE) {
-    const bundled =
-      table === 'library_exercises'
-        ? (getBundledExercises() as T[])
-        : table === 'library_combat'
-          ? (getBundledCombat() as T[])
-          : (getBundledFlowSpirit() as T[]);
+    const bundled = getBundledExercises() as T[];
 
     if (bundled.length) {
       memoryRef.current = bundled;
@@ -236,38 +152,8 @@ export async function fetchLibraryExercises(): Promise<LibraryExercise[]> {
   });
 }
 
-export async function fetchLibraryCombat(): Promise<LibraryCombatCombo[]> {
-  return fetchTable(
-    'library_combat',
-    CACHE_KEYS.combat,
-    LIBRARY_COMBAT_SELECT,
-    mapCombatRow,
-    { current: memoryCombat },
-  ).then((rows) => {
-    memoryCombat = rows;
-    return rows;
-  });
-}
-
-export async function fetchLibraryFlowSpirit(): Promise<LibraryFlowSpiritSession[]> {
-  return fetchTable(
-    'library_flow_spirit',
-    CACHE_KEYS.flowSpirit,
-    LIBRARY_FLOW_SPIRIT_SELECT,
-    mapFlowSpiritRow,
-    { current: memoryFlowSpirit },
-  ).then((rows) => {
-    memoryFlowSpirit = rows;
-    return rows;
-  });
-}
-
 export async function prefetchLibraryCatalogs(): Promise<void> {
-  await Promise.all([
-    fetchLibraryExercises(),
-    fetchLibraryCombat(),
-    fetchLibraryFlowSpirit(),
-  ]);
+  await fetchLibraryExercises();
 }
 
 export function getExerciseById(
@@ -275,43 +161,6 @@ export function getExerciseById(
   id: string,
 ): LibraryExercise | null {
   return exercises.find((row) => row.id === id) ?? null;
-}
-
-export function getCombatComboById(
-  combos: LibraryCombatCombo[],
-  id: string,
-): LibraryCombatCombo | null {
-  return combos.find((row) => row.id === id) ?? null;
-}
-
-export function getFlowSpiritById(
-  sessions: LibraryFlowSpiritSession[],
-  id: string,
-): LibraryFlowSpiritSession | null {
-  return sessions.find((row) => row.id === id) ?? null;
-}
-
-export function getFlowSpiritBySlug(
-  sessions: LibraryFlowSpiritSession[],
-  slug: string,
-): LibraryFlowSpiritSession | null {
-  return sessions.find((row) => row.slug === slug) ?? null;
-}
-
-export function filterCombatByMastery(
-  combos: LibraryCombatCombo[],
-  combatMastery: number,
-): LibraryCombatCombo[] {
-  const filtered = combos.filter((combo) => combo.complexity_level <= combatMastery + 2);
-  return filtered.length > 0 ? filtered : combos;
-}
-
-export function filterCombatByTacticalFocus(
-  combos: LibraryCombatCombo[],
-  tacticalFocus: CombatTacticalFocus,
-): LibraryCombatCombo[] {
-  const filtered = combos.filter((combo) => combo.tactical_focus === tacticalFocus);
-  return filtered.length > 0 ? filtered : combos;
 }
 
 /** Human-readable preview for Daily Command cards */
@@ -330,39 +179,8 @@ export async function resolveBlockPreviewLabel(block: GameplanBlock): Promise<st
     return `${name} · ${first.target_sets}×${first.target_reps}${load}`;
   }
 
-  if (block.combat?.rounds?.length) {
-    const structure = block.combat.rounds_structure;
-    if (structure?.length) {
-      return structure
-        .map((segment) => {
-          const range =
-            segment.round_start === segment.round_end
-              ? `R${segment.round_start}`
-              : `R${segment.round_start}–${segment.round_end}`;
-          return `${range} ${COMBAT_TACTICAL_FOCUS_LABELS[segment.tactical_focus]}`;
-        })
-        .join(' · ');
-    }
-    const catalog = await fetchLibraryCombat();
-    const firstRound = block.combat.rounds[0];
-    const combo = getCombatComboById(catalog, firstRound.combo_id);
-    const comboName = combo?.combo_name ?? 'Combat rounds';
-    return `${comboName} · ${block.combat.rounds.length} rounds`;
-  }
-
-  if (block.spirit) {
-    if (block.spirit.mode === 'flow' && block.spirit.asanas?.length) {
-      const catalog = await fetchLibraryFlowSpirit();
-      const first = block.spirit.asanas[0];
-      const row = catalog.find((item) => item.id === first.asana_id);
-      const name = first.name || row?.session_name || 'Flow recovery';
-      const zones = block.spirit.recovery_focus_zones?.slice(0, 2).join(', ') ?? 'recovery';
-      return `${name} + ${block.spirit.asanas.length - 1} · ${zones}`;
-    }
-    const catalog = await fetchLibraryFlowSpirit();
-    const session = findSpiritSessionByTempoId(catalog, block.spirit.tempo_id);
-    const label = session?.session_name ?? block.spirit.tempo_id?.replace(/^tempo_/, '') ?? 'breathwork';
-    return `${label} · ${block.spirit.duration_minutes} min`;
+  if (block.nutrition) {
+    return block.nutrition.note;
   }
 
   return block.subtitle;

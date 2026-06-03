@@ -4,7 +4,6 @@ import { PillarGoalSelect } from '@/components/foundation/PillarGoalSelect';
 import { webTextInputProps } from '@/lib/ux/webTextInput';
 import { TrainingFrequencySelect } from '@/components/foundation/TrainingFrequencySelect';
 import { ValueStepper } from '@/components/iron/ValueStepper';
-import { RpeSelector } from '@/components/combat/RpeSelector';
 import {
   clampBodyFatPercent,
   getBodyFatPercentage,
@@ -116,8 +115,13 @@ export function BiologicalPassportForm({ value, onChange }: BiologicalPassportFo
       </View>
 
       <View className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4">
-        <RpeSelector
-          value={value.baseline_stress_level}
+        <ValueStepper
+          label="Baseline stress"
+          value={value.baseline_stress_level ?? 5}
+          unit="/ 10"
+          step={1}
+          min={1}
+          max={10}
           onChange={(baseline_stress_level) => onChange({ baseline_stress_level })}
         />
         <Text className="mt-3 text-center font-body text-xs text-[#6B7568]">
@@ -163,17 +167,19 @@ export function BiologicalPassportForm({ value, onChange }: BiologicalPassportFo
 
       <View className="gap-6 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-5">
         <Text className="font-body text-[10px] uppercase tracking-[0.35em] text-matte-gold/70">
-          Pillar goals
+          Coaching goals
         </Text>
         <Text className="font-body text-xs leading-5 text-[#6B7568]">
-          Each specialist coach uses these targets when building your daily protocol.
+          Iron drives the training engine; nutrition is reserved for the biomarker surface.
         </Text>
-        {(['iron', 'combat', 'flow', 'spirit'] as PillarGoalKey[]).map((pillar) => (
+        {(['iron', 'nutrition'] as PillarGoalKey[]).map((pillar) => (
           <PillarGoalSelect
             key={pillar}
             pillar={pillar}
-            value={value[`goal_${pillar}`]}
-            onChange={(goal) => onChange({ [`goal_${pillar}`]: goal })}
+            value={pillar === 'iron' ? value.goal_iron : value.nutrition_goal}
+            onChange={(goal) =>
+              onChange(pillar === 'iron' ? { goal_iron: goal } : { nutrition_goal: goal })
+            }
           />
         ))}
       </View>

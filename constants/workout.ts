@@ -4,12 +4,12 @@ import type { WorkoutPillar } from '@/types/gameplan';
 
 export const WORKOUT_ROUTES: Record<WorkoutPillar, Href> = {
   iron: '/(workout)/iron',
-  combat: '/(workout)/combat',
-  spirit: '/(workout)/spirit',
+  nutrition: '/(tabs)/analytics',
+  spirit: '/(tabs)/home',
 };
 
 export const PILLAR_LABELS: Record<WorkoutPillar, string> = {
   iron: 'Iron',
-  combat: 'Blood & Bone',
-  spirit: 'Spirit & Flow',
+  nutrition: 'Nutrition',
+  spirit: 'Recovery',
 };

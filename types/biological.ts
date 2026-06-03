@@ -10,7 +10,7 @@ export const TARGET_ARCHETYPE_OPTIONS: { id: TargetArchetype; label: string; des
   { id: 'LEAN_RECOMP', label: 'Lean Recomp', description: 'Simultaneous fat loss + muscle gain — moderate deficit' },
 ];
 
-/** Biological Passport — maps to `profiles` anthropometric + pillar goal columns */
+/** Biological Passport — maps to anthropometric, Iron and nutrition steering fields */
 export interface BiologicalProfile {
   date_of_birth: string | null;
   weight_kg: number | null;
@@ -19,26 +19,20 @@ export interface BiologicalProfile {
   current_injuries: string | null;
   baseline_stress_level: number | null;
   goal_iron: string | null;
-  goal_combat: string | null;
-  goal_flow: string | null;
-  goal_spirit: string | null;
+  nutrition_goal: string | null;
   /** Weekly availability for microcycle planning (1–7) */
   training_days_per_week: number | null;
   /** Self-reported lifting experience for cold-start load safety. */
   experience_level: TrainingExperienceLevel | null;
-  /** Typical session duration per pillar (minutes) */
+  /** Typical Iron session duration (minutes) */
   available_time_iron: number | null;
-  available_time_combat: number | null;
-  available_time_spirit: number | null;
   /**
    * Iron mastery tier (1–5). 5 = elite (Mr. Olympia), 1 = beginner.
    * Used by the deterministic iron engine to filter overly-basic movements and improve rotation quality.
    */
   iron_mastery: 1 | 2 | 3 | 4 | 5 | null;
-  /** Pillar blocks per 7-day microcycle (0–7 each) */
+  /** Iron blocks per 7-day microcycle (0–7) */
   frequency_iron: number | null;
-  frequency_combat: number | null;
-  frequency_spirit: number | null;
   /** Mesocycle week 1–4; week 4 = deload (Clinical Law III) */
   mesocycle_week: number | null;
   /** Rolling CNS fatigue 0–100 from performance sync */
@@ -49,26 +43,26 @@ export interface BiologicalProfile {
   current_body_fat_estimate: number | null;
   /** Selected shape archetype driving volume allocation + natural timeline */
   target_archetype: TargetArchetype | null;
+  /** Regra 2/3: hormonal transition phase increases recovery and hydration caution. */
+  hormonal_transition?: boolean | null;
 }
+
+export type UserBiological = BiologicalProfile;
 
 export const PILLAR_FREQUENCY_MIN = 0;
 export const PILLAR_FREQUENCY_MAX = 7;
 export const DEFAULT_FREQUENCY_IRON = 4;
-export const DEFAULT_FREQUENCY_COMBAT = 4;
-export const DEFAULT_FREQUENCY_SPIRIT = 4;
 
 export const TIME_BUDGET_PRESETS = [
-  { id: '45', label: '45m', iron: 45, combat: 30, spirit: 20 },
-  { id: '60', label: '60m', iron: 60, combat: 40, spirit: 25 },
-  { id: '90', label: '90m', iron: 90, combat: 50, spirit: 30 },
-  { id: 'max', label: 'Unlimited / Max Results', iron: 180, combat: 120, spirit: 90 },
+  { id: '45', label: '45m', iron: 45 },
+  { id: '60', label: '60m', iron: 60 },
+  { id: '90', label: '90m', iron: 90 },
+  { id: 'max', label: 'Unlimited / Max Results', iron: 180 },
 ] as const;
 
 export type TimeBudgetPresetId = (typeof TIME_BUDGET_PRESETS)[number]['id'];
 
 export const DEFAULT_AVAILABLE_TIME_IRON = 45;
-export const DEFAULT_AVAILABLE_TIME_COMBAT = 30;
-export const DEFAULT_AVAILABLE_TIME_SPIRIT = 20;
 
 export const TRAINING_DAYS_MIN = 1;
 export const TRAINING_DAYS_MAX = 7;
@@ -82,24 +76,11 @@ export const PILLAR_GOAL_PRESETS = {
     'Maintenance',
     'Rehab / joint-safe',
   ],
-  combat: [
-    'Cardio conditioning',
-    'Technical mastery',
-    'Fight prep',
-    'Footwork & defense',
-    'Stress relief',
-  ],
-  flow: [
-    'Mobility',
-    'Active recovery',
-    'Flexibility',
-    'Pre-workout primer',
-  ],
-  spirit: [
-    'Nervous system recovery',
-    'Sleep prep',
-    'Breath mastery',
-    'Mindfulness',
+  nutrition: [
+    'Hypertrophy support',
+    'Lean recomposition',
+    'Maintenance',
+    'Digestive consistency',
   ],
 } as const;
 
@@ -113,23 +94,18 @@ export const initialBiologicalProfile: BiologicalProfile = {
   current_injuries: null,
   baseline_stress_level: null,
   goal_iron: null,
-  goal_combat: null,
-  goal_flow: null,
-  goal_spirit: null,
+  nutrition_goal: null,
   training_days_per_week: DEFAULT_TRAINING_DAYS_PER_WEEK,
   experience_level: null,
   available_time_iron: DEFAULT_AVAILABLE_TIME_IRON,
-  available_time_combat: DEFAULT_AVAILABLE_TIME_COMBAT,
-  available_time_spirit: DEFAULT_AVAILABLE_TIME_SPIRIT,
   iron_mastery: null,
   frequency_iron: DEFAULT_FREQUENCY_IRON,
-  frequency_combat: DEFAULT_FREQUENCY_COMBAT,
-  frequency_spirit: DEFAULT_FREQUENCY_SPIRIT,
   mesocycle_week: 1,
   cns_fatigue_score: 0,
   clinical_exit_interview: null,
   current_body_fat_estimate: null,
   target_archetype: null,
+  hormonal_transition: false,
 };
 
 /** Valid body fat % for passport and physics (0–60). */
@@ -189,17 +165,13 @@ export function clampPillarFrequency(
   return Math.min(PILLAR_FREQUENCY_MAX, Math.max(PILLAR_FREQUENCY_MIN, Math.round(value)));
 }
 
-/** Legacy `training_days_per_week` sync — active days = max pillar frequency. */
+/** Legacy `training_days_per_week` sync — active days = Iron frequency. */
 export function deriveTrainingDaysFromFrequencies(profile: Pick<
   BiologicalProfile,
-  'frequency_iron' | 'frequency_combat' | 'frequency_spirit'
+  'frequency_iron'
 >): number {
-  const maxFreq = Math.max(
-    clampPillarFrequency(profile.frequency_iron, 0),
-    clampPillarFrequency(profile.frequency_combat, 0),
-    clampPillarFrequency(profile.frequency_spirit, 0),
-  );
-  return maxFreq > 0 ? clampTrainingDaysPerWeek(maxFreq) : TRAINING_DAYS_MIN;
+  const frequency = clampPillarFrequency(profile.frequency_iron, 0);
+  return frequency > 0 ? clampTrainingDaysPerWeek(frequency) : TRAINING_DAYS_MIN;
 }
 
 export function inferTimeBudgetPresetId(profile: BiologicalProfile): TimeBudgetPresetId {
@@ -210,13 +182,11 @@ export function inferTimeBudgetPresetId(profile: BiologicalProfile): TimeBudgetP
 
 export function timeBudgetFromPresetId(presetId: TimeBudgetPresetId): Pick<
   BiologicalProfile,
-  'available_time_iron' | 'available_time_combat' | 'available_time_spirit'
+  'available_time_iron'
 > {
   const preset = TIME_BUDGET_PRESETS.find((entry) => entry.id === presetId) ?? TIME_BUDGET_PRESETS[0];
   return {
     available_time_iron: preset.iron,
-    available_time_combat: preset.combat,
-    available_time_spirit: preset.spirit,
   };
 }
 

@@ -130,7 +130,7 @@ export default function WorkoutSummaryScreen() {
             <MetricCard
               label="CNS fatigue generated"
               value={summary ? String(summary.cns_fatigue_total) : '—'}
-              detail="Sum of catalog CNS cost · Iron sets + Combat round complexity"
+              detail="Sum of catalog CNS cost across Iron sets"
             />
             {(summary?.e1rm_unlocks?.length ?? 0) > 0 ? (
               (summary?.e1rm_unlocks ?? []).map((unlock) => (

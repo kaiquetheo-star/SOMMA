@@ -14,11 +14,6 @@ export default function WorkoutLayout() {
         options={{ gestureEnabled: false, animation: 'fade' }}
       />
       <Stack.Screen name="iron" />
-      <Stack.Screen name="combat" />
-      <Stack.Screen
-        name="spirit"
-        options={{ contentStyle: { backgroundColor: '#0A0E0C' } }}
-      />
       <Stack.Screen
         name="ascension"
         options={{ gestureEnabled: false, animation: 'fade' }}

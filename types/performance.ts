@@ -1,4 +1,4 @@
-export type WorkoutPillarLog = 'iron' | 'combat' | 'flow' | 'spirit';
+export type WorkoutPillarLog = 'iron' | 'nutrition';
 
 export interface IronSetLog {
   set_index: number;
@@ -23,36 +23,11 @@ export interface IronSessionLog {
   completed_at: string;
 }
 
-export interface CombatRoundLog {
-  round: number;
-  combo_name: string;
-  work_seconds: number;
-  rest_seconds: number;
-}
-
-export interface CombatSessionLog {
-  block_id: string;
-  rounds: CombatRoundLog[];
-  rpe_score: number | null;
-  completed_at: string;
-}
-
-export interface SpiritSessionLog {
-  block_id: string;
-  tempo_id: string;
-  tempo_name: string;
-  cycles_completed: number;
-  total_seconds: number;
-  completed_at: string;
-}
-
 export interface PerformanceLogEntry {
   id: string;
   pillar: WorkoutPillarLog;
   block_id: string;
   iron?: IronSessionLog;
-  combat?: CombatSessionLog;
-  spirit?: SpiritSessionLog;
   timestamp: string;
 }
 

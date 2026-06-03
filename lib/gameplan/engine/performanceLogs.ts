@@ -60,19 +60,6 @@ export function flattenPerformanceLogs(entries: PerformanceLogEntry[]): EnginePe
         continue;
       }
 
-      if (entry.pillar === 'combat' || entry.pillar === 'spirit') {
-        rows.push({
-          pillar: entry.pillar,
-          exercise_id: null,
-          weight_used: null,
-          reps_completed: null,
-          rpe_score: entry.combat?.rpe_score ?? null,
-          timestamp: entry.timestamp,
-          payload: entry.combat
-            ? { volume: (entry.combat.rounds?.length ?? 0) * 180 }
-            : null,
-        });
-      }
     } catch {
       continue;
     }

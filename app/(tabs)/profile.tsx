@@ -32,21 +32,9 @@ const PILLAR_CONTROLS = [
     unit: 'days / week',
     accent: 'text-[#E8E4DC]',
   },
-  {
-    key: 'frequency_combat' as const,
-    label: 'Combat Frequency',
-    unit: 'days / week',
-    accent: 'text-matte-gold',
-  },
-  {
-    key: 'frequency_spirit' as const,
-    label: 'Spirit Frequency',
-    unit: 'days / week',
-    accent: 'text-[#A8B4A0]',
-  },
 ];
 
-/** Command Center — granular pillar frequencies & session time budget */
+/** Command Center — Iron frequency, session time budget and nutrition placeholder */
 export default function ProfileScreen() {
   const storedBiological = useSommaStore((state) => state.user_biological);
   const setUserBiological = useSommaStore((state) => state.setUserBiological);
@@ -67,16 +55,12 @@ export default function ProfileScreen() {
 
   const hasChanges = useMemo(() => {
     const storedPreset = inferTimeBudgetPresetId(storedBiological);
-  return (
+    return (
       JSON.stringify({
         frequency_iron: draft.frequency_iron,
-        frequency_combat: draft.frequency_combat,
-        frequency_spirit: draft.frequency_spirit,
       }) !==
         JSON.stringify({
           frequency_iron: storedBiological.frequency_iron,
-          frequency_combat: storedBiological.frequency_combat,
-          frequency_spirit: storedBiological.frequency_spirit,
         }) || timeBudgetId !== storedPreset
     );
   }, [draft, storedBiological, timeBudgetId]);
@@ -111,7 +95,7 @@ export default function ProfileScreen() {
 
       Alert.alert(
         'Neural link recalibrated',
-        `Week rebuilt: Iron ${payload.frequency_iron}× · Combat ${payload.frequency_combat}× · Spirit ${payload.frequency_spirit}× (${activeTrainingDays} active days).`,
+        `Week rebuilt: Iron ${payload.frequency_iron}× (${activeTrainingDays} active days). Nutrition coaching remains in placeholder mode.`,
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Could not save steering settings.';
@@ -135,8 +119,7 @@ export default function ProfileScreen() {
         </Text>
         <Text className="mt-3 font-display-bold text-3xl text-[#E8E4DC]">Steering Wheel</Text>
         <Text className="mt-4 font-body text-sm leading-6 text-[#8A9488]">
-          Granular control over each pillar&apos;s weekly frequency and session time budget. Changes
-          rebuild your 7-day microcycle immediately.
+          Control Iron weekly frequency and session time budget. Nutrition is reserved for the next coaching surface.
         </Text>
 
         <View className="mt-10 gap-10">
@@ -174,7 +157,7 @@ export default function ProfileScreen() {
                 Time budget
               </Text>
               <Text className="font-body text-xs leading-5 text-[#8A9488]">
-                Scales Iron, Combat, and Spirit session lengths for the Head Coach.
+                Scales Iron session length for the Head Coach.
               </Text>
               <View className="mt-2 flex-row flex-wrap gap-3">
                 {TIME_BUDGET_PRESETS.map((preset) => {
@@ -203,6 +186,15 @@ export default function ProfileScreen() {
                   );
                 })}
               </View>
+            </View>
+
+            <View className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-6">
+              <Text className="font-body text-[10px] uppercase tracking-[0.35em] text-[#6B7568]">
+                Nutrition
+              </Text>
+              <Text className="mt-3 font-body text-sm leading-6 text-[#8A9488]">
+                Future nutrition and biomarker controls will live here.
+              </Text>
             </View>
 
             <Pressable

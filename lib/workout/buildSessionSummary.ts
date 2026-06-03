@@ -1,6 +1,6 @@
 import { calculateE1RM, estimateBestE1RMFromLogs } from '@/lib/physics/rmCalculator';
 import { getMicrocycleDay } from '@/lib/gameplan/microcycleWeek';
-import type { LibraryCombatCombo, LibraryExercise } from '@/lib/catalog/library';
+import type { LibraryExercise } from '@/lib/catalog/library';
 import type { MicrocycleDay } from '@/types/gameplan';
 import type {
   E1rmUnlock,
@@ -49,7 +49,6 @@ export function computeTotalVolumeKg(logs: PerformanceLogEntry[]): number {
 export function computeCnsFatigueTotal(
   logs: PerformanceLogEntry[],
   exerciseCatalog: LibraryExercise[],
-  combatCatalog: LibraryCombatCombo[],
 ): number {
   let total = 0;
 
@@ -59,15 +58,6 @@ export function computeCnsFatigueTotal(
       const cns = meta?.cns_fatigue_cost ?? 3;
       total += cns * log.iron.sets.length;
       continue;
-    }
-
-    if (log.pillar === 'combat' && log.combat) {
-      for (const round of log.combat.rounds) {
-        const combo = combatCatalog.find(
-          (row) => row.combo_name === round.combo_name || row.slug === round.combo_name,
-        );
-        total += combo?.complexity_level ?? 3;
-      }
     }
   }
 
@@ -140,7 +130,6 @@ export function buildWorkoutSessionSummary(input: {
   weeklyMicrocycle: MicrocycleDay[] | null;
   performanceLogs: PerformanceLogEntry[];
   exerciseCatalog: LibraryExercise[];
-  combatCatalog: LibraryCombatCombo[];
 }): WorkoutSessionSummary {
   const day = getMicrocycleDay(input.weeklyMicrocycle, input.dayIndex);
   const dayLogs = logsForDay(input.performanceLogs, day);
@@ -152,7 +141,6 @@ export function buildWorkoutSessionSummary(input: {
     cns_fatigue_total: computeCnsFatigueTotal(
       dayLogs,
       input.exerciseCatalog,
-      input.combatCatalog,
     ),
     e1rm_unlocks: detectE1rmUnlocks(dayLogs, input.performanceLogs),
     completed_at: new Date().toISOString(),

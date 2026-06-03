@@ -13,31 +13,13 @@ export const PILLAR_OPTIONS: PillarOption[] = [
     id: 'iron',
     label: 'Iron',
     subtitle: 'Hypertrophy · bone density · progressive overload',
-    preference: { iron: 45, combat: 20, flow: 20, spirit: 15 },
+    preference: { iron: 80, nutrition: 20 },
   },
   {
-    id: 'combat',
-    label: 'Blood & Bone',
-    subtitle: 'Boxing · Muay Thai · metabolic catharsis',
-    preference: { iron: 20, combat: 45, flow: 20, spirit: 15 },
-  },
-  {
-    id: 'flow',
-    label: 'Flow',
-    subtitle: 'Yoga · joint longevity · biomechanical control',
-    preference: { iron: 20, combat: 15, flow: 45, spirit: 20 },
-  },
-  {
-    id: 'spirit',
-    label: 'Spirit',
-    subtitle: 'Breathwork · nervous system · meditation',
-    preference: { iron: 15, combat: 15, flow: 20, spirit: 50 },
-  },
-  {
-    id: 'balanced',
-    label: 'Balanced Alchemy',
-    subtitle: 'Equal attunement across all four pillars',
-    preference: { iron: 25, combat: 25, flow: 25, spirit: 25 },
+    id: 'nutrition',
+    label: 'Nutrition',
+    subtitle: 'Fueling · biomarkers · body composition',
+    preference: { iron: 60, nutrition: 40 },
   },
 ];
 
@@ -52,7 +34,6 @@ export const EQUIPMENT_OPTIONS: EquipmentOption[] = [
   { id: 'kettlebell', label: 'Kettlebell' },
   { id: 'barbell', label: 'Barbell' },
   { id: 'pull_up_bar', label: 'Pull-up Bar' },
-  { id: 'heavy_bag', label: 'Heavy Bag' },
   { id: 'full_gym', label: 'Full Gym Access' },
 ];
 
@@ -64,9 +45,9 @@ export const FOUNDATION_STEP_META: Record<
   { eyebrow: string; title: string; hint: string }
 > = {
   focus: {
-    eyebrow: 'Step I · Attunement',
-    title: 'Where does your\nalchemy lean?',
-    hint: 'Choose the pillar that will anchor your daily protocol.',
+    eyebrow: 'Step I · Focus',
+    title: 'Define your\ntraining focus',
+    hint: 'Choose whether Iron or nutrition will anchor your daily protocol.',
   },
   biology: {
     eyebrow: 'Step II · Biological Passport',

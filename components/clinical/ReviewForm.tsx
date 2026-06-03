@@ -10,7 +10,7 @@ const MUTED = '#6B7568';
 export interface ReviewFormProps {
   title?: string;
   description?: string;
-  /** Pre-filled from on-device load telemetry (iron + combat, 21d) */
+  /** Pre-filled from on-device Iron load telemetry (21d) */
   suggestedAverageRpe?: number | null;
   onSubmit: (interview: ClinicalExitInterview) => void;
 }

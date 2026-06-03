@@ -9,7 +9,7 @@ import {
 } from '@/lib/physics/loadTelemetry';
 import type { PerformanceLogEntry } from '@/types/performance';
 
-const PILLAR_ORDER: LoadTelemetryPillar[] = ['iron', 'combat', 'spirit'];
+const PILLAR_ORDER: LoadTelemetryPillar[] = ['iron'];
 
 interface LoadTelemetryStripProps {
   performanceLogs: PerformanceLogEntry[];
@@ -39,8 +39,7 @@ export function LoadTelemetryStrip({
           Internal load telemetry
         </Text>
         <Text className="mt-2 font-body text-xs leading-5 text-[#8A9488]">
-          Log iron sets with RIR and combat sessions to unlock ACWR and RPE variability — $0,
-          on-device only.
+          Log Iron sets with RIR to unlock ACWR and RPE variability — $0, on-device only.
         </Text>
         {variant === 'detail' ? (
           <Text className="mt-3 font-body text-[10px] uppercase tracking-[0.22em] text-[#6B7568]">
@@ -68,8 +67,7 @@ export function LoadTelemetryStrip({
       )}
       {variant === 'detail' ? (
         <Text className="mt-2 font-body text-xs leading-5 text-[#8A9488]">
-          Iron ACWR bands follow your strength goal. Combat uses conditioning defaults (spike ≥
-          1.50).
+          Iron ACWR bands follow your current strength or hypertrophy goal.
         </Text>
       ) : null}
       <View className="mt-4 gap-2">

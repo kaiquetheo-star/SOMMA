@@ -95,12 +95,10 @@ export function BiologicalPassportSummary({ profile }: BiologicalPassportSummary
 
       <View className="border-t border-white/5 py-3">
         <Text className="font-body text-[10px] uppercase tracking-[0.3em] text-[#6B7568]">
-          Pillar goals
+          Coaching goals
         </Text>
         <SummaryRow label="Iron" value={profile.goal_iron?.trim() || '—'} />
-        <SummaryRow label="Combat" value={profile.goal_combat?.trim() || '—'} />
-        <SummaryRow label="Flow" value={profile.goal_flow?.trim() || '—'} />
-        <SummaryRow label="Spirit" value={profile.goal_spirit?.trim() || '—'} />
+        <SummaryRow label="Nutrition" value={profile.nutrition_goal?.trim() || '—'} />
       </View>
 
       {timeline ? (

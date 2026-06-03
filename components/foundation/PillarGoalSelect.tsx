@@ -7,17 +7,9 @@ const PILLAR_LABELS: Record<PillarGoalKey, { title: string; hint: string }> = {
     title: 'Iron goal',
     hint: 'Hypertrophy vs strength drives set/rep and progression style.',
   },
-  combat: {
-    title: 'Combat goal',
-    hint: 'Cardio conditioning vs technical mastery shapes round structure.',
-  },
-  flow: {
-    title: 'Flow goal',
-    hint: 'Mobility and recovery focus for movement prep.',
-  },
-  spirit: {
-    title: 'Spirit goal',
-    hint: 'Breathwork vs sanctuary flow for nervous-system work.',
+  nutrition: {
+    title: 'Nutrition goal',
+    hint: 'Fueling target for future nutrition and biomarker coaching.',
   },
 };
 
@@ -27,7 +19,7 @@ interface PillarGoalSelectProps {
   onChange: (goal: string | null) => void;
 }
 
-/** Preset chips + free-text goal for one pillar coach */
+/** Preset chips + free-text goal for one coach */
 export function PillarGoalSelect({ pillar, value, onChange }: PillarGoalSelectProps) {
   const presets = PILLAR_GOAL_PRESETS[pillar];
   const { title, hint } = PILLAR_LABELS[pillar];

@@ -5,99 +5,14 @@ import {
 } from '@/lib/gameplan/microcycleWeek';
 import { isDegenerateMicrocycle } from '@/lib/gameplan/microcycleValidation';
 import type {
-  CombatBlockPrescription,
-  CombatRoundStructureEntry,
-  CombatTacticalFocus,
   DailyGameplan,
   GameplanBlock,
   IronBlockPrescription,
   MicrocycleDay,
-  SpiritBlockPrescription,
   WorkoutPillar,
 } from '@/types/gameplan';
 
-const VALID_PILLARS: WorkoutPillar[] = ['iron', 'combat', 'spirit'];
-
-const VALID_TACTICAL_FOCUS: CombatTacticalFocus[] = [
-  'footwork_range',
-  'power_inside',
-  'defense_counter',
-  'burnout',
-];
-
-function parseTacticalFocus(value: unknown): CombatTacticalFocus | null {
-  return typeof value === 'string' &&
-    VALID_TACTICAL_FOCUS.includes(value as CombatTacticalFocus)
-    ? (value as CombatTacticalFocus)
-    : null;
-}
-
-function parseRoundsStructure(raw: unknown): CombatRoundStructureEntry[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.flatMap((item) => {
-    if (!item || typeof item !== 'object') return [];
-    const row = item as Record<string, unknown>;
-    const focus = parseTacticalFocus(row.tactical_focus);
-    if (!focus) return [];
-    const roundStart =
-      typeof row.round_start === 'number'
-        ? row.round_start
-        : typeof row.round_index_start === 'number'
-          ? row.round_index_start
-          : null;
-    const roundEnd =
-      typeof row.round_end === 'number'
-        ? row.round_end
-        : typeof row.round_index_end === 'number'
-          ? row.round_index_end
-          : null;
-    if (roundStart == null || roundEnd == null || roundStart < 1 || roundEnd < roundStart) {
-      return [];
-    }
-    return [
-      {
-        round_start: roundStart,
-        round_end: roundEnd,
-        tactical_focus: focus,
-        coach_intent:
-          typeof row.coach_intent === 'string'
-            ? row.coach_intent
-            : typeof row.intent === 'string'
-              ? row.intent
-              : undefined,
-      },
-    ];
-  });
-}
-
-function deriveRoundsStructureFromRounds(
-  rounds: CombatBlockPrescription['rounds'],
-): CombatRoundStructureEntry[] {
-  if (!rounds.length) return [];
-  const segments: CombatRoundStructureEntry[] = [];
-  let segmentStart = rounds[0]!.round_index;
-  let currentFocus = rounds[0]!.tactical_focus;
-
-  for (let i = 1; i < rounds.length; i += 1) {
-    const round = rounds[i]!;
-    if (round.tactical_focus === currentFocus) continue;
-    segments.push({
-      round_start: segmentStart,
-      round_end: rounds[i - 1]!.round_index,
-      tactical_focus: currentFocus,
-    });
-    segmentStart = round.round_index;
-    currentFocus = round.tactical_focus;
-  }
-
-  segments.push({
-    round_start: segmentStart,
-    round_end: rounds[rounds.length - 1]!.round_index,
-    tactical_focus: currentFocus,
-  });
-
-  return segments;
-}
+const VALID_PILLARS: WorkoutPillar[] = ['iron', 'nutrition'];
 
 function isWorkoutPillar(value: unknown): value is WorkoutPillar {
   return typeof value === 'string' && VALID_PILLARS.includes(value as WorkoutPillar);
@@ -159,126 +74,6 @@ function parseIronPrescription(raw: unknown): IronBlockPrescription | undefined 
   };
 }
 
-function parseCombatPrescription(raw: unknown): CombatBlockPrescription | undefined {
-  if (!raw || typeof raw !== 'object') return undefined;
-  const record = raw as Record<string, unknown>;
-  const roundsRaw = record.rounds;
-  if (!Array.isArray(roundsRaw) || roundsRaw.length === 0) return undefined;
-
-  const structureFromPayload = parseRoundsStructure(
-    record.rounds_structure ?? record.roundsStructure,
-  );
-
-  const rounds = roundsRaw.flatMap((item, index) => {
-    if (!item || typeof item !== 'object') return [];
-    const row = item as Record<string, unknown>;
-    if (typeof row.combo_id !== 'string') return [];
-    const roundIndex = typeof row.round_index === 'number' ? row.round_index : index + 1;
-    const tacticalFocus =
-      parseTacticalFocus(row.tactical_focus) ??
-      structureFromPayload.find(
-        (segment) => roundIndex >= segment.round_start && roundIndex <= segment.round_end,
-      )?.tactical_focus ??
-      'footwork_range';
-
-    return [
-      {
-        round_index: roundIndex,
-        combo_id: row.combo_id,
-        work_seconds: typeof row.work_seconds === 'number' ? row.work_seconds : 180,
-        rest_seconds: typeof row.rest_seconds === 'number' ? row.rest_seconds : 60,
-        tactical_focus: tacticalFocus,
-      },
-    ];
-  });
-
-  if (rounds.length === 0) return undefined;
-
-  const rounds_structure =
-    structureFromPayload.length > 0
-      ? structureFromPayload
-      : deriveRoundsStructureFromRounds(rounds);
-
-  return { rounds_structure, rounds };
-}
-
-function parseRecoveryZones(raw: unknown): string[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.map(String).filter(Boolean);
-}
-
-function parseSpiritPrescription(raw: unknown): SpiritBlockPrescription | undefined {
-  if (!raw || typeof raw !== 'object') return undefined;
-  const record = raw as Record<string, unknown>;
-  const mode = record.mode === 'flow' ? 'flow' : 'breathwork';
-
-  const asanasRaw = record.asanas ?? record.sequence;
-  const asanas = Array.isArray(asanasRaw)
-    ? asanasRaw.flatMap((item, index) => {
-        if (!item || typeof item !== 'object') return [];
-        const row = item as Record<string, unknown>;
-        const asanaId =
-          typeof row.asana_id === 'string'
-            ? row.asana_id
-            : typeof row.session_id === 'string'
-              ? row.session_id
-              : null;
-        if (!asanaId) return [];
-        return [
-          {
-            asana_id: asanaId,
-            slug: typeof row.slug === 'string' ? row.slug : '',
-            name:
-              typeof row.name === 'string'
-                ? row.name
-                : typeof row.session_name === 'string'
-                  ? row.session_name
-                  : 'Asana',
-            order: typeof row.order === 'number' ? row.order : index + 1,
-            hold_seconds:
-              typeof row.hold_seconds === 'number'
-                ? row.hold_seconds
-                : typeof row.default_hold_seconds === 'number'
-                  ? row.default_hold_seconds
-                  : 45,
-            target_recovery_zones: parseRecoveryZones(row.target_recovery_zones),
-            is_dynamic_flow: row.is_dynamic_flow === true,
-          },
-        ];
-      })
-    : undefined;
-
-  if (mode === 'flow') {
-    if (!asanas?.length) return undefined;
-    return {
-      mode: 'flow',
-      duration_minutes:
-        typeof record.duration_minutes === 'number' ? record.duration_minutes : 15,
-      prescribed_reason:
-        typeof record.prescribed_reason === 'string' ? record.prescribed_reason : undefined,
-      recovery_focus_zones: parseRecoveryZones(
-        record.recovery_focus_zones ?? record.recovery_zones,
-      ),
-      asanas,
-      sequence: asanas,
-    };
-  }
-
-  if (typeof record.tempo_id !== 'string') return undefined;
-
-  return {
-    mode: 'breathwork',
-    tempo_id: record.tempo_id,
-    duration_minutes:
-      typeof record.duration_minutes === 'number' ? record.duration_minutes : 15,
-    prescribed_reason:
-      typeof record.prescribed_reason === 'string' ? record.prescribed_reason : undefined,
-    recovery_focus_zones: parseRecoveryZones(
-      record.recovery_focus_zones ?? record.recovery_zones,
-    ),
-  };
-}
-
 export function parseGameplanBlocks(blocksRaw: unknown): GameplanBlock[] {
   if (!Array.isArray(blocksRaw)) return [];
 
@@ -299,12 +94,17 @@ export function parseGameplanBlocks(blocksRaw: unknown): GameplanBlock[] {
     };
 
     const iron = parseIronPrescription(block.iron);
-    const combat = parseCombatPrescription(block.combat);
-    const spirit = parseSpiritPrescription(block.spirit);
 
     if (iron) parsed.iron = iron;
-    if (combat) parsed.combat = combat;
-    if (spirit) parsed.spirit = spirit;
+    if (block.pillar === 'nutrition') {
+      parsed.nutrition = {
+        goal: typeof block.nutrition_goal === 'string' ? block.nutrition_goal : null,
+        note:
+          typeof block.subtitle === 'string' && block.subtitle.trim()
+            ? block.subtitle
+            : 'Nutrition guidance placeholder',
+      };
+    }
 
     return [parsed];
   });

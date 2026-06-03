@@ -89,16 +89,6 @@ function mapQueueItemToRow(userId: string, item: PerformanceQueueItem) {
     );
   }
 
-  if (session?.combat) {
-    rpe_score = session.combat.rpe_score ?? rpe_score;
-    volume = session.combat.rounds.reduce((sum, round) => sum + round.work_seconds, 0);
-  }
-
-  if (session?.spirit) {
-    volume = session.spirit.total_seconds;
-    rpe_score = rpe_score ?? 6;
-  }
-
   return {
     user_id: userId,
     pillar: input.pillar,

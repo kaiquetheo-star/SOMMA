@@ -4,10 +4,14 @@ import {
   createInitialSolverState,
   solveDaySlots,
 } from '@/lib/gameplan/engine/iron/ConstraintSolver';
-import { PPL_DAY_SLOTS } from '@/lib/gameplan/engine/iron/splits/pplSplit';
 import { createWeeklyVolumeTracker } from '@/lib/gameplan/engine/iron/WeeklyVolumeTracker';
+import { initialBiologicalProfile } from '@/types/biological';
 import type { LibraryExercise } from '@/types/catalog';
 import type { EquipmentTag } from '@/store/useSommaStore';
+import type {
+  SolverConstraints,
+  SolverSlot,
+} from '@/lib/gameplan/engine/iron/types';
 
 function mockSeedExercise(
   partial: Pick<LibraryExercise, 'id' | 'slug' | 'name'> &
@@ -51,40 +55,6 @@ const CABLE_LATERAL = mockSeedExercise({
   cns_fatigue_cost: 1,
 });
 
-const DUMBBELL_LATERAL = mockSeedExercise({
-  id: 'ex-db-lateral',
-  slug: 'dumbbell_lateral_raise',
-  name: 'Dumbbell Lateral Raise',
-  movement_pattern: 'isolation',
-  primary_muscle: 'side_delts',
-  synergist_muscles: ['traps'],
-  cns_fatigue_cost: 2,
-  equipment_required: ['dumbbells', 'full_gym'],
-});
-
-/** Isolation with anterior synergist load — should lose vs cable when front_delts are fatigued. */
-const LEANING_LATERAL_WITH_ANTERIOR_SYNERGIST = mockSeedExercise({
-  id: 'ex-leaning-lateral',
-  slug: 'leaning_lateral_raise',
-  name: 'Leaning Lateral Raise',
-  movement_pattern: 'isolation',
-  primary_muscle: 'side_delts',
-  synergist_muscles: ['front_delts', 'traps'],
-  cns_fatigue_cost: 2,
-});
-
-const OVERHEAD_PRESS = mockSeedExercise({
-  id: 'ex-ohp',
-  slug: 'overhead_press',
-  name: 'Standing Overhead Press',
-  movement_pattern: 'push',
-  primary_muscle: 'front_delts',
-  synergist_muscles: ['triceps', 'upper_chest', 'core'],
-  cns_fatigue_cost: 4,
-  equipment_required: ['barbell', 'full_gym'],
-  default_sets: 4,
-});
-
 const MACHINE_SHOULDER_PRESS = mockSeedExercise({
   id: 'ex-machine-press',
   slug: 'machine_shoulder_press',
@@ -95,55 +65,193 @@ const MACHINE_SHOULDER_PRESS = mockSeedExercise({
   cns_fatigue_cost: 3,
 });
 
-describe('solveDaySlots — Push shoulder_lateral (3D shoulder rule)', () => {
-  it('prefers cable lateral raise when front_delts are near MRV from prior volume', () => {
-    const catalog = buildExerciseCatalog([
-      CABLE_LATERAL,
-      DUMBBELL_LATERAL,
-      LEANING_LATERAL_WITH_ANTERIOR_SYNERGIST,
-      OVERHEAD_PRESS,
-      MACHINE_SHOULDER_PRESS,
-    ]);
+const BARBELL_BACK_SQUAT = mockSeedExercise({
+  id: 'ex-barbell-back-squat',
+  slug: 'barbell_back_squat',
+  name: 'Barbell Back Squat',
+  movement_pattern: 'squat',
+  primary_muscle: 'quadriceps',
+  synergist_muscles: ['glutes', 'erectors', 'core'],
+  cns_fatigue_cost: 5,
+  joint_stress_profile: 'spinal_axial_load',
+  equipment_required: ['barbell', 'full_gym'],
+  default_sets: 4,
+  default_reps: 6,
+});
 
-    const weekStartDate = '2026-05-26';
-    const tracker = createWeeklyVolumeTracker(catalog, [], weekStartDate);
+const BELT_SQUAT = mockSeedExercise({
+  id: 'ex-belt-squat',
+  slug: 'belt_squat',
+  name: 'Belt Squat',
+  movement_pattern: 'squat',
+  primary_muscle: 'quadriceps',
+  synergist_muscles: ['glutes'],
+  cns_fatigue_cost: 2,
+  joint_stress_profile: 'low_impact',
+  equipment_required: ['full_gym'],
+  default_sets: 4,
+  default_reps: 10,
+});
 
-    const anteriorLoader = catalog.bySlug.get('machine_shoulder_press');
-    expect(anteriorLoader).toBeDefined();
-    tracker.creditVolume(anteriorLoader!, 18);
+const LEG_EXTENSION = mockSeedExercise({
+  id: 'ex-leg-extension',
+  slug: 'leg_extension',
+  name: 'Leg Extension',
+  movement_pattern: 'isolation',
+  primary_muscle: 'quadriceps',
+  synergist_muscles: [],
+  cns_fatigue_cost: 1,
+  joint_stress_profile: 'low_impact',
+});
 
-    expect(tracker.completedSetsForMuscle('front_delts')).toBe(18);
+const BARBELL_RDL = mockSeedExercise({
+  id: 'ex-barbell-rdl',
+  slug: 'barbell_romanian_deadlift',
+  name: 'Barbell Romanian Deadlift',
+  movement_pattern: 'hinge',
+  primary_muscle: 'hamstrings',
+  synergist_muscles: ['glutes', 'erectors'],
+  cns_fatigue_cost: 4,
+  joint_stress_profile: 'lumbar_shear',
+  equipment_required: ['barbell', 'full_gym'],
+});
 
-    const shoulderSlot = PPL_DAY_SLOTS.push.find((slot) => slot.slotId === 'shoulder_lateral');
-    expect(shoulderSlot).toBeDefined();
+const FACE_PULL = mockSeedExercise({
+  id: 'ex-face-pull',
+  slug: 'face_pull',
+  name: 'Face Pull',
+  movement_pattern: 'isolation',
+  primary_muscle: 'rear_delts',
+  synergist_muscles: ['traps', 'rotator_cuff'],
+  cns_fatigue_cost: 1,
+  joint_stress_profile: 'rotator_cuff_heavy',
+});
 
-    const equipment: EquipmentTag[] = ['full_gym', 'dumbbells', 'barbell'];
+function defaultConstraints(overrides: Partial<SolverConstraints> = {}): SolverConstraints {
+  const equipment: EquipmentTag[] = ['full_gym', 'barbell', 'dumbbells'];
+  return {
+    available_equipment: equipment,
+    equipment,
+    blockedJointProfiles: [],
+    maxSessionCns: 15,
+    iron_mastery: 3,
+    available_time_minutes: 5,
+    weekStartDate: '2026-05-26',
+    targetArchetype: null,
+    ...overrides,
+  };
+}
+
+describe('solveDaySlots — V8 constraint solver', () => {
+  it('A: prioritizes cable lateral raise over machine shoulder press by X-Frame score', () => {
+    const catalog = buildExerciseCatalog([CABLE_LATERAL, MACHINE_SHOULDER_PRESS]);
+    const tracker = createWeeklyVolumeTracker(catalog, [], [], initialBiologicalProfile);
+    const shoulderSlot: SolverSlot = {
+      slotId: 'shoulder_x_frame',
+      day: 'push',
+      requiredPatterns: ['isolation', 'push'],
+      defaultSets: 3,
+    };
+
     const { picks } = solveDaySlots(
       'push',
-      [shoulderSlot!],
+      [shoulderSlot],
       catalog,
-      {
-        equipment,
-        blockedJointProfiles: [],
-        maxSessionCns: 15,
-        weekStartDate,
-        targetArchetype: null,
-      },
+      defaultConstraints(),
       createInitialSolverState(tracker),
       tracker,
     );
 
     expect(picks).toHaveLength(1);
-    expect(picks[0]?.slotId).toBe('shoulder_lateral');
-
     const chosen = catalog.byId.get(picks[0]!.exerciseId);
     expect(chosen?.slug).toBe('cable_lateral_raise');
+    expect(chosen?.selection_score).toBe(3.0);
+    expect(catalog.bySlug.get('machine_shoulder_press')?.selection_score).toBe(1.0);
+  });
 
-    const machinePress = catalog.bySlug.get('machine_shoulder_press');
-    const overheadPress = catalog.bySlug.get('overhead_press');
-    expect(machinePress).toBeDefined();
-    expect(overheadPress).toBeDefined();
-    expect(tracker.canAddSets(machinePress!, shoulderSlot!.defaultSets).allowed).toBe(false);
-    expect(tracker.canAddSets(overheadPress!, shoulderSlot!.defaultSets).allowed).toBe(false);
+  it('B: in recovery mode rejects axial squats and selects low-CNS legs work', () => {
+    const catalog = buildExerciseCatalog([BARBELL_BACK_SQUAT, BELT_SQUAT, LEG_EXTENSION]);
+    const tracker = createWeeklyVolumeTracker(catalog, [], [], {
+      ...initialBiologicalProfile,
+      hormonal_transition: true,
+    });
+    const legSlot: SolverSlot = {
+      slotId: 'legs_recovery',
+      day: 'legs',
+      requiredPatterns: ['squat', 'isolation'],
+      primaryMuscleHint: 'quads',
+      defaultSets: 3,
+    };
+
+    const state = {
+      ...createInitialSolverState(tracker),
+      isRecoveryMode: true,
+    };
+    const { picks } = solveDaySlots('legs', [legSlot], catalog, defaultConstraints(), state, tracker);
+
+    expect(tracker.isRecoveryMode).toBe(true);
+    expect(picks).toHaveLength(1);
+    const chosen = catalog.byId.get(picks[0]!.exerciseId);
+    expect(chosen?.slug).not.toBe('barbell_back_squat');
+    expect(['belt_squat', 'leg_extension']).toContain(chosen?.slug);
+    expect(chosen?.cns_fatigue_cost).toBeLessThanOrEqual(2);
+    expect(chosen?.joint_stress_profile).toBe('low_impact');
+  });
+
+  it('C: blocks squat and hinge patterns on legs after HIIT', () => {
+    const catalog = buildExerciseCatalog([BARBELL_BACK_SQUAT, BARBELL_RDL]);
+    const tracker = createWeeklyVolumeTracker(catalog, [], [], initialBiologicalProfile);
+    const postHiitSlot: SolverSlot = {
+      slotId: 'post_hiit_legs',
+      day: 'legs',
+      requiredPatterns: ['squat', 'hinge'],
+      defaultSets: 3,
+    };
+
+    const { picks } = solveDaySlots(
+      'legs',
+      [postHiitSlot],
+      catalog,
+      defaultConstraints({ previousDayWasHiit: true }),
+      createInitialSolverState(tracker),
+      tracker,
+    );
+
+    expect(picks).toHaveLength(0);
+  });
+
+  it('D: blocks exact duplicate isolation exercises across the microcycle', () => {
+    const catalog = buildExerciseCatalog([FACE_PULL]);
+    const tracker = createWeeklyVolumeTracker(catalog, [], [], initialBiologicalProfile);
+    const facePullSlot: SolverSlot = {
+      slotId: 'rear_delt_health',
+      day: 'pull',
+      requiredPatterns: ['isolation'],
+      primaryMuscleHint: 'rear_delts',
+      isolationOnly: true,
+      defaultSets: 3,
+    };
+
+    const first = solveDaySlots(
+      'pull',
+      [facePullSlot],
+      catalog,
+      defaultConstraints(),
+      createInitialSolverState(tracker),
+      tracker,
+    );
+
+    const second = solveDaySlots(
+      'pull',
+      [facePullSlot],
+      catalog,
+      defaultConstraints(),
+      first.state,
+      tracker,
+    );
+
+    expect(first.picks).toHaveLength(1);
+    expect(catalog.byId.get(first.picks[0]!.exerciseId)?.slug).toBe('face_pull');
+    expect(second.picks).toHaveLength(0);
   });
 });

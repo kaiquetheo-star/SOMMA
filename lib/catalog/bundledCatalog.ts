@@ -1,9 +1,9 @@
 import type {
-  LibraryCombatCombo,
+  CatalogExercise,
   LibraryExercise,
-  LibraryFlowSpiritSession,
   MovementPattern,
 } from '@/types/catalog';
+import { enrichExerciseWithCues } from '@/lib/catalog/biomechanicalMapper';
 import { normalizePrimaryMuscle } from '@/lib/catalog/primaryMuscle';
 
 function iron(
@@ -131,98 +131,11 @@ const BUNDLED_EXERCISES: LibraryExercise[] = [
   iron('sphinx', 'Sphinx Pose', 'chest', 'isolation', ['bodyweight'], { cns: 1 }),
 ];
 
-const BUNDLED_COMBAT: LibraryCombatCombo[] = [
-  {
-    id: 'local-combat-footwork',
-    slug: 'footwork_shadow_1',
-    combo_name: 'Footwork Shadow A',
-    sequence: ['Jab', 'Cross', 'Slip', 'Hook'],
-    complexity_level: 3,
-    tactical_focus: 'footwork_range',
-  },
-  {
-    id: 'local-combat-power',
-    slug: 'power_inside_1',
-    combo_name: 'Inside Power A',
-    sequence: ['Uppercut', 'Hook', 'Knee'],
-    complexity_level: 4,
-    tactical_focus: 'power_inside',
-  },
-  {
-    id: 'local-combat-defense',
-    slug: 'defense_counter_1',
-    combo_name: 'Defense Counter A',
-    sequence: ['Parry', 'Cross', 'Low kick'],
-    complexity_level: 4,
-    tactical_focus: 'defense_counter',
-  },
-  {
-    id: 'local-combat-burnout',
-    slug: 'burnout_1',
-    combo_name: 'Burnout Finisher',
-    sequence: ['Jab', 'Jab', 'Cross', 'Sprawl'],
-    complexity_level: 5,
-    tactical_focus: 'burnout',
-  },
-];
-
-const BUNDLED_FLOW_SPIRIT: LibraryFlowSpiritSession[] = [
-  {
-    id: 'local-flow-recovery',
-    slug: 'flow_recovery_malasana',
-    pillar: 'flow',
-    session_name: 'Hip Recovery Flow',
-    description: '48h healer flow',
-    duration_minutes: 15,
-    tempo_profile: {},
-    complexity_level: 2,
-    target_recovery_zones: ['hips', 'thoracic'],
-    complexity_tier: 1,
-    is_dynamic_flow: true,
-    default_hold_seconds: 45,
-  },
-  {
-    id: 'local-spirit-breath',
-    slug: 'spirit_box_breath',
-    pillar: 'spirit',
-    session_name: 'Box Breathwork',
-    description: 'Parasympathetic reset',
-    duration_minutes: 12,
-    tempo_profile: { inhale: 4, hold: 4, exhale: 4 },
-    complexity_level: 1,
-    target_recovery_zones: ['nervous_system'],
-    complexity_tier: 1,
-    is_dynamic_flow: false,
-    default_hold_seconds: 0,
-  },
-  {
-    id: 'local-spirit-nsdr',
-    slug: 'spirit_nsdr',
-    pillar: 'spirit',
-    session_name: 'NSDR Body Scan',
-    description: 'Down-regulation',
-    duration_minutes: 20,
-    tempo_profile: {},
-    complexity_level: 1,
-    target_recovery_zones: ['sleep', 'recovery'],
-    complexity_tier: 1,
-    is_dynamic_flow: false,
-    default_hold_seconds: 0,
-  },
-];
-
-export function getBundledExercises(): LibraryExercise[] {
-  return BUNDLED_EXERCISES;
+export function getBundledExercises(): CatalogExercise[] {
+  return BUNDLED_EXERCISES.map(enrichExerciseWithCues);
 }
 
 export function getBundledExerciseCount(): number {
   return BUNDLED_EXERCISES.length;
 }
 
-export function getBundledCombat(): LibraryCombatCombo[] {
-  return BUNDLED_COMBAT;
-}
-
-export function getBundledFlowSpirit(): LibraryFlowSpiritSession[] {
-  return BUNDLED_FLOW_SPIRIT;
-}

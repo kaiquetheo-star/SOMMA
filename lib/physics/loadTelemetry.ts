@@ -25,7 +25,7 @@ export function effectiveRpeFromSet(set: {
   return null;
 }
 
-export type LoadTelemetryPillar = 'iron' | 'combat' | 'spirit';
+export type LoadTelemetryPillar = 'iron';
 
 export interface PillarLoadMetrics {
   pillar: LoadTelemetryPillar;
@@ -35,7 +35,7 @@ export interface PillarLoadMetrics {
   rpeStdDev: number | null;
   /** Sum of session-RPE × duration (minutes) — Foster sRPE */
   sRpe7d: number;
-  /** Sum of kg×reps (iron) or work seconds (combat) in 7d */
+  /** Sum of kg×reps in 7d */
   volume7d: number;
   /** Acute (7d) / chronic (28d weekly average) workload ratio */
   acwr: number | null;
@@ -53,7 +53,11 @@ export interface AcwrThresholds {
 export interface TrainingLoadSnapshot {
   computedAt: string;
   pillars: Record<LoadTelemetryPillar, PillarLoadMetrics>;
-  /** Volume-weighted mean RPE across iron + combat sessions (14d) */
+  /** Regra 5.2: top-level convenience for recovery orchestration. */
+  acwr?: number | null;
+  /** Regra 5.4: explicit deload flag for deterministic recovery injection. */
+  is_deload_week?: boolean;
+  /** Mean RPE across Iron sessions (14d) */
   globalRpeMean: number | null;
   ironGoal: IronGoalType;
   ironAcwrThresholds: AcwrThresholds;
@@ -64,17 +68,10 @@ const ACUTE_DAYS = 7;
 const CHRONIC_DAYS = 28;
 const RPE_WINDOW_DAYS = 14;
 
-/** Default ACWR bands (combat / spirit / legacy callers) */
+/** Default ACWR bands retained for shared threshold helpers. */
 export const ACWR_SPIKE = 1.5;
 export const ACWR_ELEVATED = 1.3;
 export const ACWR_UNDER = 0.8;
-
-const COMBAT_ACWR_THRESHOLDS: AcwrThresholds = {
-  spike: ACWR_SPIKE,
-  elevated: ACWR_ELEVATED,
-  under: ACWR_UNDER,
-  label: 'Combat conditioning',
-};
 
 /** Goal-aware ACWR bands for iron internal load (research-informed defaults). */
 export function resolveAcwrThresholds(goalIron: string | null | undefined): AcwrThresholds {
@@ -168,42 +165,6 @@ function ironSessionFromEntry(entry: PerformanceLogEntry): SessionLoad | null {
   };
 }
 
-function combatSessionFromEntry(entry: PerformanceLogEntry): SessionLoad | null {
-  if (!entry.combat) return null;
-
-  const ts = Date.parse(entry.combat.completed_at ?? entry.timestamp);
-  if (!Number.isFinite(ts)) return null;
-
-  const rounds = Array.isArray(entry.combat.rounds) ? entry.combat.rounds : [];
-  const workSeconds = rounds.reduce((sum, round) => sum + (round.work_seconds ?? 0), 0);
-  const durationMinutes = Math.max(1, (workSeconds + rounds.length * 30) / 60);
-  const rpe = entry.combat.rpe_score;
-
-  return {
-    pillar: 'combat',
-    timestamp: ts,
-    rpe: rpe != null && Number.isFinite(rpe) ? rpe : null,
-    durationMinutes,
-    workload: workSeconds > 0 ? workSeconds : rounds.length * 180,
-  };
-}
-
-function spiritSessionFromEntry(entry: PerformanceLogEntry): SessionLoad | null {
-  if (!entry.spirit) return null;
-
-  const ts = Date.parse(entry.spirit.completed_at ?? entry.timestamp);
-  if (!Number.isFinite(ts)) return null;
-
-  const seconds = entry.spirit.total_seconds ?? 0;
-  return {
-    pillar: 'spirit',
-    timestamp: ts,
-    rpe: 6,
-    durationMinutes: Math.max(1, seconds / 60),
-    workload: seconds,
-  };
-}
-
 function sessionsFromLogs(entries: PerformanceLogEntry[]): SessionLoad[] {
   if (!Array.isArray(entries) || entries.length === 0) return [];
 
@@ -214,12 +175,6 @@ function sessionsFromLogs(entries: PerformanceLogEntry[]): SessionLoad[] {
     try {
       if (entry.pillar === 'iron') {
         const session = ironSessionFromEntry(entry);
-        if (session) sessions.push(session);
-      } else if (entry.pillar === 'combat') {
-        const session = combatSessionFromEntry(entry);
-        if (session) sessions.push(session);
-      } else if (entry.pillar === 'spirit') {
-        const session = spiritSessionFromEntry(entry);
         if (session) sessions.push(session);
       }
     } catch {
@@ -298,29 +253,26 @@ export function computeTrainingLoadSnapshot(
   const safeEntries = Array.isArray(entries) ? entries : [];
   const sessions = sessionsFromLogs(safeEntries);
   const iron = buildPillarMetrics('iron', sessions, ironAcwrThresholds, now);
-  const combat = buildPillarMetrics('combat', sessions, COMBAT_ACWR_THRESHOLDS, now);
-  const spirit = buildPillarMetrics('spirit', sessions, COMBAT_ACWR_THRESHOLDS, now);
 
   const globalSamples = filterSessionsByDays(sessions, RPE_WINDOW_DAYS, now)
-    .filter((session) => session.pillar === 'iron' || session.pillar === 'combat')
     .map((session) => session.rpe)
     .filter((rpe): rpe is number => rpe != null);
 
   return {
     computedAt: new Date(now).toISOString(),
-    pillars: { iron, combat, spirit },
+    pillars: { iron },
+    acwr: iron.acwr,
+    is_deload_week: false,
     globalRpeMean: mean(globalSamples) != null ? Math.round(mean(globalSamples)! * 10) / 10 : null,
     ironGoal,
     ironAcwrThresholds,
   };
 }
 
-/** Suggested average RPE for Clinical Exit Interview (iron + combat, 21d). */
+/** Suggested average RPE for Clinical Exit Interview (Iron, 21d). */
 export function suggestedAverageRpeForClinicalReview(entries: PerformanceLogEntry[]): number | null {
   const sessions = sessionsFromLogs(entries).filter(
-    (session) =>
-      (session.pillar === 'iron' || session.pillar === 'combat') &&
-      session.timestamp >= Date.now() - 21 * MS_PER_DAY,
+    (session) => session.timestamp >= Date.now() - 21 * MS_PER_DAY,
   );
   const rpeValues = sessions
     .map((session) => session.rpe)
@@ -392,10 +344,9 @@ export function telemetrySuggestsPoorRecovery(
   goalIron?: string | null,
 ): boolean {
   const iron = snapshot.pillars.iron;
-  const combat = snapshot.pillars.combat;
   const rpeBands = resolveTelemetryRpeThresholds(goalIron);
 
-  if (iron.acwrStatus === 'spike' || combat.acwrStatus === 'spike') return true;
+  if (iron.acwrStatus === 'spike') return true;
   if (
     iron.rpeMean != null &&
     iron.rpeMean >= rpeBands.chronicHighRpeMean &&
@@ -403,7 +354,6 @@ export function telemetrySuggestsPoorRecovery(
   ) {
     return true;
   }
-  if (combat.rpeMean != null && combat.rpeMean >= 9) return true;
   return false;
 }
 

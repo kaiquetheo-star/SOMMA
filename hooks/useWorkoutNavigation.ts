@@ -109,7 +109,7 @@ export function completionFromParams(params: {
   if (!params.blockId || !params.pillar) return null;
 
   const pillar = params.pillar as WorkoutPillarLog;
-  if (!['iron', 'combat', 'flow', 'spirit'].includes(pillar)) return null;
+  if (!['iron', 'nutrition'].includes(pillar)) return null;
 
   return {
     block_id: params.blockId,

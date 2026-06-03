@@ -55,7 +55,7 @@ export function EmailAuthPanel({ onCancel }: EmailAuthPanelProps) {
   return (
     <View className="gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-5">
       <Text className="font-body text-[10px] uppercase tracking-[0.35em] text-matte-gold/80">
-        Email attunement
+        Email access
       </Text>
       <TextInput
         value={email}

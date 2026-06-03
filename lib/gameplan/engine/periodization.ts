@@ -22,8 +22,6 @@ import {
 
 export interface PillarFrequency {
   frequency_iron: number;
-  frequency_combat: number;
-  frequency_spirit: number;
 }
 
 /** Law III — Effective Hypertrophy Zone upper bound (weekly working sets per muscle) */
@@ -33,8 +31,6 @@ export function resolvePillarFrequencies(biological: BiologicalProfile): PillarF
   const legacy = clampTrainingDaysPerWeek(biological.training_days_per_week ?? 4);
   return {
     frequency_iron: clampPillarFrequency(biological.frequency_iron, legacy),
-    frequency_combat: clampPillarFrequency(biological.frequency_combat, legacy),
-    frequency_spirit: clampPillarFrequency(biological.frequency_spirit, legacy),
   };
 }
 
@@ -46,21 +42,16 @@ export function focusLabelForIronSlot(trainingDaysPerWeek: number, slot: number)
   const rotation =
     MICROCYCLE_FOCUS_ROTATIONS[clampTrainingDaysPerWeek(trainingDaysPerWeek)] ??
     MICROCYCLE_FOCUS_ROTATIONS[4]!;
-  const ironLabels = rotation.filter(
-    (label) => label.startsWith('Iron:') && !label.includes('Combat:'),
-  );
+  const ironLabels = rotation.filter((label) => label.startsWith('Iron:'));
   if (ironLabels.length > 0) {
     return ironLabels[slot % ironLabels.length]!;
   }
-  const withoutCombat = rotation.filter((label) => !label.includes('Combat:'));
-  return withoutCombat[slot % withoutCombat.length] ?? 'Iron: Full Body';
+  return rotation[slot % rotation.length] ?? 'Iron: Full Body';
 }
 
 export function deriveActiveTrainingDays(pillarFreq: PillarFrequency): number {
   return deriveTrainingDaysFromFrequencies({
     frequency_iron: pillarFreq.frequency_iron,
-    frequency_combat: pillarFreq.frequency_combat,
-    frequency_spirit: pillarFreq.frequency_spirit,
   });
 }
 
@@ -90,13 +81,6 @@ export function targetIronExerciseCount(minutes: number, goalIron: string | null
   }
 
   return Math.min(cap, target);
-}
-
-export function targetCombatRoundCount(minutes: number): number {
-  if (minutes <= 20) return 2;
-  if (minutes <= 35) return 3;
-  if (minutes <= 50) return 4;
-  return 5;
 }
 
 export function equipmentMatches(exercise: LibraryExercise, availableEquipment: EquipmentTag[]): boolean {

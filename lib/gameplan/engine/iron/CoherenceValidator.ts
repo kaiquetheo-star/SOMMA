@@ -423,9 +423,6 @@ function fixShoulderImbalance(
   const pushDay = microcycle.find((row) => row.day === 'push');
   if (!pushDay) return false;
 
-  const lateralSlot = PPL_DAY_SLOTS.push.find((slot) => slot.slotId === 'shoulder_lateral');
-  if (!lateralSlot) return false;
-
   const shoulderTotals = sumShoulderRegions(microcycle, catalog);
   const lateralPosteriorDeficit =
     shoulderTotals.anterior > 0
@@ -433,100 +430,89 @@ function fixShoulderImbalance(
         (shoulderTotals.lateral + shoulderTotals.posterior)
       : 0;
 
+  if (lateralPosteriorDeficit <= 0) return false;
+
   const exclude = usedExerciseIds(microcycle);
-  const targetSets = Math.max(lateralSlot.defaultSets, lateralPosteriorDeficit);
+  const sets = Math.max(3, lateralPosteriorDeficit);
+  const availableSeconds = Math.max(0, constraints.available_time_minutes) * 60;
 
-  if (lateralPosteriorDeficit > 0) {
-    // If the slot already exists, prefer increasing volume (do not swap or delete compounds like OHP).
-    const existingIndex = pushDay.picks.findIndex((pick) => pick.slotId === 'shoulder_lateral');
-    if (existingIndex !== -1) {
-      const existing = pushDay.picks[existingIndex]!;
-      const existingExercise = catalog.byId.get(existing.exerciseId);
-      if (existingExercise && SHOULDER_FIX_PRIMARY_MUSCLES.has(existingExercise.primary_muscle)) {
-        // Deficit is expressed in additional lateral+posterior sets needed.
-        const add = Math.max(0, lateralPosteriorDeficit);
-        if (add <= 0) return true;
-        if (!tracker.canAddSets(existingExercise, add).allowed) return false;
-        tracker.creditVolume(existingExercise, add);
-        existing.prescribedSets += add;
-        swaps.push({
-          fromExerciseId: existingExercise.id,
-          toExerciseId: existingExercise.id,
-          reason: 'SHOULDER_IMBALANCE',
-        });
-        return true;
+  const candidates = catalog.exercises
+    .filter((exercise) => exercise.movement_pattern === 'isolation')
+    .filter((exercise) => exercise.cns_fatigue_cost <= 2)
+    .filter((exercise) => SHOULDER_FIX_PRIMARY_MUSCLES.has(exercise.primary_muscle))
+    .filter((exercise) => !exclude.has(exercise.id))
+    .filter(
+      (exercise) =>
+        equipmentSubsetAllowed(exercise, constraints.equipment) &&
+        jointProfileAllowed(exercise, constraints.blockedJointProfiles),
+    )
+    .filter((exercise) => tracker.canAddSets(exercise, sets).allowed)
+    .sort((a, b) => {
+      if (a.primary_muscle !== b.primary_muscle) {
+        return a.primary_muscle === 'side_delts' ? -1 : 1;
       }
+      return a.slug.localeCompare(b.slug);
+    });
+
+  for (const candidate of candidates) {
+    const restSeconds = candidate.cns_fatigue_cost <= 1 ? 60 : 75;
+    const projectedSeconds = candidate.default_reps * 3 * sets + restSeconds * sets;
+    const currentSeconds = pushDay.picks.reduce((sum, pick) => {
+      const exercise = catalog.byId.get(pick.exerciseId);
+      if (!exercise) return sum;
+      const rest = exercise.cns_fatigue_cost <= 1 ? 60 : exercise.cns_fatigue_cost === 2 ? 75 : 105;
+      return sum + pick.prescribedSets * (exercise.default_reps * 3 + rest);
+    }, 0);
+    if (currentSeconds + projectedSeconds > availableSeconds && currentSeconds < availableSeconds) {
+      continue;
     }
 
-    const candidates = listSlotCandidates(
-      catalog,
-      lateralSlot,
-      constraints,
-      exclude,
-      tracker,
-      targetSets,
-    ).filter((exercise) => SHOULDER_FIX_PRIMARY_MUSCLES.has(exercise.primary_muscle));
-
-    const replacement = candidates[0];
-    if (!replacement) return false;
-
-    const emptySlotIndex = pushDay.picks.findIndex((pick) => pick.slotId === 'shoulder_lateral');
-    if (emptySlotIndex === -1) {
-      if (!tracker.canAddSets(replacement, targetSets).allowed) return false;
-      tracker.creditVolume(replacement, targetSets);
-      pushDay.picks.push({
-        slotId: 'shoulder_lateral',
-        exerciseId: replacement.id,
-        prescribedSets: targetSets,
-      });
-      swaps.push({
-        fromExerciseId: '',
-        toExerciseId: replacement.id,
-        reason: 'SHOULDER_IMBALANCE',
-      });
-      return true;
-    }
-
-    const fromId = pushDay.picks[emptySlotIndex]!.exerciseId;
-    if (trySwapPick(microcycle, 'push', emptySlotIndex, replacement, targetSets, catalog, constraints, tracker)) {
-      swaps.push({ fromExerciseId: fromId, toExerciseId: replacement.id, reason: 'SHOULDER_IMBALANCE' });
-      return true;
-    }
-    return false;
+    tracker.creditVolume(candidate, sets);
+    pushDay.picks.push({
+      slotId: `${candidate.primary_muscle}_shoulder_3d_extra`,
+      exerciseId: candidate.id,
+      prescribedSets: sets,
+      intensity_technique: 'myo_reps',
+      technique_params: {
+        activationReps: 15,
+        miniSets: 3,
+        miniSetReps: 5,
+        intraSetRestSeconds: 20,
+        note: 'Shoulder 3D correction by addition; compounds preserved.',
+      },
+    });
+    swaps.push({
+      fromExerciseId: '',
+      toExerciseId: candidate.id,
+      reason: 'SHOULDER_IMBALANCE_ADD_VOLUME',
+    });
+    return true;
   }
 
-  const pullDay = microcycle.find((row) => row.day === 'pull');
-  const rearSlot = PPL_DAY_SLOTS.pull.find((slot) => slot.slotId === 'rear_delt');
-  if (pullDay && rearSlot) {
-    const hasRear = pullDay.picks.some((pick) => {
-      const exercise = catalog.byId.get(pick.exerciseId);
-      return exercise?.primary_muscle === 'rear_delts';
-    });
-    if (!hasRear) {
-      const rearCandidates = listSlotCandidates(
-        catalog,
-        rearSlot,
-        constraints,
-        exclude,
-        tracker,
-        rearSlot.defaultSets,
-      ).filter((exercise) => exercise.primary_muscle === 'rear_delts');
+  const existing = pushDay.picks.find((pick) => {
+    const exercise = catalog.byId.get(pick.exerciseId);
+    return exercise != null && SHOULDER_FIX_PRIMARY_MUSCLES.has(exercise.primary_muscle);
+  });
 
-      const rearExercise = rearCandidates[0];
-      if (rearExercise && tracker.canAddSets(rearExercise, rearSlot.defaultSets).allowed) {
-        tracker.creditVolume(rearExercise, rearSlot.defaultSets);
-        pullDay.picks.push({
-          slotId: 'rear_delt',
-          exerciseId: rearExercise.id,
-          prescribedSets: rearSlot.defaultSets,
-        });
-        swaps.push({
-          fromExerciseId: '',
-          toExerciseId: rearExercise.id,
-          reason: 'SHOULDER_IMBALANCE',
-        });
-        return true;
-      }
+  if (existing) {
+    const exercise = catalog.byId.get(existing.exerciseId);
+    if (exercise && tracker.canAddSets(exercise, lateralPosteriorDeficit).allowed) {
+      tracker.creditVolume(exercise, lateralPosteriorDeficit);
+      existing.prescribedSets += lateralPosteriorDeficit;
+      existing.intensity_technique = existing.intensity_technique ?? 'myo_reps';
+      existing.technique_params = existing.technique_params ?? {
+        activationReps: 15,
+        miniSets: 3,
+        miniSetReps: 5,
+        intraSetRestSeconds: 20,
+        note: 'Shoulder 3D correction by added volume; compounds preserved.',
+      };
+      swaps.push({
+        fromExerciseId: '',
+        toExerciseId: exercise.id,
+        reason: 'SHOULDER_IMBALANCE_ADD_SETS',
+      });
+      return true;
     }
   }
 
@@ -680,6 +666,9 @@ function fixWeeklyMrv(
     for (let index = dayPlan.picks.length - 1; index >= 0; index -= 1) {
       const pick = dayPlan.picks[index]!;
       const exercise = catalog.byId.get(pick.exerciseId);
+      if (pick.slotId.includes('finisher_extra') || pick.slotId.includes('shoulder_3d_extra')) {
+        continue;
+      }
       if (!exercise || pick.prescribedSets <= 2) continue;
 
       const overloaded = [...tracker.snapshot.byMuscle.entries()].some(

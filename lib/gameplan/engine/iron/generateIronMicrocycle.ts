@@ -13,6 +13,7 @@ import {
 } from '@/lib/gameplan/engine/iron/ConstraintSolver';
 import { mapToIronPrescription } from '@/lib/gameplan/engine/iron/loadPrescriptionMapper';
 import { PPL_DAY_SLOTS, PPL_ROTATION, resolvePplDayTemplate } from '@/lib/gameplan/engine/iron/splits/pplSplit';
+import { getDailyIronFocus, type DailyIronFocus } from '@/lib/gameplan/engine/iron/dupLogic';
 import type {
   CatalogExercise,
   ExerciseCatalog,
@@ -31,7 +32,6 @@ import type { BiologicalProfile } from '@/types/biological';
 import type { IronExercisePrescription } from '@/types/gameplan';
 import type { GameplanBlock } from '@/types/gameplan';
 import type { LibraryExercise } from '@/types/catalog';
-import { computeRestSecondsFromCns } from '@/types/catalog';
 import type { EquipmentTag } from '@/store/useSommaStore';
 
 export interface EnrichedIronPick extends SolverResult {
@@ -94,6 +94,7 @@ function buildConstraints(
   };
 
   return {
+    available_equipment: input.equipment,
     equipment: input.equipment,
     blockedJointProfiles: input.blockedJointProfiles,
     maxSessionCns: maxSessionCnsForMinutes(input.availableMinutes),
@@ -106,73 +107,12 @@ function buildConstraints(
   };
 }
 
-function estimateSessionSeconds(picks: readonly SolverResult[], catalog: ExerciseCatalog): number {
-  let seconds = 0;
-  for (const pick of picks) {
-    const exercise = catalog.byId.get(pick.exerciseId);
-    if (!exercise) continue;
-    const rest = computeRestSecondsFromCns(exercise.cns_fatigue_cost);
-    const reps = Math.max(1, exercise.default_reps);
-    seconds += pick.prescribedSets * (reps * 3 + rest);
-  }
-  return seconds;
-}
-
-function listFinisherMuscleHints(splitDay: SplitDayKey): readonly string[] {
-  if (splitDay === 'push') return ['side_delts', 'rear_delts', 'chest', 'triceps'];
-  if (splitDay === 'pull') return ['rear_delts', 'biceps', 'traps', 'back'];
-  return ['quads', 'hamstrings', 'glutes', 'calves'];
-}
-
-function tryAddFinisher(
-  picks: SolverResult[],
-  catalog: ExerciseCatalog,
-  constraints: SolverConstraints,
-  usedIds: Set<string>,
-  tracker: ReturnType<typeof createWeeklyVolumeTracker>,
-  splitDay: SplitDayKey,
-): boolean {
-  const hints = listFinisherMuscleHints(splitDay);
-  for (const hint of hints) {
-    const basePool = catalog.exercises
-      .filter((row) => row.movement_pattern === 'isolation')
-      .filter((row) => row.cns_fatigue_cost <= 2)
-      .filter((row) => {
-        if (constraints.iron_mastery >= 4) {
-          // Still allow basic isolations as finishers.
-          return true;
-        }
-        return true;
-      })
-      .filter((row) => row.primary_muscle === hint)
-      .filter((row) => row.equipment_required.length === 0 || row.equipment_required.some((tag) => constraints.equipment.includes(tag as EquipmentTag)))
-      .filter((row) => !row.joint_stress_profile || !constraints.blockedJointProfiles.includes(row.joint_stress_profile))
-      .sort((a, b) => a.slug.localeCompare(b.slug));
-
-    const unused = basePool.find((row) => usedIds.has(row.id) === false) ?? null;
-    const candidate = unused ?? basePool[0] ?? null;
-
-    if (!candidate) continue;
-    const sets = Math.max(3, candidate.default_sets);
-    // Time budget > MRV for elite sessions: finishers are low-CNS and can be added even when volume caps are near.
-    // (We intentionally do not credit these into the weekly MRV ledger, so coherence can focus on pattern balance.)
-    usedIds.add(candidate.id);
-    picks.push({
-      slotId: `finisher_${splitDay}_${hint}_${picks.length}`,
-      exerciseId: candidate.id,
-      prescribedSets: sets,
-      score: 0,
-    });
-    return true;
-  }
-  return false;
-}
-
 function picksFromSolver(
   solverPicks: readonly SolverResult[],
   catalog: ExerciseCatalog,
   logs21d: readonly EnginePerformanceRow[],
   goalIron: string | null,
+  dailyFocus: DailyIronFocus,
 ): EnrichedIronPick[] {
   return solverPicks.flatMap((pick) => {
     const exercise = catalog.byId.get(pick.exerciseId);
@@ -181,7 +121,7 @@ function picksFromSolver(
       {
         ...pick,
         exercise,
-        prescription: mapToIronPrescription(pick, exercise, null, logs21d, goalIron),
+        prescription: mapToIronPrescription(pick, exercise, null, logs21d, goalIron, dailyFocus),
       },
     ];
   });
@@ -205,12 +145,15 @@ function applyDraftToDayBlocks(
         exerciseId: pick.exerciseId,
         prescribedSets: pick.prescribedSets,
         score: 0,
+        intensity_technique: pick.intensity_technique,
+        technique_params: pick.technique_params,
       };
+      const dailyFocus = getDailyIronFocus(block.ironSlotIndex + 1, block.splitDay);
       return [
         {
           ...solverResult,
           exercise,
-          prescription: mapToIronPrescription(solverResult, exercise, null, logs21d, goalIron),
+          prescription: mapToIronPrescription(solverResult, exercise, null, logs21d, goalIron, dailyFocus),
         },
       ];
     });
@@ -233,7 +176,7 @@ export function generateIronMicrocycle(input: GenerateIronMicrocycleInput): Iron
   }
 
   const constraints = buildConstraints(input);
-  const tracker = createWeeklyVolumeTracker(catalog, input.logs7d, input.weekStartDate);
+  const tracker = createWeeklyVolumeTracker(catalog, input.logs7d, input.logs21d, input.biological);
   let solverState = createInitialSolverState(tracker);
 
   const rotation = resolveSplitRotation(input.biological.frequency_iron ?? 6);
@@ -247,6 +190,11 @@ export function generateIronMicrocycle(input: GenerateIronMicrocycleInput): Iron
         : { splitDay: rotation[ironSlot % rotation.length] ?? 'push', focusLabel: PPL_FOCUS_LABELS[rotation[ironSlot % rotation.length] ?? 'push'], slots: PPL_DAY_SLOTS[rotation[ironSlot % rotation.length] ?? 'push'] };
     const splitDay = template.splitDay;
     const daySlots = trimSlotsForTimeBudget(template.slots, input.availableMinutes);
+    const dailyIronFocus = getDailyIronFocus(ironSlot + 1, splitDay);
+    const dayConstraints: SolverConstraints = {
+      ...constraints,
+      dailyIronFocus,
+    };
 
     solverState = {
       ...solverState,
@@ -254,36 +202,23 @@ export function generateIronMicrocycle(input: GenerateIronMicrocycleInput): Iron
       shoulderSets: { anterior: 0, lateral: 0, posterior: 0 },
     };
 
-    const { picks: basePicks, state } = solveDaySlots(
+    const { picks, state } = solveDaySlots(
       splitDay,
       daySlots,
       catalog,
-      constraints,
+      dayConstraints,
       solverState,
       tracker,
+      input.ironDayIndices[ironSlot],
     );
     solverState = state;
-
-    const picks: SolverResult[] = [...basePicks];
-
-    // Time budget enforcer: if we are meaningfully under target, add low-CNS isolations as finishers.
-    const targetSeconds = Math.max(0, constraints.available_time_minutes) * 60;
-    const minAcceptable = Math.max(0, (constraints.available_time_minutes - 10) * 60);
-    const usedIds = new Set<string>(solverState.usedExerciseIds);
-    let estimated = estimateSessionSeconds(picks, catalog);
-    let guard = 0;
-    while (estimated < minAcceptable && guard < 12) {
-      guard += 1;
-      const added = tryAddFinisher(picks, catalog, constraints, usedIds, tracker, splitDay);
-      if (!added) break;
-      estimated = estimateSessionSeconds(picks, catalog);
-      if (estimated >= targetSeconds) break;
-    }
 
     const planPicks: MicrocyclePick[] = picks.map((pick) => ({
       slotId: pick.slotId,
       exerciseId: pick.exerciseId,
       prescribedSets: pick.prescribedSets,
+      intensity_technique: pick.intensity_technique,
+      technique_params: pick.technique_params,
     }));
 
     draft.push({ day: splitDay, picks: planPicks });
@@ -293,11 +228,11 @@ export function generateIronMicrocycle(input: GenerateIronMicrocycleInput): Iron
       splitDay,
       focusLabel: template.focusLabel ?? PPL_FOCUS_LABELS[splitDay],
       ironSlotIndex: ironSlot,
-      picks: picksFromSolver(picks, catalog, input.logs21d, input.goalIron),
+      picks: picksFromSolver(picks, catalog, input.logs21d, input.goalIron, dailyIronFocus),
       coherenceValidated: false,
     });
 
-    const shouldAudit = draft.length === input.ironDayIndices.length || draft.length % 3 === 0;
+    const shouldAudit = draft.length === input.ironDayIndices.length;
     if (shouldAudit && draft.length > 0) {
       const draftClone = cloneMicrocycle(draft);
       const report = validateMicrocycleCoherence(draftClone, catalog, constraints, tracker);

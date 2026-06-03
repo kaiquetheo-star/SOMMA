@@ -6,7 +6,7 @@ interface RirSelectorProps {
   onChange: (rir: number) => void;
 }
 
-/** Post-set reps-in-reserve capture (0–4) — mirrors combat RPE gate aesthetic */
+/** Post-set reps-in-reserve capture (0–4) for Iron load telemetry */
 export function RirSelector({ value, prescribedRir = 2, onChange }: RirSelectorProps) {
   const options = [0, 1, 2, 3, 4] as const;
 

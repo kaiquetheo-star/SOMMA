@@ -2,6 +2,8 @@ import { beautifyCatalogName } from '@/lib/gameplan/engine/clinicalLaws';
 import type { CatalogExercise } from '@/lib/gameplan/engine/iron/types';
 import type { SolverResult } from '@/lib/gameplan/engine/iron/types';
 import type { EnginePerformanceRow } from '@/lib/gameplan/engine/performanceLogs';
+import { mapToExerciseCueCard } from '@/lib/gameplan/engine/iron/cueMapper';
+import type { DailyIronFocus } from '@/lib/gameplan/engine/iron/dupLogic';
 import {
   calculateE1RM,
   estimateBestE1RMFromLogs,
@@ -80,6 +82,36 @@ function repRangeForExercise(exercise: CatalogExercise, prescribedSets: number):
   return { targetReps, targetRir, lo, hi };
 }
 
+function repRangeForDupFocus(
+  exercise: CatalogExercise,
+  prescribedSets: number,
+  dailyFocus: DailyIronFocus | null,
+): {
+  targetReps: number;
+  targetRir: number;
+  lo: number;
+  hi: number;
+} {
+  if (!dailyFocus) return repRangeForExercise(exercise, prescribedSets);
+
+  const [lo, hi] = dailyFocus.targetRepRange;
+  return {
+    targetReps: hi,
+    targetRir: dailyFocus.focus === 'pure_mechanical_tension' ? 1 : 2,
+    lo,
+    hi,
+  };
+}
+
+function displayTechnique(technique: SolverResult['intensity_technique']): string {
+  if (!technique || technique === 'standard') return 'Standard';
+  return technique
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join('-')
+    .replace('Myo-Reps', 'Myo-Reps');
+}
+
 /**
  * Maps solver output → UI-ready `IronExercisePrescription` (Text-Only Elite / Zustand shape).
  */
@@ -89,10 +121,16 @@ export function mapToIronPrescription(
   e1rm: number | null,
   recentLogs: readonly EnginePerformanceRow[],
   goalIron: string | null,
+  dailyFocus: DailyIronFocus | null = null,
 ): IronExercisePrescription {
-  const { targetReps, targetRir, lo, hi } = repRangeForExercise(exercise, solverResult.prescribedSets);
+  const { targetReps, targetRir, lo, hi } = repRangeForDupFocus(
+    exercise,
+    solverResult.prescribedSets,
+    dailyFocus,
+  );
   const samples = engineRowsToSamples(recentLogs);
   const resolvedE1rm = e1rm ?? estimateBestE1RMFromLogs(samples, exercise.id);
+  const dayFocus = dailyFocus?.focus ?? 'metabolic_hypertrophy';
 
   let targetWeight: number | null = null;
   const notes: string[] = [];
@@ -113,8 +151,13 @@ export function mapToIronPrescription(
     notes.push('Calibrate first set @ prescribed RIR');
   }
 
+  if (solverResult.technique_params?.note) {
+    notes.push(solverResult.technique_params.note);
+  }
+
   return {
     exercise_id: exercise.id,
+    slug: exercise.slug,
     display_name: beautifyCatalogName(exercise.name),
     target_sets: solverResult.prescribedSets,
     target_reps: targetReps,
@@ -122,8 +165,11 @@ export function mapToIronPrescription(
     target_rir: targetRir,
     target_weight_kg: targetWeight,
     rest_seconds: computeRestSecondsFromCns(exercise.cns_fatigue_cost),
-    progression_note: notes.join(' · ') || 'Heuristic engine prescription',
-    execution_technique: 'Standard',
+    progression_note: notes.join(' · ') || 'Calibrate First Set',
+    execution_technique: displayTechnique(solverResult.intensity_technique),
+    // Regra 4.1 + Regra 5.1: DUP cadence overrides catalog default for the day stimulus.
+    tempo: dailyFocus?.defaultTempo ?? exercise.tempo,
+    cue_card: mapToExerciseCueCard(exercise, dayFocus),
   };
 }
 

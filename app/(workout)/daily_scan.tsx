@@ -43,7 +43,7 @@ export default function DailyReadinessScanScreen() {
   const readinessHint = useMemo(() => {
     if (score == null) return null;
     if (score < 4) {
-      return 'Autoregulation Mode — Combat removed · Iron loads −15%';
+      return 'Autoregulation Mode — Iron loads −15%';
     }
     if (score >= 8) return 'High readiness — execute prescribed loads';
     return 'Standard protocol — proceed as prescribed';

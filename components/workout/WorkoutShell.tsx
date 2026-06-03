@@ -12,13 +12,13 @@ interface WorkoutShellProps {
   footer?: ReactNode;
   completeLabel?: string;
   completeDisabled?: boolean;
-  accent?: 'obsidian' | 'copper' | 'spirit';
+  accent?: 'obsidian' | 'copper' | 'dark';
 }
 
 const ACCENT_BG = {
   obsidian: 'bg-obsidian',
   copper: 'bg-[#120A0A]',
-  spirit: 'bg-[#0D1210]',
+  dark: 'bg-[#0D1210]',
 } as const;
 
 export function WorkoutShell({

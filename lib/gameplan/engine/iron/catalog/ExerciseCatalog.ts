@@ -3,6 +3,7 @@ import {
   isIronMovementPattern,
   normalizeMovementPattern,
 } from '@/lib/gameplan/engine/iron/taxonomy/movementPatterns';
+import { enrichExerciseWithCues } from '@/lib/catalog/biomechanicalMapper';
 import type { IronMovementPattern } from '@/lib/gameplan/engine/iron/taxonomy/movementPatterns';
 import type { LibraryExercise } from '@/types/catalog';
 
@@ -133,6 +134,7 @@ function normalizeSynergists(raw: string[] | null | undefined): readonly string[
 }
 
 function toCatalogExercise(row: LibraryExercise): CatalogExercise | null {
+  const enriched = enrichExerciseWithCues(row);
   const movement_pattern = normalizeMovementPattern(row.movement_pattern);
   const primary_muscle = normalizeCatalogMuscle(row.primary_muscle);
 
@@ -145,6 +147,7 @@ function toCatalogExercise(row: LibraryExercise): CatalogExercise | null {
     id: row.id,
     slug: row.slug,
     name: row.name,
+    biomechanical_instructions: row.biomechanical_instructions,
     movement_pattern,
     primary_muscle,
     synergist_muscles: normalizeSynergists(row.synergist_muscles),
@@ -155,6 +158,9 @@ function toCatalogExercise(row: LibraryExercise): CatalogExercise | null {
     default_sets: row.default_sets,
     default_reps: row.default_reps,
     stretch_mediated_hypertrophy: row.stretch_mediated_hypertrophy,
+    selection_score: enriched.selection_score,
+    tempo: enriched.tempo,
+    cue_card: enriched.cue_card,
   };
 }
 

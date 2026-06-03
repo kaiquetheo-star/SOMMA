@@ -1,10 +1,6 @@
-import type { LibraryExercise, LibraryFlowSpiritSession } from '@/types/catalog';
+import type { LibraryExercise } from '@/types/catalog';
 import { applyFivePhaseClinicalMatrix, classifyClinicalPhase } from '@/lib/gameplan/engine/clinicalMatrix';
 import type {
-  CombatBlockPrescription,
-  CombatRoundPrescription,
-  CombatTacticalFocus,
-  FlowAsanaPrescription,
   GameplanBlock,
   IronExercisePrescription,
   MicrocycleDay,
@@ -30,17 +26,8 @@ const TITLE_CASE_SMALL_WORDS = new Set([
 /** Neuro-Mechanical Recruitment — Iron exercise buckets (1 = first) — alias of ClinicalPhase */
 export type IronRecruitmentRank = 1 | 2 | 3 | 4 | 5;
 
-const COMBAT_TACTICAL_RECRUITMENT_ORDER: Record<CombatTacticalFocus, number> = {
-  footwork_range: 1,
-  defense_counter: 2,
-  power_inside: 3,
-  burnout: 4,
-};
-
 /** Clinical Law III — CNS fatigue deltas (sync.ts) */
 export const CNS_DELTA_IRON_SET = 2;
-export const CNS_DELTA_COMBAT_ROUND = 3;
-export const CNS_DELTA_SPIRIT_FLOW = -1;
 export const CNS_FATIGUE_MAX = 100;
 /** Rolling profile score at/above this → poor_recovery autoreg (Clinical Law III) */
 export const CNS_FATIGUE_AUTOREG_THRESHOLD = 70;
@@ -49,7 +36,6 @@ export const CNS_FATIGUE_AUTOREG_THRESHOLD = 70;
 export const DELOAD_MESOCYCLE_WEEK = 4;
 export const DELOAD_IRON_EXERCISE_CAP = 4;
 export const DELOAD_LOAD_FACTOR = 0.6;
-export const DELOAD_SPIRIT_TIME_MULTIPLIER = 2;
 
 /** Clinical Law II — Subjective readiness autoreg */
 export const READINESS_AUTOREG_THRESHOLD = 4;
@@ -113,76 +99,6 @@ export function sortIronExercises(
   return applyFivePhaseClinicalMatrix(withNames, catalog, prerequisiteSlugs);
 }
 
-function combatRoundRank(round: CombatRoundPrescription): number {
-  return COMBAT_TACTICAL_RECRUITMENT_ORDER[round.tactical_focus] ?? 3;
-}
-
-/** Technical shadow work → power inside → burnout HIIT finisher */
-export function sortCombatPrescription(combat: CombatBlockPrescription): CombatBlockPrescription {
-  const rounds = [...combat.rounds].sort(
-    (a, b) => combatRoundRank(a) - combatRoundRank(b) || a.round_index - b.round_index,
-  );
-
-  const rounds_structure = [...combat.rounds_structure].sort(
-    (a, b) =>
-      COMBAT_TACTICAL_RECRUITMENT_ORDER[a.tactical_focus] -
-        COMBAT_TACTICAL_RECRUITMENT_ORDER[b.tactical_focus] || a.round_start - b.round_start,
-  );
-
-  let roundIndex = 1;
-  const reindexedRounds = rounds.map((round) => ({
-    ...round,
-    round_index: roundIndex++,
-  }));
-
-  return {
-    rounds_structure,
-    rounds: reindexedRounds,
-  };
-}
-
-export function classifySpiritAsanaRank(asana: FlowAsanaPrescription): number {
-  const name = asana.name.toLowerCase();
-  const slug = asana.slug.toLowerCase();
-
-  if (
-    /savasana|shavasana|corpse pose|final relaxation|final rest/.test(name) ||
-    slug.includes('savasana') ||
-    slug.includes('corpse')
-  ) {
-    return 5;
-  }
-
-  if (/restorative|supine|reclined|child'?s pose|happy baby|pigeon/.test(name)) {
-    return 4;
-  }
-
-  if (
-    asana.is_dynamic_flow ||
-    /malasana|sphinx|forward fold|uttanasana|triangle|tree|warrior|chair pose|sun salutation/.test(
-      name,
-    ) ||
-    slug.includes('malasana') ||
-    slug.includes('sphinx')
-  ) {
-    return 1;
-  }
-
-  return 2;
-}
-
-/** Active mobility first — Savasana / deep restorative hardlocked last */
-export function sortSpiritAsanas(asanas: FlowAsanaPrescription[]): FlowAsanaPrescription[] {
-  const ranked = asanas.map((asana, index) => ({
-    asana: { ...asana, name: beautifyCatalogName(asana.name) },
-    rank: classifySpiritAsanaRank(asana),
-    index,
-  }));
-
-  ranked.sort((a, b) => a.rank - b.rank || a.index - b.index);
-  return ranked.map((row, order) => ({ ...row.asana, order: order + 1 }));
-}
-
 function orderGameplanBlock(
   block: GameplanBlock,
   catalog: LibraryExercise[],
@@ -198,23 +114,6 @@ function orderGameplanBlock(
       ...block,
       subtitle: subtitle || block.subtitle,
       iron: { ...block.iron, exercises },
-    };
-  }
-
-  if (block.pillar === 'combat' && block.combat) {
-    return { ...block, combat: sortCombatPrescription(block.combat) };
-  }
-
-  if (block.pillar === 'spirit' && block.spirit?.asanas?.length) {
-    const asanas = sortSpiritAsanas(block.spirit.asanas);
-    return {
-      ...block,
-      subtitle: asanas[0]?.name ? `${asanas[0].name} · active recovery` : block.subtitle,
-      spirit: {
-        ...block.spirit,
-        asanas,
-        sequence: asanas,
-      },
     };
   }
 
@@ -290,13 +189,6 @@ export function resolveBiomechanicalPrerequisiteSlugs(exerciseNames: string[]): 
   return [...new Set(slugs)];
 }
 
-export function findFlowBySlug(
-  catalog: LibraryFlowSpiritSession[],
-  slug: string,
-): LibraryFlowSpiritSession | undefined {
-  return catalog.find((row) => row.slug === slug && row.pillar === 'flow');
-}
-
 export function applyDeloadToIronExercise(
   exercise: IronExercisePrescription,
 ): IronExercisePrescription {
@@ -319,11 +211,6 @@ export function capIronExercisesForDeload<T>(exercises: T[], isDeload: boolean):
   return exercises.slice(0, DELOAD_IRON_EXERCISE_CAP);
 }
 
-export function scaleSpiritMinutesForDeload(minutes: number, isDeload: boolean): number {
-  if (!isDeload) return minutes;
-  return Math.min(90, Math.round(minutes * DELOAD_SPIRIT_TIME_MULTIPLIER));
-}
-
 /** CNS delta for a single performance queue item */
 export function cnsDeltaFromQueueItem(item: PerformanceQueueItem): number {
   if (item.kind === 'iron_set') return CNS_DELTA_IRON_SET;
@@ -333,11 +220,6 @@ export function cnsDeltaFromQueueItem(item: PerformanceQueueItem): number {
     const setCount = item.session?.iron?.sets.length ?? 1;
     return setCount * CNS_DELTA_IRON_SET;
   }
-  if (pillar === 'combat') {
-    const rounds = item.session?.combat?.rounds.length ?? 1;
-    return rounds * CNS_DELTA_COMBAT_ROUND;
-  }
-  if (pillar === 'spirit' || pillar === 'flow') return CNS_DELTA_SPIRIT_FLOW;
   return 0;
 }
 
@@ -356,9 +238,7 @@ export function applyReadinessAutoregulationToMicrocycle(
   return microcycle.map((day) => {
     if (day.day_index !== dayIndex) return day;
 
-    const blocks = day.blocks
-      .filter((block) => block.pillar !== 'combat')
-      .map((block) => {
+    const blocks = day.blocks.map((block) => {
         if (block.pillar !== 'iron' || !block.iron?.exercises) return block;
 
         const exercises = block.iron.exercises.map((exercise) => ({

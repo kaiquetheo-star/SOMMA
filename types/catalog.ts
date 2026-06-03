@@ -1,14 +1,10 @@
 /**
 
- * SOMMA Encyclopedia catalog types — `library_exercises`, `library_combat`, `library_flow_spirit`
+ * SOMMA Encyclopedia catalog types — `library_exercises`
 
  * Text-only Elite: coaching copy lives in `biomechanical_instructions` JSONB.
 
  */
-
-
-
-import type { CombatTacticalFocus } from '@/types/gameplan';
 
 
 
@@ -59,6 +55,42 @@ export type MovementPattern =
   | (string & {});
 
 
+export type ExerciseTempo = [number, number, string | number, number];
+
+
+export type ExerciseFailureType = 'technical' | 'concentric';
+
+
+export interface ExerciseCueCard {
+
+  setup: string;
+
+  vector: string;
+
+  catch: string;
+
+  anti_pattern: string;
+
+  failure_type: ExerciseFailureType;
+
+}
+
+
+export interface XFrameCatalogMetadata {
+
+  /** Aesthetic priority weight for deterministic X-Frame selection. */
+
+  selection_score: number;
+
+  /** Cadence: eccentric, stretch pause, concentric, peak contraction. */
+
+  tempo: ExerciseTempo;
+
+  cue_card: ExerciseCueCard;
+
+}
+
+
 
 /** Biomechanical metadata for Elite Hypertrophy coaching / AI Experts */
 
@@ -107,59 +139,7 @@ export interface LibraryExerciseBase {
 export type LibraryExercise = LibraryExerciseBase & IronExerciseBiomechanics;
 
 
-
-/** Blood & Bone combo — maps to `library_combat` */
-
-export interface LibraryCombatCombo {
-
-  id: string;
-
-  slug: string;
-
-  combo_name: string;
-
-  sequence: string[];
-
-  complexity_level: number;
-
-  tactical_focus: CombatTacticalFocus;
-
-}
-
-
-
-/** Flow / Spirit session — maps to `library_flow_spirit` */
-
-export interface LibraryFlowSpiritSession {
-
-  id: string;
-
-  slug: string;
-
-  pillar: 'flow' | 'spirit';
-
-  session_name: string;
-
-  description: string | null;
-
-  duration_minutes: number;
-
-  tempo_profile: Record<string, unknown>;
-
-  complexity_level: number;
-
-  target_recovery_zones: string[];
-
-  complexity_tier: number;
-
-  is_dynamic_flow: boolean;
-
-  default_hold_seconds: number;
-
-  /** Optional JSONB when catalog seed includes phase keys (setup, cues, …) */
-  biomechanical_instructions?: Record<string, string>;
-
-}
+export type CatalogExercise = LibraryExercise & XFrameCatalogMetadata;
 
 
 

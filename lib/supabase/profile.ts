@@ -4,12 +4,8 @@ import {
   clampPillarFrequency,
   clampCnsFatigueProfile,
   clampMesocycleWeekProfile,
-  DEFAULT_AVAILABLE_TIME_COMBAT,
   DEFAULT_AVAILABLE_TIME_IRON,
-  DEFAULT_AVAILABLE_TIME_SPIRIT,
-  DEFAULT_FREQUENCY_COMBAT,
   DEFAULT_FREQUENCY_IRON,
-  DEFAULT_FREQUENCY_SPIRIT,
   deriveTrainingDaysFromFrequencies,
   isBiologicalProfileComplete,
 } from '@/types/biological';
@@ -23,7 +19,7 @@ import { useSommaStore } from '@/store/useSommaStore';
 import { getSupabase } from '@/lib/supabase/client';
 
 const PROFILE_BIOLOGY_SELECT =
-  'focus_preference, date_of_birth, weight_kg, height_cm, body_fat_percentage, current_injuries, baseline_stress_level, training_days_per_week, goal_iron, goal_combat, goal_flow, goal_spirit, available_time_iron, available_time_combat, available_time_spirit, frequency_iron, frequency_combat, frequency_spirit, mesocycle_week, cns_fatigue_score';
+  'focus_preference, date_of_birth, weight_kg, height_cm, body_fat_percentage, current_injuries, baseline_stress_level, training_days_per_week, goal_iron, available_time_iron, frequency_iron, mesocycle_week, cns_fatigue_score';
 
 /** Ensures the Supabase client has a JWT before PostgREST calls (avoids opaque 401s). */
 async function requireAuthenticatedUserId(expectedUserId?: string): Promise<string> {
@@ -59,17 +55,12 @@ function mapProfileBiology(row: Record<string, unknown> | null): BiologicalProfi
       current_injuries: null,
       baseline_stress_level: null,
       goal_iron: null,
-      goal_combat: null,
-      goal_flow: null,
-      goal_spirit: null,
+      nutrition_goal: null,
       training_days_per_week: null,
       experience_level: null,
       available_time_iron: null,
-      available_time_combat: null,
-      available_time_spirit: null,
+      iron_mastery: null,
       frequency_iron: null,
-      frequency_combat: null,
-      frequency_spirit: null,
       mesocycle_week: null,
       cns_fatigue_score: null,
       clinical_exit_interview: null,
@@ -98,9 +89,7 @@ function mapProfileBiology(row: Record<string, unknown> | null): BiologicalProfi
     baseline_stress_level:
       row.baseline_stress_level != null ? Number(row.baseline_stress_level) : null,
     goal_iron: goalText('goal_iron'),
-    goal_combat: goalText('goal_combat'),
-    goal_flow: goalText('goal_flow'),
-    goal_spirit: goalText('goal_spirit'),
+    nutrition_goal: goalText('nutrition_goal'),
     training_days_per_week: Number.isFinite(training_days_per_week)
       ? training_days_per_week
       : null,
@@ -116,29 +105,17 @@ function mapProfileBiology(row: Record<string, unknown> | null): BiologicalProfi
       180,
       DEFAULT_AVAILABLE_TIME_IRON,
     ),
-    available_time_combat: clampPillarTimeMinutes(
-      row.available_time_combat != null ? Number(row.available_time_combat) : null,
-      10,
-      120,
-      DEFAULT_AVAILABLE_TIME_COMBAT,
-    ),
-    available_time_spirit: clampPillarTimeMinutes(
-      row.available_time_spirit != null ? Number(row.available_time_spirit) : null,
-      5,
-      90,
-      DEFAULT_AVAILABLE_TIME_SPIRIT,
-    ),
+    iron_mastery:
+      row.iron_mastery === 1 ||
+      row.iron_mastery === 2 ||
+      row.iron_mastery === 3 ||
+      row.iron_mastery === 4 ||
+      row.iron_mastery === 5
+        ? row.iron_mastery
+        : null,
     frequency_iron: clampPillarFrequency(
       row.frequency_iron != null ? Number(row.frequency_iron) : null,
       DEFAULT_FREQUENCY_IRON,
-    ),
-    frequency_combat: clampPillarFrequency(
-      row.frequency_combat != null ? Number(row.frequency_combat) : null,
-      DEFAULT_FREQUENCY_COMBAT,
-    ),
-    frequency_spirit: clampPillarFrequency(
-      row.frequency_spirit != null ? Number(row.frequency_spirit) : null,
-      DEFAULT_FREQUENCY_SPIRIT,
     ),
     mesocycle_week: clampMesocycleWeekProfile(
       row.mesocycle_week != null ? Number(row.mesocycle_week) : null,
@@ -208,10 +185,8 @@ export async function fetchRemoteUserSnapshot(
 
   const user_stats = statsRes.data
     ? {
-        body_essence: statsRes.data.body_essence ?? 0,
-        mind_essence: statsRes.data.mind_essence ?? 0,
-        spirit_essence: statsRes.data.spirit_essence ?? 0,
-        combat_mastery: statsRes.data.combat_mastery ?? 0,
+        iron_sessions_completed: statsRes.data.iron_sessions_completed ?? 0,
+        nutrition_checkins_completed: statsRes.data.nutrition_checkins_completed ?? 0,
       }
     : null;
 
@@ -277,16 +252,9 @@ export async function syncFoundationToSupabase(
       current_injuries: payload.biological.current_injuries,
       baseline_stress_level: payload.biological.baseline_stress_level,
       goal_iron: payload.biological.goal_iron,
-      goal_combat: payload.biological.goal_combat,
-      goal_flow: payload.biological.goal_flow,
-      goal_spirit: payload.biological.goal_spirit,
       training_days_per_week: payload.biological.training_days_per_week,
       available_time_iron: payload.biological.available_time_iron,
-      available_time_combat: payload.biological.available_time_combat,
-      available_time_spirit: payload.biological.available_time_spirit,
       frequency_iron: payload.biological.frequency_iron,
-      frequency_combat: payload.biological.frequency_combat,
-      frequency_spirit: payload.biological.frequency_spirit,
       mesocycle_week: payload.biological.mesocycle_week,
       cns_fatigue_score: payload.biological.cns_fatigue_score,
     }),
@@ -297,10 +265,8 @@ export async function syncFoundationToSupabase(
     }),
     supabase.from('user_stats').upsert({
       user_id: authedUserId,
-      body_essence: payload.user_stats.body_essence,
-      mind_essence: payload.user_stats.mind_essence,
-      spirit_essence: payload.user_stats.spirit_essence,
-      combat_mastery: payload.user_stats.combat_mastery,
+      iron_sessions_completed: payload.user_stats.iron_sessions_completed,
+      nutrition_checkins_completed: payload.user_stats.nutrition_checkins_completed,
     }),
   ]);
 
@@ -328,16 +294,9 @@ export async function upsertBiologicalPassport(
     current_injuries: biological.current_injuries,
     baseline_stress_level: biological.baseline_stress_level,
     goal_iron: biological.goal_iron,
-    goal_combat: biological.goal_combat,
-    goal_flow: biological.goal_flow,
-    goal_spirit: biological.goal_spirit,
     training_days_per_week: biological.training_days_per_week,
     available_time_iron: biological.available_time_iron,
-    available_time_combat: biological.available_time_combat,
-    available_time_spirit: biological.available_time_spirit,
     frequency_iron: biological.frequency_iron,
-    frequency_combat: biological.frequency_combat,
-    frequency_spirit: biological.frequency_spirit,
   });
 
   if (error) throw error;
@@ -357,11 +316,7 @@ export async function upsertSteeringWheelSettings(
   const { error } = await supabase.from('profiles').upsert({
     id: authedUserId,
     frequency_iron: biological.frequency_iron,
-    frequency_combat: biological.frequency_combat,
-    frequency_spirit: biological.frequency_spirit,
     available_time_iron: biological.available_time_iron,
-    available_time_combat: biological.available_time_combat,
-    available_time_spirit: biological.available_time_spirit,
     training_days_per_week,
   });
 

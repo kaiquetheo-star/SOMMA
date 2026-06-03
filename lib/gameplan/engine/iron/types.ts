@@ -1,18 +1,38 @@
 import type { IronMovementPattern } from '@/lib/gameplan/engine/iron/taxonomy/movementPatterns';
-import type { JointStressProfile } from '@/types/catalog';
+import type { ExerciseCueCard, ExerciseTempo, JointStressProfile } from '@/types/catalog';
 import type { EnginePerformanceRow } from '@/lib/gameplan/engine/performanceLogs';
 import type { EquipmentTag } from '@/store/useSommaStore';
 import type { TargetArchetype } from '@/types/biological';
+import type { DailyIronFocus } from '@/lib/gameplan/engine/iron/dupLogic';
 
 export type SplitDayKey = 'push' | 'pull' | 'legs';
 
 export type ShoulderRegion = 'anterior' | 'lateral' | 'posterior';
+
+export type IntensityTechnique =
+  | 'standard'
+  | 'myo_reps'
+  | 'rest_pause'
+  | 'drop_set'
+  | 'lengthened_partials'
+  | 'slow_eccentric';
+
+export interface TechniqueParams {
+  activationReps?: number;
+  miniSets?: number;
+  miniSetReps?: number;
+  intraSetRestSeconds?: number;
+  tempo?: string;
+  dropPercent?: number;
+  note?: string;
+}
 
 /** Normalized row mirroring `library_exercises` / `seed_hypertrophy.sql` */
 export interface CatalogExercise {
   id: string;
   slug: string;
   name: string;
+  biomechanical_instructions: Record<string, string>;
   movement_pattern: IronMovementPattern;
   primary_muscle: string;
   synergist_muscles: readonly string[];
@@ -24,6 +44,9 @@ export interface CatalogExercise {
   default_sets: number;
   default_reps: number;
   stretch_mediated_hypertrophy: boolean;
+  selection_score: number;
+  tempo: ExerciseTempo;
+  cue_card: ExerciseCueCard;
 }
 
 export interface ExerciseCatalog {
@@ -50,9 +73,14 @@ export interface SolverSlot {
   primaryMuscleHint?: string;
   isolationOnly?: boolean;
   defaultSets: number;
+  intensity_technique?: IntensityTechnique;
+  technique_params?: TechniqueParams;
 }
 
 export interface SolverConstraints {
+  /** Preferred V8 equipment contract. */
+  available_equipment?: readonly EquipmentTag[];
+  /** Legacy engine alias retained for existing callers. */
   equipment: readonly EquipmentTag[];
   blockedJointProfiles: readonly string[];
   maxSessionCns: number;
@@ -62,14 +90,20 @@ export interface SolverConstraints {
   available_time_minutes: number;
   weekStartDate: string;
   targetArchetype: TargetArchetype | null;
+  previousDayWasHiit?: boolean;
+  usedExerciseIds?: ReadonlySet<string>;
+  dailyIronFocus?: DailyIronFocus;
 }
 
 export interface SolverState {
   usedExerciseIds: ReadonlySet<string>;
   weeklyVolume: WeeklyVolumeSnapshot;
   synergistLoad: SynergistLoadMatrix;
+  isRecoveryMode: boolean;
   sessionCnsAccum: number;
   shoulderSets: ShoulderVolumeLedger;
+  previousDayIndex: number | null;
+  previousDayHadAxialLoad: boolean;
 }
 
 export interface SolverResult {
@@ -77,6 +111,8 @@ export interface SolverResult {
   exerciseId: string;
   prescribedSets: number;
   score: number;
+  intensity_technique?: IntensityTechnique;
+  technique_params?: TechniqueParams;
 }
 
 /** One prescribed exercise in a PPL microcycle day (pre-gameplan / engine draft). */
@@ -84,6 +120,8 @@ export interface MicrocyclePick {
   slotId: string;
   exerciseId: string;
   prescribedSets: number;
+  intensity_technique?: IntensityTechnique;
+  technique_params?: TechniqueParams;
 }
 
 /** Draft iron day — validated and corrected before `DailyGameplan` serialization. */

@@ -1,320 +1,307 @@
 # SOMMA — Context Anchor V8
 
-**Paste or `@CONTEXT_ANCHOR_V8.md` at the start of every new session.** This file supersedes V7 on conflict. Spec detail: `markdown.md` · `AGENTS.md` (Expo v54 docs).
+**Paste or `@CONTEXT_ANCHOR_V8.md` at the start of every new session.** This file supersedes V7 and all prior anchors on conflict. Spec detail: `markdown.md` · `AGENTS.md` (Expo v54 docs).
 
 | Meta | Value |
 |------|--------|
-| **Product** | SOMMA — The Longevity OS |
-| **North star** | SHRED-level performance for ~6×/week athletes |
-| **Checkpoint** | May 2026 — **100% local-first PWA** · **$0 on-device Head Coach** · **RIR gate + load telemetry** · **Vercel web SPA** · **zero cloud auth/DB** |
+| **Product** | SOMMA — Iron + Nutrition OS |
+| **Scope** | **Musculacao (Iron) + Nutricao only** |
+| **Checkpoint** | Jun 2026 — **Total Cleanup complete** · old pillars removed from active code · **100% local-first PWA** · **$0 on-device Head Coach** |
 | **Prior anchors** | V1–V7 — historical only |
 | **Last commit** | *(uncommitted session work — verify with `git log -1`)* |
-| **Deploy gate** | `npm run build` (web export) · no Supabase required |
+| **Deploy gate** | `npx tsc --noEmit` · `npm run build` (web export) |
 
 ---
 
-## 1. Architecture
+## 1. Product Scope
+
+SOMMA is now focused exclusively on:
+
+| Pillar | Status | Purpose |
+|--------|--------|---------|
+| **Iron** | Active | Musculacao, hypertrophy, strength, progressive overload, load telemetry |
+| **Nutrition** | Placeholder / next pillar | Nutrition goals, biomarker direction, future analytics surface |
+
+Removed from active code:
+
+- Blood & Bone / Combat
+- Flow
+- Spirit
+- Mastery / Constellation
+- Attunement Orbs
+- Combat and breathwork audio/timer/catalog surfaces
+
+**Hard rule:** New code must not reintroduce `combat`, `spirit`, `flow`, `mastery`, `library_combat`, or `library_flow_spirit` into active app code unless explicitly requested as a new product decision.
+
+---
+
+## 2. Architecture
 
 | Layer | Stack | Role |
 |-------|--------|------|
 | **Client** | **Expo SDK 54** · RN 0.81 · React 19 · **Expo Router** v6 | `(auth)` · `(tabs)` · `(workout)` |
 | **Styling** | **NativeWind v4** + Tailwind 3 | Obsidian `#0F1512` / `#0A0E0C` · Matte Gold `#BFA06A` |
-| **State** | **Zustand** + `AsyncStorage` (`somma-offline-store`) | **Sole source of truth** — gameplan, logs, passport, queue |
-| **Head Coach** | **`lib/gameplan/engine/*`** | **Deterministic microcycle — client-only** (bundled catalog + passport + logs) |
-| **Recalibrate** | `lib/local/recalibrate.ts` | Queue flush → merge logs → `fetchDailyGameplan` on-device |
-| **Catalog** | `lib/catalog/bundledCatalog.ts` | Bundled iron/combat/flow when `LOCAL_FIRST_MODE` |
-| **Load telemetry** | `lib/physics/loadTelemetry.ts` | On-device ACWR · sRPE · RPE σ — feeds Head Coach autoreg |
-| **Backend** | *(none at runtime)* | `lib/supabase/*` retained for reference only; `isSupabaseConfigured = false` |
-| **Deploy (Vercel)** | `npm run build` → `dist/` SPA | **Web-only** — no iOS/Android bundle in CI |
+| **State** | **Zustand** + `AsyncStorage` (`somma-offline-store`) | Source of truth for passport, microcycle, logs, queue |
+| **Head Coach** | `lib/gameplan/engine/*` | Deterministic Iron microcycle from catalog + passport + logs |
+| **Iron engine** | `lib/gameplan/engine/iron/*` | ConstraintSolver, CoherenceValidator, PPL split, prescription mapping |
+| **Recalibrate** | `lib/local/recalibrate.ts` | Queue flush → local fetch → merge microcycle |
+| **Catalog** | `lib/catalog/bundledCatalog.ts` | Bundled `library_exercises` only |
+| **Load telemetry** | `lib/physics/loadTelemetry.ts` | Iron ACWR · sRPE · RPE sigma · poor recovery signal |
+| **Backend** | Optional / disabled locally | `lib/supabase/*` retained for auth/profile reference; local-first path is primary |
+| **Deploy** | Vercel web SPA | `npm run build` → `dist/` |
 
-### Vercel / web export (strict)
+### Vercel / Web Export
 
 | File | Contract |
 |------|----------|
 | `package.json` | `"build": "npx expo export --platform web"` · `"web": "expo start --web"` |
-| `app.json` | `"platforms": ["web"]` only · `"web": { "bundler": "metro", "output": "single" }` · plugins: **`expo-router` only** (no `expo-secure-store` / `expo-audio` config plugins) |
+| `app.json` | `"platforms": ["web"]` only · `"web": { "bundler": "metro", "output": "single" }` · plugins: `expo-router` only |
 | `vercel.json` | `buildCommand` + `outputDirectory: dist` + SPA rewrite → `index.html` |
-| `metro.config.js` | `resolver.platforms = ['web', 'ios', 'android']` — `.web.ts` shims win on export |
+| `metro.config.js` | NativeWind v4 / Metro web pipeline |
 
-**Native shims (do not import native-only modules from shared paths):**
+**Do not** add iOS/Android build assumptions or native config plugins for CI unless native ship returns.
 
-| Module | Web | Native |
-|--------|-----|--------|
-| `lib/haptics.*` | no-op | `expo-haptics` |
-| `lib/audio/combatAudio.*` | no-op | `expo-audio` |
-| `lib/supabase/authStorage.*` | `localStorage` | `expo-secure-store` |
+---
 
-iOS/Android blocks removed from `app.json` until native ship returns. Hermes/bin errors on Vercel = usually missing `--platform web` or native config plugins in export.
+## 3. Active Routing
 
-### Zustand contract (key fields)
+```text
+app/
+├── index.tsx                 # → /(tabs)/home
+├── (auth)/
+│   ├── index.tsx             # email access
+│   └── foundation.tsx        # foundation scan
+├── (tabs)/
+│   ├── _layout.tsx           # Home · Nutrition · Command
+│   ├── home.tsx              # Daily Command: Iron block + Nutrition placeholder
+│   ├── analytics.tsx         # Nutrition/Biomarkers/Passport surface
+│   └── profile.tsx           # Command Center
+└── (workout)/
+    ├── _layout.tsx
+    ├── daily_scan.tsx        # readiness gate
+    ├── iron.tsx              # Iron execution
+    ├── ascension.tsx         # completion sync/return
+    └── summary.tsx           # Iron session summary
+```
+
+Deleted active routes:
+
+- `app/(workout)/combat.tsx`
+- `app/(workout)/spirit.tsx`
+- `app/(tabs)/mastery.tsx`
+
+---
+
+## 4. Zustand Contract
 
 | Field | Purpose |
 |-------|---------|
 | `weeklyMicrocycle` | 7-day `MicrocycleDay[]` (Mon–Sun) |
 | `selectedDayIndex` | Active strip day (1–7) |
-| `performance_logs` / `performanceQueue` | Local history; queue flushed via `recalibrateFromPerformanceQueue` |
-| `user_biological` | Passport + **granular frequencies** + pillar time budgets |
+| `performance_logs` / `performanceQueue` | Local Iron history and pending sync |
+| `user_biological` | Biological passport + Iron frequency/time + nutrition placeholder |
 | `gameplan_source` | `'local'` \| `'deterministic'` \| `'stub'` \| `'fallback'` |
-| `gameplan_error` | Surfaces on-device generation failures |
-| `fetchDailyGameplanAsync` | Sole owner of `weeklyMicrocycle` |
-| `logIronSet` | Writes to `performance_logs` only — no per-set cloud sync |
+| `gameplan_error` | Local Head Coach failure surface |
+| `fetchDailyGameplanAsync` | Sole owner of `weeklyMicrocycle` generation |
+| `logIronSet` | Writes Iron set logs with reported RIR |
 
-### Head Coach data path (V8 — local-first only)
+### Canonical Types
 
-```
-app/index.tsx → Redirect /(tabs)/home
-LocalBootstrap → seed default athlete (first launch) → fetchDailyGameplanAsync
+| Type | Current shape |
+|------|---------------|
+| `WorkoutPillar` | `'iron' \| 'nutrition'` |
+| `WorkoutPillarLog` | `'iron' \| 'nutrition'` |
+| `BiologicalProfile` | `goal_iron`, `nutrition_goal`, `frequency_iron`, `available_time_iron`, Iron telemetry fields |
+| `GameplanBlock` | `iron?: IronBlockPrescription`, `nutrition?: NutritionBlockPrescription` |
+| `UserStats` | `iron_sessions_completed`, `nutrition_checkins_completed` |
+
+Removed fields from active types/store:
+
+- `frequency_combat`, `frequency_spirit`
+- `available_time_combat`, `available_time_spirit`
+- `goal_combat`, `goal_flow`, `goal_spirit`
+- `body_essence`, `mind_essence`, `spirit_essence`, `combat_mastery`
+
+---
+
+## 5. Head Coach Data Path
+
+```text
+app/index.tsx → /(tabs)/home
+LocalBootstrap → seed default athlete → fetchDailyGameplanAsync
 fetchDailyGameplanAsync
   → fetchDailyGameplan (lib/gameplan/fetchDailyGameplan.ts)
       → generateDeterministicGameplan (lib/gameplan/engine/)
-          → bundled catalog (lib/catalog/bundledCatalog.ts)
+          → fetchLibraryExercises()
           → user_biological + performance_logs + user_stats
-      → finalizeGameplanOrdering (neuro-mechanical sort)
-  → weeklyMicrocycle in Zustand → Home strip → workout screens
+          → Iron engine / legacy Iron builder
+      → finalize gameplan ordering
+  → weeklyMicrocycle in Zustand
+  → Home strip → Iron workout
 ```
 
-Post-workout: `completeWorkout` / `flushPerformanceQueue` → `lib/local/recalibrate.ts` (same engine).
+Post-workout:
 
-### Boot (no auth)
-
-| Component | Behavior |
-|-----------|----------|
-| `app/index.tsx` | Redirect straight to **Daily Command** (`/(tabs)/home`) |
-| `providers/AuthProvider.tsx` | Stub `LOCAL_USER` — always “signed in” locally |
-| `components/routing/LocalBootstrap.tsx` | Auto foundation + gameplan on hydrate |
-| `components/routing/FoundationGuard.tsx` | No-op (no redirects) |
-| `(auth)/*` | Legacy routes; not linked from main flow |
-
-Command tab save → `setUserBiological` → `fetchDailyGameplanAsync({ forceRefresh: true })` — device only.
-
-### Repo map (operational)
-
-```
-app/index.tsx                                     # → /(tabs)/home
-components/routing/{LocalBootstrap,PerformanceSyncBridge}.tsx
-app/(tabs)/{home,mastery,analytics,profile}.tsx   # profile = Command · analytics = passport + telemetry
-lib/local/{defaultAthlete,recalibrate}.ts
-lib/catalog/bundledCatalog.ts
-app/(workout)/{iron,combat,spirit,ascension,summary}.tsx
-components/auth/EmailAuthPanel.tsx
-components/iron/{RirSelector,LoadTelemetryStrip,ExerciseCueCard,TargetLoadBanner,...}.tsx
-components/clinical/ReviewForm.tsx                # Exit Interview · telemetry-suggested RPE prefill
-components/command-center/{CommandCenterShell,InstructionPanel}.tsx
-components/combat/{ComboSequencePanel,CombatIntervalClock,RpeSelector}.tsx
-components/spirit/{FlowStepper,FlowGestureZones,SanctuaryBreathOrb}.tsx
-components/sanctuary/WeeklyMicrocycleStrip.tsx
-lib/physics/{rmCalculator,loadTelemetry}.ts       # ACWR · sRPE · RPE σ · goal-aware thresholds
-lib/gameplan/engine/
-  performanceLogs.ts        # reported_rir → effective RPE for engine rows
-  generateDeterministicGameplan.ts  # computeTrainingLoadSnapshot + telemetry autoreg
-lib/gameplan/{fetchDailyGameplan,parseGameplan,microcycleValidation}.ts
-lib/supabase/{client,authStorage.*,sync,profile}.ts
-lib/haptics.{web,native}.ts · lib/audio/combatAudio.{web,native}.ts
-store/useSommaStore.ts
-types/performance.ts        # IronSetLog.target_rir + reported_rir
-vercel.json · app.json        # web-only export (see §1)
-supabase/migrations/021_profiles_granular_frequency.sql
+```text
+Iron set log → reported RIR → performance_logs
+completeWorkout / flushPerformanceQueue
+  → lib/local/recalibrate.ts
+  → fetchDailyGameplan({ forceRefresh: true })
+  → merge block statuses + refreshed microcycle
 ```
 
 ---
 
-## 2. Status — Text-Only Elite (DONE)
+## 6. Deterministic Iron Engine
 
-**Decision:** Coaching value is **typography-first** — biomechanical instructions, cues, prescriptions, timers. No movement media on the workout surface.
-
-| Removed | Replacement |
-|---------|-------------|
-| `ModularMovementPlayer` · movement video pipeline | `InstructionPanel` + pillar panels |
-| `expo-video` · `expo-image` (workout deps) | — |
-
-**Do not re-introduce video/image workout dependencies unless explicitly requested.**
-
----
-
-## 3. Granular pillar frequencies (V8)
-
-### DB — migration `021`
-
-Columns on `profiles`:
-
-| Column | Range | Purpose |
-|--------|------:|---------|
-| `frequency_iron` | 0–7 | Iron blocks per microcycle |
-| `frequency_combat` | 0–7 | Combat blocks per microcycle |
-| `frequency_spirit` | 0–7 | Spirit blocks per microcycle |
-
-Backfills from legacy `training_days_per_week`. Client syncs `training_days_per_week = max(frequencies)` on save.
-
-### Command Center UI — `app/(tabs)/profile.tsx`
-
-Tab label: **Command** (sliders icon).
-
-- **ValueSteppers** for Iron / Combat / Spirit frequency (0–7 days/week)
-- **Time budget** chips: 45m · 60m · 90m · Unlimited / Max Results → sets `available_time_*`
-- **Save & Recalibrate Neural Link** → `upsertSteeringWheelSettings()` → Zustand → `fetchDailyGameplanAsync({ forceRefresh: true })`
-
-Example athlete intent: Iron 6× · Spirit 6× · Combat 3× — pillars may share days or differ (no longer forced tri-pillar on every active day).
-
-### TypeScript helpers (`types/biological.ts`)
-
-- `PILLAR_FREQUENCY_MIN/MAX`, defaults, `TIME_BUDGET_PRESETS`
-- `clampPillarFrequency`, `deriveTrainingDaysFromFrequencies`, `inferTimeBudgetPresetId`, `timeBudgetFromPresetId`
-
----
-
-## 4. Local deterministic Head Coach ($0 API)
-
-Hardcoded periodization in `lib/gameplan/engine/` — **no LLM** for standard generation.
+Hardcoded periodization in `lib/gameplan/engine/` — **no LLM for standard generation**.
 
 | Rule domain | Implementation |
 |-------------|----------------|
-| **Weekly layout** | `spreadPillarDayIndices` per pillar; union of days = active days |
-| **Iron splits** | Push / Pull / Legs / Upper / Lower / Full Body focus rotation → `selectExercisesForSplit` from `library_exercises` |
-| **Hypertrophy volume** | `targetIronExerciseCount(minutes, goal_iron)` → 6–8 for hypertrophy/powerbuilding |
-| **Mesocycle / load** | 21d logs → Epley E1RM, **reported RIR → RPE**, MEV/MRV set caps, CNS rest, injury/CNS autoreg swaps |
-| **Load telemetry** | `computeTrainingLoadSnapshot` + `telemetrySuggestsPoorRecovery` | ACWR spike / chronic high RPE + low σ → `poor_recovery` |
-| **ACWR bands (iron)** | `resolveAcwrThresholds(goal_iron)` | Strength tighter (spike ≥1.35) · Hypertrophy looser (≥1.52) · Combat fixed 1.50 |
-| **Combat** | Tactical round plan (footwork → power → defense/burnout) from `library_combat` |
-| **Spirit** | Healer 48h zones → flow from `library_flow_spirit`; breathwork fallback |
-| **Validation** | Exact pillar block counts must match `frequency_*` or throws `DEGENERATE_MICROCYCLE` |
+| **Weekly layout** | `spreadPillarDayIndices(frequency_iron)` only |
+| **Active days** | 0–7 Iron days per microcycle from `frequency_iron` |
+| **Catalog** | `library_exercises` only via `fetchLibraryExercises()` |
+| **Iron splits** | Push / Pull / Legs / Upper / Lower / Full Body focus rotation |
+| **Heuristic 6x engine** | `generateIronMicrocycle()` using `ConstraintSolver`, `CoherenceValidator`, PPL split |
+| **Other frequencies** | Existing Iron block builder path remains in `prescription.ts` |
+| **Hypertrophy volume** | `targetIronExerciseCount(minutes, goal_iron)` |
+| **Mesocycle / load** | 21d logs → Epley E1RM, reported RIR → RPE, MEV/MRV caps |
+| **Autoregulation** | stress, CNS score, yesterday RPE, load telemetry poor recovery |
+| **Validation** | Iron block count must match `frequency_iron` or throw `DEGENERATE_MICROCYCLE` |
 
-`fetchDailyGameplan` writes `daily_protocols.source = 'local'`. Home shows **Expert protocol** for `local` and `deterministic`.
+Do not break these files without running tests/typecheck:
 
-### Edge function (optional / legacy)
-
-- Client **does not invoke** Edge for gameplan fetch.
-- Edge handler still has deterministic + `enforceGranularPillarSchedule` for server-side callers.
-- LLM path runs **only** when `HEAD_COACH_USE_LLM=true` **and** `OPENROUTER_API_KEY` is set.
-- Default: `HEAD_COACH_USE_LLM` unset → deterministic only, $0 API.
-
----
-
-## 5. Catalog — ground truth
-
-### Remote (project `<YOUR_PROJECT_REF>` — set in `.env`, never commit)
-
-| Table | Rows | Notes |
-|-------|-----:|-------|
-| `library_exercises` | **1,514** | Equipment-filtered in engine |
-| `library_combat` | **52** | `tactical_focus` on combos |
-| `library_flow_spirit` | **70** | flow + spirit pillars |
-
-Client cache: `somma-cache-library-*-v3`, TTL 12h.
-
-**Seed rule:** Never `ON CONFLICT DO UPDATE SET id = excluded.id` — breaks `performance_logs.exercise_id` FK.
+- `lib/gameplan/engine/iron/ConstraintSolver.ts`
+- `lib/gameplan/engine/iron/CoherenceValidator.ts`
+- `lib/gameplan/engine/iron/generateIronMicrocycle.ts`
+- `lib/gameplan/engine/iron/loadPrescriptionMapper.ts`
+- `lib/gameplan/engine/iron/splits/pplSplit.ts`
+- `lib/gameplan/engine/iron/types.ts`
 
 ---
 
-## 6. Command Center workout UI (pillars)
+## 7. Catalog
 
-| Pillar | Surface | Data |
-|--------|---------|------|
-| **Iron** | `InstructionPanel` → `TargetLoadBanner` → `ExerciseCueCard` | `biomechanical_instructions` JSONB |
-| **Combat** | `ComboSequencePanel` | `library_combat.sequence` + tactical focus |
-| **Spirit** | `FlowStepper` | `library_flow_spirit` via `parseAsanaCatalog.ts` |
+Active catalog:
 
-### Iron load UX
+| Table / source | Purpose |
+|----------------|---------|
+| `library_exercises` | Iron exercise encyclopedia and biomechanical instructions |
+| `lib/catalog/bundledCatalog.ts` | Local bundled Iron fallback |
+| `lib/catalog/library.ts` | `fetchLibraryExercises()`, `prefetchLibraryCatalogs()`, `resolveBlockPreviewLabel()` |
+
+Deprecated catalogs are ignored by active code:
+
+- `library_combat`
+- `library_flow_spirit`
+
+**Seed rule:** Never `ON CONFLICT DO UPDATE SET id = excluded.id` for exercise seeds; it can break `performance_logs.exercise_id`.
+
+---
+
+## 8. UI Surfaces
+
+| Surface | File | Current responsibility |
+|---------|------|------------------------|
+| Daily Command | `app/(tabs)/home.tsx` | Weekly strip, Iron block cards, Nutrition placeholder, clinical review |
+| Nutrition | `app/(tabs)/analytics.tsx` | Passport, biomarkers, Iron telemetry detail, future nutrition surface |
+| Command | `app/(tabs)/profile.tsx` | Iron frequency, Iron time budget, Nutrition placeholder controls |
+| Iron workout | `app/(workout)/iron.tsx` | Exercise execution, target load, RIR gate, set logging |
+| Readiness | `app/(workout)/daily_scan.tsx` | Subjective readiness; low score reduces Iron loads |
+| Ascension | `app/(workout)/ascension.tsx` | Completion sync, graceful return |
+| Summary | `app/(workout)/summary.tsx` | Iron volume, CNS fatigue, E1RM unlocks |
+
+### Iron Load UX
 
 | State | UI |
 |-------|-----|
-| E1RM / logged history | Banner shows **X kg** + optional `loadHint` from last reported RIR |
-| No history | **Calibrate First Set** — `target_weight_kg: null` |
+| E1RM / logged history | Target load banner with kg and optional RIR-derived hint |
+| No history | Calibrate first set (`target_weight_kg: null`) |
+| Set completion | `RirSelector` captures reported RIR (0–4) |
 
-### Iron RIR gate (bio-feedback — DONE)
-
-```
-Log Set → RirSelector (0–4) → Confirm set → rest / next set
-```
-
-| Field | Purpose |
-|-------|---------|
-| `IronSetLog.target_rir` | Prescribed RIR from Head Coach |
-| `IronSetLog.reported_rir` | Athlete-reported RIR (drives telemetry) |
-| `sync.ts` | `rpe_score = 10 - reported_rir` on `performance_logs` iron_set rows |
-
-Combat keeps session-end `RpeSelector` (1–10). Spirit/combat unchanged.
-
-### Internal load telemetry (DONE — $0 on-device)
+### Load Telemetry
 
 | Metric | Window | Use |
 |--------|--------|-----|
-| **ACWR** | 7d acute / 28d chronic (sRPE) | Autoreg · gold highlight when elevated/spike |
-| **RPE mean / σ** | 14d per pillar | Fatigue pattern detection |
-| **Global RPE** | Iron + combat | Clinical Exit Interview prefill (`suggestedAverageRpeForClinicalReview`) |
+| **ACWR** | 7d acute / 28d chronic sRPE | Autoregulation and UI highlight |
+| **RPE mean / sigma** | 14d Iron sessions | Detect chronic high effort / low variation |
+| **Global RPE** | Iron only | Clinical Exit Interview prefill |
 
-| UI surface | Component |
-|------------|-----------|
-| Command tab | `LoadTelemetryStrip` · `goalIron` from steering draft |
-| Analytics tab | `LoadTelemetryStrip` · `variant="detail"` (sRPE 7d + threshold caption) |
-| Home (week 4) | `ReviewForm` · `suggestedAverageRpe` from telemetry |
-
-**Do not** add LLM or wearable APIs for load — extend `loadTelemetry.ts` only.
+**Do not** add LLM, wearable APIs, or external services for load telemetry. Extend `lib/physics/loadTelemetry.ts`.
 
 ---
 
-## 7. Fixes landed (V7 → V8)
+## 9. Cleanup Status
 
-| Issue | Fix |
-|-------|-----|
-| Global `training_days_per_week` only — no per-pillar UI | `021` + Command Steering Wheel tab |
-| LLM cost + latency for every week | Local `lib/gameplan/engine/` — primary path |
-| Tri-pillar forced on every training day | Granular frequencies; pillars on independent day spreads |
-| Edge enforcer ignored granular freqs | `enforceGranularPillarSchedule` (Edge); local engine native |
-| Recalibrate still hit Edge | `sync.ts` + store pass biological/stats/logs to local fetch |
-| Iron `rir` was prescribed only, not athlete-reported | Post-set **RIR gate** + `reported_rir` in logs/sync |
-| No ACWR / session load math | `lib/physics/loadTelemetry.ts` → Head Coach + Command/Analytics UI |
-| Vercel Hermes / native bin errors on export | `platforms: ["web"]` · `output: single` · `.web.ts` shims · `vercel.json` |
-| Cluttered auth (Google + email tiles) | **Email magic link only** on welcome screen |
+The active codebase was cleaned to remove old pillars from:
+
+- routing
+- tabs
+- Home UI
+- Zustand store
+- `types/biological.ts`
+- `types/gameplan.ts`
+- `types/performance.ts`
+- deterministic gameplan engine
+- catalog layer
+- parser/stub gameplan
+- load telemetry
+- workout summary
+- old component folders
+- old hooks/constants/audio/breathwork helpers
+
+Verification already run after cleanup:
+
+```powershell
+npx tsc --noEmit
+```
+
+Result: passed.
+
+Lints in edited directories: no linter errors found.
+
+Search verification in active directories:
+
+```text
+app, components, constants, hooks, lib, store, types
+```
+
+No active matches for removed pillar terms/fields:
+
+- old pillar names
+- `library_combat`
+- `library_flow_spirit`
+- removed biological/store fields
+
+Allowed residuals:
+
+- historical docs / migrations / edge functions may still mention old schema
+- `iron_mastery` remains valid because it belongs to the Iron engine
 
 ---
 
-## 8. Known debt
+## 10. Known Debt
 
 | Area | Status |
 |------|--------|
-| Migration `021` | **Local file** — run `npx supabase db push` on remote |
-| Session changes | Likely **uncommitted** — verify `git status` |
-| Edge deploy | Optional unless server-side generation needed |
-| Catalog `setup` phase keys | ~1,100+ iron rows still need `import_catalog.py` regen |
-| Cached `daily_protocols` with old `ai` source | User must **Recalibrate** or `forceRefresh` after frequency changes |
-
-### Apply migration (Windows)
-
-```powershell
-npx supabase db push
-```
-
-### Optional Edge deploy (LLM off by default)
-
-```powershell
-npx supabase functions deploy generate_weekly_microcycle generate_daily_protocol
-```
+| Edge functions | May still contain historical multi-pillar logic; client does not depend on Edge for local generation |
+| Supabase migrations | Historical schema still includes removed columns; local-first app no longer requires them |
+| Nutrition | Placeholder only; needs future data model and UI |
+| Catalog import | Iron `setup` phase keys may still need regeneration where `merged_steps` is empty |
+| Build gate | Run `npm run build` before deploy |
 
 ---
 
-## 9. Pending action (next session)
+## 11. Fresh-Session Checklist
 
-1. **Apply migration 021** and confirm `profiles.frequency_*` columns on remote.
-2. **Commit** session bundle: telemetry, RIR gate, Vercel web config, email-only auth.
-3. **Regression:** Iron set → RIR gate → `performance_logs.rpe_score` · Command/Analytics telemetry lines · ACWR gold on spike · Exit Interview RPE prefill · `npm run build` → `dist/index.html`.
-4. **Regression (core):** Command save → pillar block counts · post-workout recalibrate stays local · `gameplan_source === 'local'`.
-5. **Catalog:** Regenerate `setup` phase keys where `merged_steps` empty.
-6. **`npx tsc --noEmit`** + **`npm run build`** before Vercel push.
-
----
-
-## 10. Fresh-session checklist
-
-1. Read **§2 Text-Only Elite** — do not rebuild video pipeline.
-2. Read **§4 Local Head Coach** — default path is **client engine**, not Edge/LLM.
-3. Read **§6 RIR gate + load telemetry** — extend `loadTelemetry.ts`, not LLM/wearables.
-4. Migrations **001–021**; `021` = granular pillar frequency columns.
-5. Profile must have `frequency_iron/combat/spirit` + time budgets (Command tab or backfill from `training_days_per_week`).
-6. Catalog cache v3 populated (`prefetchLibraryCatalogs` on Home).
-7. Auth welcome = **email magic link only** (no Google button).
-8. `OPENROUTER_API_KEY` only needed if explicitly enabling `HEAD_COACH_USE_LLM=true` on Edge.
-9. `npx tsc --noEmit` before client ship.
-10. **Vercel:** `npm run build` must emit `dist/index.html` + `_expo/static/*` with **zero** errors; do not add iOS/Android to `app.json` `platforms` for CI.
+1. Read **§1 Product Scope** first: SOMMA is Iron + Nutrition only.
+2. Do not reintroduce old pillars or old catalogs in active code.
+3. Preserve the Iron engine under `lib/gameplan/engine/iron/*`.
+4. For generation, use `frequency_iron` and `available_time_iron` only.
+5. For catalog work, use `library_exercises` only.
+6. For telemetry, use Iron logs/RIR only.
+7. Run `npx tsc --noEmit` after substantive changes.
+8. Run `npm run build` before Vercel deploy.
 
 ---
 

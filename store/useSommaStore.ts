@@ -16,7 +16,7 @@ import {
   nextMesocycleWeekAfterReview,
 } from '@/lib/gameplan/engine/progression';
 import type { ClinicalExitInterview } from '@/types/clinical';
-import { fetchLibraryCombat, fetchLibraryExercises } from '@/lib/catalog/library';
+import { fetchLibraryExercises } from '@/lib/catalog/library';
 import { buildWorkoutSessionSummary } from '@/lib/workout/buildSessionSummary';
 import type { BiologicalProfile } from '@/types/biological';
 import {
@@ -32,11 +32,9 @@ import type {
   MicrocycleDay,
 } from '@/types/gameplan';
 import type {
-  CombatSessionLog,
   IronSessionLog,
   PerformanceLogEntry,
   PerformanceQueueItem,
-  SpiritSessionLog,
   LogIronSetInput,
   WorkoutCompletionInput,
   WorkoutSessionSummary,
@@ -48,20 +46,17 @@ export type { WorkoutCompletionInput, PerformanceQueueItem, LogIronSetInput } fr
 export type EquipmentTag =
   | 'bodyweight'
   | 'dumbbells'
-  | 'heavy_bag'
   | 'barbell'
   | 'kettlebell'
   | 'pull_up_bar'
   | 'full_gym';
 
-export type PillarId = 'iron' | 'combat' | 'flow' | 'spirit' | 'balanced';
+export type PillarId = 'iron' | 'nutrition';
 
-/** Pillar ratio distribution (percentages, sum = 100) — maps to `profiles.focus_preference` */
+/** Product focus distribution for Iron + nutrition */
 export interface FocusPreference {
   iron: number;
-  combat: number;
-  flow: number;
-  spirit: number;
+  nutrition: number;
 }
 
 export interface UserEnvironment {
@@ -70,10 +65,8 @@ export interface UserEnvironment {
 }
 
 export interface UserStats {
-  body_essence: number;
-  mind_essence: number;
-  spirit_essence: number;
-  combat_mastery: number;
+  iron_sessions_completed: number;
+  nutrition_checkins_completed: number;
 }
 
 export interface UserFoundation {
@@ -116,7 +109,7 @@ function mergeBlockStatuses(
 
 export { getMicrocycleDay } from '@/lib/gameplan/microcycleWeek';
 
-/** Today's blocks for attunement / ritual progress HUD */
+/** Today's scheduled training blocks */
 export function getTodayBlocksFromStore(state: {
   weeklyMicrocycle: MicrocycleDay[] | null;
   weekStartDate: string | null;
@@ -236,8 +229,6 @@ interface SommaState {
   logIronSet: (input: LogIronSetInput) => void;
   prepareWorkoutSummary: () => Promise<WorkoutSessionSummary | null>;
   appendIronSession: (log: IronSessionLog) => void;
-  appendCombatSession: (log: CombatSessionLog) => void;
-  appendSpiritSession: (log: SpiritSessionLog) => void;
   completeWorkout: (input: WorkoutCompletionInput) => Promise<void>;
   flushPerformanceQueue: () => Promise<void>;
   completeFoundationScan: (payload: {
@@ -265,10 +256,8 @@ const initialEnvironment: UserEnvironment = {
 };
 
 const initialStats: UserStats = {
-  body_essence: 0,
-  mind_essence: 0,
-  spirit_essence: 0,
-  combat_mastery: 0,
+  iron_sessions_completed: 0,
+  nutrition_checkins_completed: 0,
 };
 
 const initialFoundation: UserFoundation = {
@@ -502,17 +491,13 @@ export const useSommaStore = create<SommaState>()(
       prepareWorkoutSummary: async () => {
         const state = get();
         try {
-          const [exerciseCatalog, combatCatalog] = await Promise.all([
-            fetchLibraryExercises(),
-            fetchLibraryCombat(),
-          ]);
+          const exerciseCatalog = await fetchLibraryExercises();
 
           const summary = buildWorkoutSessionSummary({
             dayIndex: state.selectedDayIndex,
             weeklyMicrocycle: state.weeklyMicrocycle,
             performanceLogs: state.performance_logs,
             exerciseCatalog,
-            combatCatalog,
           });
 
           set({ lastWorkoutSummary: summary });
@@ -531,34 +516,6 @@ export const useSommaStore = create<SommaState>()(
               pillar: 'iron',
               block_id: log.block_id,
               iron: log,
-              timestamp: log.completed_at,
-            },
-            ...state.performance_logs,
-          ],
-        })),
-
-      appendCombatSession: (log) =>
-        set((state) => ({
-          performance_logs: [
-            {
-              id: `combat-${log.block_id}-${Date.now()}`,
-              pillar: 'combat',
-              block_id: log.block_id,
-              combat: log,
-              timestamp: log.completed_at,
-            },
-            ...state.performance_logs,
-          ],
-        })),
-
-      appendSpiritSession: (log) =>
-        set((state) => ({
-          performance_logs: [
-            {
-              id: `spirit-${log.block_id}-${Date.now()}`,
-              pillar: 'spirit',
-              block_id: log.block_id,
-              spirit: log,
               timestamp: log.completed_at,
             },
             ...state.performance_logs,
@@ -703,10 +660,8 @@ export const useSommaStore = create<SommaState>()(
             updated_at: new Date().toISOString(),
           },
           user_stats: {
-            body_essence: focus_preference.iron,
-            mind_essence: focus_preference.flow,
-            spirit_essence: focus_preference.spirit,
-            combat_mastery: focus_preference.combat,
+            iron_sessions_completed: 0,
+            nutrition_checkins_completed: 0,
           },
         });
         void get().fetchDailyGameplanAsync({ forceRefresh: true });

@@ -11,12 +11,7 @@ import {
   resolvePillarFrequencies,
   spreadPillarDayIndices,
 } from '@/lib/gameplan/engine/periodization';
-import {
-  analyzeHealerRecovery48h,
-  buildCombatBlock,
-  buildSpiritBlock,
-  type PillarTimeBudget,
-} from '@/lib/gameplan/engine/prescription';
+import type { PillarTimeBudget } from '@/lib/gameplan/engine/prescription';
 import {
   buildIronGameplanBlock,
   generateIronMicrocycle,
@@ -36,21 +31,17 @@ import {
   telemetrySuggestsPoorRecovery,
   yesterdayEffectiveRpe,
 } from '@/lib/physics/loadTelemetry';
+import { computeNutritionSnapshot } from '@/lib/physics/metabolicTelemetry';
+import { injectRecoveryProtocols } from '@/lib/gameplan/engine/iron/recoveryInjector';
 import {
   applyNeuroMechanicalOrderingToMicrocycle,
-  ironExerciseNamesFromBlock,
-  resolveBiomechanicalPrerequisiteSlugs,
 } from '@/lib/gameplan/engine/clinicalLaws';
 import { MESOCYCLE_DAYS, WEEKLY_VOLUME_DAYS } from '@/lib/gameplan/engine/constants';
 import { buildGenerationContext } from '@/lib/gameplan/engine/generation';
 import { pruneIronBlocksInMicrocycle } from '@/lib/gameplan/engine/volumePruning';
 import { clampMesocycleWeekProfile } from '@/types/biological';
 import { buildClinicalReviewTrigger } from '@/lib/gameplan/engine/progression';
-import {
-  fetchLibraryCombat,
-  fetchLibraryExercises,
-  fetchLibraryFlowSpirit,
-} from '@/lib/catalog/library';
+import { fetchLibraryExercises } from '@/lib/catalog/library';
 import type { BiologicalProfile } from '@/types/biological';
 import type { DailyGameplan, GameplanBlock, MicrocycleDay } from '@/types/gameplan';
 import type { PerformanceLogEntry } from '@/types/performance';
@@ -86,7 +77,7 @@ function resolveBaseRoutineIds(
   return routine;
 }
 
-function countPillarBlocks(microcycle: MicrocycleDay[], pillar: 'iron' | 'combat' | 'spirit'): number {
+function countPillarBlocks(microcycle: MicrocycleDay[], pillar: 'iron'): number {
   return microcycle.reduce(
     (sum, day) => sum + day.blocks.filter((block) => block.pillar === pillar).length,
     0,
@@ -97,17 +88,57 @@ function usesHeuristicIronEngine(frequencyIron: number): boolean {
   return frequencyIron === 6;
 }
 
+function nutritionFocusForDay(day: MicrocycleDay): string {
+  if (day.is_rest_day) return 'rest';
+  return day.focus_label.toLowerCase();
+}
+
+function totalTrainingDuration(day: MicrocycleDay): number {
+  return day.blocks
+    .filter((block) => block.pillar === 'iron')
+    .reduce((sum, block) => sum + block.duration_minutes, 0);
+}
+
+function appendNutritionTargets(
+  microcycle: MicrocycleDay[],
+  biological: BiologicalProfile,
+): MicrocycleDay[] {
+  return microcycle.map((day) => {
+    const target = computeNutritionSnapshot(
+      biological,
+      nutritionFocusForDay(day),
+      totalTrainingDuration(day),
+    );
+    const order = day.blocks.reduce((max, block) => Math.max(max, block.order), -1) + 1;
+    const nutritionBlock: GameplanBlock = {
+      id: `block-d${day.day_index}-nutrition`,
+      pillar: 'nutrition',
+      title: 'Biological Fueling',
+      subtitle: `${target.total_calories} kcal · ${target.carbs_g}g C · ${target.protein_g}g P · ${target.fat_g}g F`,
+      duration_minutes: 0,
+      order,
+      status: 'pending',
+      nutrition: {
+        goal: biological.nutrition_goal,
+        note: `Peri-workout carbs: ${Math.round(target.carbs_g * target.peri_workout_carb_ratio)}g · Water ${target.water_ml}ml`,
+        nutrition_target: target,
+      },
+    };
+
+    return {
+      ...day,
+      blocks: [...day.blocks, nutritionBlock],
+    };
+  });
+}
+
 /**
  * Local Head Coach — $0 API. Builds a 7-day microcycle from catalog + passport + logs.
  */
 export async function generateDeterministicGameplan(
   input: GenerateDeterministicGameplanInput,
 ): Promise<DailyGameplan> {
-  const [exerciseCatalog, comboCatalog, flowCatalog] = await Promise.all([
-    fetchLibraryExercises(),
-    fetchLibraryCombat(),
-    fetchLibraryFlowSpirit(),
-  ]);
+  const exerciseCatalog = await fetchLibraryExercises();
 
   const equipmentFiltered = exerciseCatalog.filter((row) => equipmentMatches(row, input.equipment));
   const catalog = equipmentFiltered.length > 0 ? equipmentFiltered : exerciseCatalog;
@@ -121,8 +152,6 @@ export async function generateDeterministicGameplan(
   const trainingDaysPerWeek = deriveActiveTrainingDays(pillarFreq);
   const pillarTime: PillarTimeBudget = {
     available_time_iron: input.biological.available_time_iron ?? 45,
-    available_time_combat: input.biological.available_time_combat ?? 30,
-    available_time_spirit: input.biological.available_time_spirit ?? 20,
   };
 
   const flatLogs = flattenPerformanceLogs(input.performanceLogs);
@@ -145,11 +174,7 @@ export async function generateDeterministicGameplan(
     autoreg,
   );
 
-  const healer = analyzeHealerRecovery48h(flatLogs, catalog, input.userStats.spirit_essence);
-
   const ironDayIndices = spreadPillarDayIndices(pillarFreq.frequency_iron).sort((a, b) => a - b);
-  const combatDays = new Set(spreadPillarDayIndices(pillarFreq.frequency_combat));
-  const spiritDays = new Set(spreadPillarDayIndices(pillarFreq.frequency_spirit));
 
   const protocolDate = input.protocolDate ?? todayDateKey();
   const week_start_date = getWeekStartMonday(protocolDate);
@@ -180,9 +205,7 @@ export async function generateDeterministicGameplan(
   const microcycle: MicrocycleDay[] = Array.from({ length: 7 }, (_, index) => {
     const day_index = index + 1;
     const wantsIron = ironDayIndices.includes(day_index);
-    const wantsCombat = combatDays.has(day_index);
-    const wantsSpirit = spiritDays.has(day_index);
-    const active = wantsIron || wantsCombat || wantsSpirit;
+    const active = wantsIron;
 
     if (!active) {
       return {
@@ -194,10 +217,9 @@ export async function generateDeterministicGameplan(
       };
     }
 
-    const focusLabel = wantsIron
-      ? ironByDayIndex.get(day_index)?.focusLabel ??
-        focusLabelForIronSlot(trainingDaysPerWeek || pillarFreq.frequency_iron || 4, ironSlot++)
-      : 'Hybrid: Combat + Spirit';
+    const focusLabel =
+      ironByDayIndex.get(day_index)?.focusLabel ??
+      focusLabelForIronSlot(trainingDaysPerWeek || pillarFreq.frequency_iron || 4, ironSlot++);
 
     const blocks: GameplanBlock[] = [];
     let order = 0;
@@ -238,66 +260,20 @@ export async function generateDeterministicGameplan(
       blocks.push(ironBlockForPrereqs);
       order += 1;
     }
-
-    if (wantsCombat) {
-      const combat = buildCombatBlock(
-        `block-d${day_index}-combat`,
-        order++,
-        comboCatalog,
-        input.userStats.combat_mastery,
-        yesterdayMainRpe,
-        input.biological.baseline_stress_level,
-        pillarTime,
-      );
-      if (combat) blocks.push(combat);
-    }
-
-    if (wantsSpirit) {
-      const ironNames = ironBlockForPrereqs
-        ? ironExerciseNamesFromBlock(ironBlockForPrereqs, catalog)
-        : [];
-      const prerequisiteSlugs = resolveBiomechanicalPrerequisiteSlugs(ironNames);
-
-      blocks.push(
-        buildSpiritBlock(
-          `block-d${day_index}-spirit`,
-          order++,
-          'Sanctuary · Active Recovery',
-          flowCatalog,
-          input.userStats.spirit_essence,
-          healer,
-          yesterdayMainRpe,
-          pillarTime,
-          { mesocycleWeek, prerequisiteSlugs },
-        ),
-      );
-    }
-
-    const pillarLabels: string[] = [];
-    if (wantsIron) pillarLabels.push('Iron');
-    if (wantsCombat) pillarLabels.push('Combat');
-    if (wantsSpirit) pillarLabels.push('Spirit');
-
     return {
       day_index,
       is_rest_day: false,
-      focus_label: wantsIron ? `Hybrid: ${focusLabel}` : `Hybrid: ${pillarLabels.join(' + ')}`,
+      focus_label: focusLabel,
       date: dateForDayIndex(week_start_date, day_index),
       blocks,
     };
   });
 
   const ironCount = countPillarBlocks(microcycle, 'iron');
-  const combatCount = countPillarBlocks(microcycle, 'combat');
-  const spiritCount = countPillarBlocks(microcycle, 'spirit');
 
-  if (
-    (pillarFreq.frequency_iron > 0 && ironCount < pillarFreq.frequency_iron) ||
-    (pillarFreq.frequency_combat > 0 && combatCount < pillarFreq.frequency_combat) ||
-    (pillarFreq.frequency_spirit > 0 && spiritCount < pillarFreq.frequency_spirit)
-  ) {
+  if (pillarFreq.frequency_iron > 0 && ironCount < pillarFreq.frequency_iron) {
     throw new Error(
-      `DEGENERATE_MICROCYCLE: Iron ${ironCount}/${pillarFreq.frequency_iron}, Combat ${combatCount}/${pillarFreq.frequency_combat}, Spirit ${spiritCount}/${pillarFreq.frequency_spirit}`,
+      `DEGENERATE_MICROCYCLE: Iron ${ironCount}/${pillarFreq.frequency_iron}`,
     );
   }
 
@@ -308,6 +284,17 @@ export async function generateDeterministicGameplan(
     catalog,
     pillarTime.available_time_iron,
   );
+
+  orderedMicrocycle = injectRecoveryProtocols(
+    orderedMicrocycle,
+    {
+      ...loadSnapshot,
+      is_deload_week: mesocycleWeek === 4 || loadSnapshot.is_deload_week === true,
+    },
+    input.biological,
+  );
+
+  orderedMicrocycle = appendNutritionTargets(orderedMicrocycle, input.biological);
 
   const todayIndex = getDayIndexForDate(protocolDate, week_start_date);
   const blocks = orderedMicrocycle.find((day) => day.day_index === todayIndex)?.blocks ?? [];
