@@ -24,7 +24,8 @@ export const SHOULDER_BALANCE_RATIO = 0.6;
 export const PUSH_PULL_RATIO_MIN = 0.85;
 export const PUSH_PULL_RATIO_MAX = 1.15;
 
-const MAX_CORRECTION_ROUNDS = 3;
+const MAX_CORRECTION_ROUNDS = 5;
+const MAX_ISOLATION_SETS_PER_PICK = 4;
 
 const FLEXIBLE_RATIO_SLOT_IDS = new Set(['chest_iso', 'chest_compound_b', 'triceps_b']);
 
@@ -433,7 +434,7 @@ function fixShoulderImbalance(
   if (lateralPosteriorDeficit <= 0) return false;
 
   const exclude = usedExerciseIds(microcycle);
-  const sets = Math.max(3, lateralPosteriorDeficit);
+  const sets = Math.min(MAX_ISOLATION_SETS_PER_PICK, Math.max(3, lateralPosteriorDeficit));
   const availableSeconds = Math.max(0, constraints.available_time_minutes) * 60;
 
   const candidates = catalog.exercises
@@ -489,18 +490,25 @@ function fixShoulderImbalance(
     return true;
   }
 
-  const existing = pushDay.picks.find((pick) => {
-    const exercise = catalog.byId.get(pick.exerciseId);
-    return exercise != null && SHOULDER_FIX_PRIMARY_MUSCLES.has(exercise.primary_muscle);
-  });
+  const existingRows = pushDay.picks
+    .map((pick) => ({ pick, exercise: catalog.byId.get(pick.exerciseId) }))
+    .filter(
+      (row): row is { pick: MicrocyclePick; exercise: CatalogExercise } =>
+        row.exercise != null &&
+        SHOULDER_FIX_PRIMARY_MUSCLES.has(row.exercise.primary_muscle) &&
+        row.pick.prescribedSets < MAX_ISOLATION_SETS_PER_PICK,
+    );
 
-  if (existing) {
-    const exercise = catalog.byId.get(existing.exerciseId);
-    if (exercise && tracker.canAddSets(exercise, lateralPosteriorDeficit).allowed) {
-      tracker.creditVolume(exercise, lateralPosteriorDeficit);
-      existing.prescribedSets += lateralPosteriorDeficit;
-      existing.intensity_technique = existing.intensity_technique ?? 'myo_reps';
-      existing.technique_params = existing.technique_params ?? {
+  for (const { pick, exercise } of existingRows) {
+    const addableSets = Math.min(
+      lateralPosteriorDeficit,
+      Math.max(0, MAX_ISOLATION_SETS_PER_PICK - pick.prescribedSets),
+    );
+    if (exercise && addableSets > 0 && tracker.canAddSets(exercise, addableSets).allowed) {
+      tracker.creditVolume(exercise, addableSets);
+      pick.prescribedSets += addableSets;
+      pick.intensity_technique = pick.intensity_technique ?? 'myo_reps';
+      pick.technique_params = pick.technique_params ?? {
         activationReps: 15,
         miniSets: 3,
         miniSetReps: 5,

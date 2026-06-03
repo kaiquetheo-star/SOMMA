@@ -1,6 +1,6 @@
 # SOMMA V8 Anchor Point
 
-Atualizado em: 2026-06-02
+Atualizado em: 2026-06-03
 
 Este arquivo resume o que foi implementado até agora nas fases SOMMA V8 executadas nesta sessão. O foco foi manter o Head Coach 100% determinístico, local-first, TypeScript strict, sem alterar `seed_hypertrophy.sql`.
 
@@ -172,6 +172,106 @@ Teste:
   - Cenário B: `barbell_back_squat` em Legs A recebe tempo `[3, 1, 'X', 0]` e falha técnica.
   - Cenário C: exercício sem JSONB recebe fallback seguro por `movement_pattern`.
 
+## Fase 4 — Termodinâmica, Recuperação Neural e Orquestração Final
+
+Objetivo: calcular deterministicamente metas nutricionais diárias, aplicar Healer Zones / deload automático e entregar um payload final compatível com Zustand/UI.
+
+Arquivos principais:
+
+- `lib/physics/metabolicTelemetry.ts`
+  - Criada `computeNutritionSnapshot(biological, dayFocus, duration_minutes)`.
+  - Implementado carb cycling:
+    - Legs/HIIT: superavit `+250 kcal`, carbo `4.5g/kg`, gordura `0.8g/kg`.
+    - Push/Pull: manutenção, carbo `3.0g/kg`, gordura `1.2g/kg`.
+    - Rest/Flow: déficit `-200 kcal`, carbo `1.5g/kg`, gordura `1.5g/kg`.
+  - Proteína fixa em `2.2g/kg`.
+  - Água: `weight_kg * 50 + duration_minutes * 15`.
+  - `hydration_focus = 'flush_sodium'` quando `hormonal_transition === true`.
+
+- `types/gameplan.ts`
+  - Criados `NutritionTarget` e `HydrationFocus`.
+  - `NutritionBlockPrescription` recebeu `nutrition_target`.
+  - Criado `SpiritBlockPrescription`.
+  - `WorkoutPillar` agora aceita `spirit` para blocos de recuperação.
+
+- `types/biological.ts`
+  - Criado alias `UserBiological`.
+  - `BiologicalProfile` recebeu `hormonal_transition?: boolean | null`.
+
+- `lib/gameplan/engine/iron/recoveryInjector.ts`
+  - Criada `injectRecoveryProtocols(microcycle, telemetry, biological)`.
+  - Healer Zone:
+    - Injeta bloco `spirit` com `tempo_id: 'tempo_478'`.
+    - Gatilhos: `baseline_stress_level >= 7` ou `acwr > 1.4`.
+  - Deload automático:
+    - `target_sets = Math.max(2, Math.floor(target_sets * 0.5))`.
+    - `target_weight_kg *= 0.85` quando houver carga.
+
+- `lib/physics/loadTelemetry.ts`
+  - `TrainingLoadSnapshot` recebeu:
+    - `acwr`
+    - `is_deload_week`
+  - Mantida compatibilidade com `pillars.iron`.
+
+- `lib/gameplan/engine/generateDeterministicGameplan.ts`
+  - Após ordenação/pruning, aplica `injectRecoveryProtocols`.
+  - Injeta um bloco diário `nutrition` com `nutrition_target`.
+  - Mantém o microciclo local-first e determinístico.
+
+- `components/sanctuary/GameplanBlockCard.tsx`
+  - Adicionado estilo visual para blocos `spirit`.
+
+- `constants/workout.ts`
+  - Adicionado mapeamento para `spirit` como bloco informativo de recuperação.
+
+Teste:
+
+- `__tests__/gameplan/iron/metabolicAndOrchestration.test.ts`
+  - Cenário A: carb cycling para Legs e Rest em atleta de 80kg.
+  - Cenário B: hidratação em transição hormonal.
+  - Cenário C: injeção de Healer Zone por ACWR alto.
+  - Cenário D: deload automático de sets e carga.
+
+## UX — Immersive Daily Iron Dashboard
+
+Objetivo: transformar `Home` em painel direto de protocolo diário, deixando de listar blocos genéricos como experiência principal.
+
+Arquivos principais:
+
+- `components/WeeklyStrip.tsx`
+  - Nova faixa semanal minimalista com 7 dias.
+  - Usa contrato `day_index` 1–7 (Segunda–Domingo), alinhado com Zustand.
+  - Estado visual:
+    - hoje/selecionado em Matte Gold `#BFA06A`;
+    - futuro em `bg-white/5`;
+    - passado em Obsidian com opacidade reduzida.
+  - Ao tocar, atualiza `selectedDayIndex` no store e sincroniza `?dayIndex=`.
+
+- `app/(tabs)/home.tsx`
+  - Refatorada para `Immersive Daily Iron Dashboard`.
+  - Renderiza diretamente o protocolo Iron do dia selecionado:
+    - foco do dia;
+    - exercícios;
+    - sets/reps;
+    - `tempo`;
+    - `cue_card.setup`;
+    - `cue_card.vector`;
+    - `cue_card.catch`;
+    - `cue_card.anti_pattern`.
+  - Exibe resumo nutricional quando `nutrition_target` existe.
+  - CTA fixo: `Iniciar Protocolo de Ferro`.
+  - O CTA usa `openBlock(ironBlock)`, preservando:
+    - readiness scan;
+    - `blockId`;
+    - status ativo;
+    - navegação real para `/(workout)/iron`.
+  - Mantidos:
+    - foundation guard;
+    - loading;
+    - erro/retry;
+    - recalibração;
+    - estado local-first do Zustand.
+
 ## Validações Executadas
 
 Comandos já executados com sucesso:
@@ -181,6 +281,8 @@ npx tsc --noEmit
 npx vitest run "__tests__/catalog/xFrameBias.test.ts"
 npx vitest run "__tests__/gameplan/iron/solver.test.ts"
 npx vitest run "__tests__/gameplan/iron/dupAndCues.test.ts"
+npx vitest run "__tests__/gameplan/iron/metabolicAndOrchestration.test.ts"
+npx vitest run "__tests__/gameplan/iron/dupAndCues.test.ts" "__tests__/gameplan/iron/metabolicAndOrchestration.test.ts"
 ```
 
 Resultado consolidado:
@@ -189,6 +291,9 @@ Resultado consolidado:
 - Fase 1: 3 testes passaram.
 - Fase 2: 4 testes passaram.
 - Fase 3: 3 testes passaram.
+- Fase 4: 4 testes passaram.
+- Regressão do payload da Home: 7 testes passaram.
+- Lints/diagnósticos da nova Home e `WeeklyStrip`: sem erros.
 
 ## Invariantes Mantidas
 
@@ -198,14 +303,16 @@ Resultado consolidado:
 - Não foi introduzido `Math.random()`.
 - A estrutura principal do `weeklyMicrocycle` foi preservada.
 - O motor Iron continua determinístico e testável.
+- A Home usa `selectedDayIndex` em base 1, alinhada com `day_index` do microciclo.
+- A navegação para Iron continua passando pelo fluxo real `openBlock`.
 
 ## Próxima Fase Prevista
 
-Fase 4 — Termodinâmica, Macros e UI Final.
+UI final / polish visual do treino Iron.
 
 Escopo esperado:
 
-- metas calóricas e macros por tipo de dia
-- carb cycling
-- hidratação/eletrólitos
-- integração com superfície de Nutrition/UI
+- renderização refinada de `tempo` e `cue_card` dentro de `/(workout)/iron`
+- experiência de nutrition card na Home/Analytics
+- microinterações Quiet Luxury
+- build web final antes de deploy

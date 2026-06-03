@@ -32,6 +32,7 @@ function eliteSeedCatalog(): LibraryExercise[] {
     ex({ id: 'incline_cable_fly', slug: 'incline_cable_fly', name: 'Incline Cable Fly (30°)', equipment_required: ['full_gym'], default_sets: 3, default_reps: 12, movement_pattern: 'isolation', primary_muscle: 'upper_chest', synergist_muscles: ['front_delts'], cns_fatigue_cost: 1, joint_stress_profile: 'shoulder_impingement_risk', stretch_mediated_hypertrophy: true }),
     ex({ id: 'dumbbell_fly_flat', slug: 'dumbbell_fly_flat', name: 'Dumbbell Fly (Flat)', equipment_required: ['dumbbells', 'full_gym'], default_sets: 3, default_reps: 12, movement_pattern: 'isolation', primary_muscle: 'chest', synergist_muscles: ['front_delts'], cns_fatigue_cost: 1, joint_stress_profile: 'shoulder_impingement_risk', stretch_mediated_hypertrophy: true }),
     ex({ id: 'cable_lateral_raise', slug: 'cable_lateral_raise', name: 'Cable Lateral Raise', equipment_required: ['full_gym'], default_sets: 3, default_reps: 15, movement_pattern: 'isolation', primary_muscle: 'side_delts', synergist_muscles: ['traps'], cns_fatigue_cost: 1, joint_stress_profile: 'low_impact', stretch_mediated_hypertrophy: false }),
+    ex({ id: 'leaning_cable_lateral_raise', slug: 'leaning_cable_lateral_raise', name: 'Leaning Cable Lateral Raise', equipment_required: ['full_gym'], default_sets: 3, default_reps: 15, movement_pattern: 'isolation', primary_muscle: 'side_delts', synergist_muscles: ['traps'], cns_fatigue_cost: 1, joint_stress_profile: 'low_impact', stretch_mediated_hypertrophy: true }),
     ex({ id: 'reverse_pec_deck', slug: 'reverse_pec_deck', name: 'Reverse Pec Deck', equipment_required: ['full_gym'], default_sets: 3, default_reps: 15, movement_pattern: 'isolation', primary_muscle: 'rear_delts', synergist_muscles: ['mid_back', 'traps'], cns_fatigue_cost: 1, joint_stress_profile: 'low_impact', stretch_mediated_hypertrophy: true }),
     ex({ id: 'face_pull', slug: 'face_pull', name: 'Face Pull', equipment_required: ['full_gym'], default_sets: 3, default_reps: 15, movement_pattern: 'isolation', primary_muscle: 'rear_delts', synergist_muscles: ['traps', 'rotator_cuff'], cns_fatigue_cost: 1, joint_stress_profile: 'rotator_cuff_heavy', stretch_mediated_hypertrophy: false }),
     ex({ id: 'tricep_rope_pushdown', slug: 'tricep_rope_pushdown', name: 'Tricep Rope Pushdown', equipment_required: ['full_gym'], default_sets: 3, default_reps: 12, movement_pattern: 'isolation', primary_muscle: 'triceps', synergist_muscles: [], cns_fatigue_cost: 1, joint_stress_profile: 'low_impact', stretch_mediated_hypertrophy: false }),
@@ -103,7 +104,12 @@ describe('elite iron engine consolidation laws', () => {
     expect(new Set(isolationSlugs).size).toBe(isolationSlugs.length);
 
     for (const day of microcycle) {
-      expect(estimateSessionSeconds(day.picks, { exercises: [], byId: new Map(day.picks.map((pick) => [pick.exercise.id, pick.exercise])), bySlug: new Map(), byPattern: new Map(), byPrimaryMuscle: new Map() })).toBeGreaterThanOrEqual(75 * 60);
+      expect(estimateSessionSeconds(day.picks, { exercises: [], byId: new Map(day.picks.map((pick) => [pick.exercise.id, pick.exercise])), bySlug: new Map(), byPattern: new Map(), byPrimaryMuscle: new Map() })).toBeLessThanOrEqual(90 * 60);
+      expect(
+        day.picks
+          .filter((pick) => pick.exercise.movement_pattern === 'isolation')
+          .every((pick) => pick.prescribedSets <= 4),
+      ).toBe(true);
     }
 
     const allPicks = microcycle.flatMap((day) => day.picks);

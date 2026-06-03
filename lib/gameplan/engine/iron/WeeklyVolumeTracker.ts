@@ -18,6 +18,9 @@ export const MRV_HARD = 22;
 /** Synergist muscles receive this fraction of working-set credit. */
 export const SYNERGIST_FRACTION = 0.5;
 
+/** Per-exercise safety cap for imported/projected set counts. */
+export const MAX_TRACKED_SETS_PER_EXERCISE = 8;
+
 export interface CanAddSetsResult {
   allowed: boolean;
   projected: ReadonlyMap<string, number>;
@@ -42,9 +45,14 @@ interface MuscleCredit {
   fraction: number;
 }
 
+function sanitizeSetCount(sets: number): number {
+  if (!Number.isFinite(sets) || sets <= 0) return 0;
+  return Math.min(sets, MAX_TRACKED_SETS_PER_EXERCISE);
+}
+
 function setsFromLog(log: EnginePerformanceRow): number {
   const fromPayload = log.payload?.iron?.sets?.length;
-  if (fromPayload != null && fromPayload > 0) return fromPayload;
+  if (fromPayload != null && fromPayload > 0) return sanitizeSetCount(fromPayload);
   return 1;
 }
 
@@ -137,8 +145,9 @@ export function createWeeklyVolumeTracker(
   const isRecoveryMode = (acwr != null && acwr > 1.5) || biological?.hormonal_transition === true;
 
   const applyDelta = (muscle: string, sets: number, fraction: number, sign: 1 | -1): void => {
-    if (sets <= 0) return;
-    const delta = sets * fraction * sign;
+    const safeSets = sanitizeSetCount(sets);
+    if (safeSets <= 0) return;
+    const delta = safeSets * fraction * sign;
     volumeByMuscle.set(muscle, (volumeByMuscle.get(muscle) ?? 0) + delta);
   };
 
@@ -182,28 +191,32 @@ export function createWeeklyVolumeTracker(
     },
 
     creditVolume(exercise: CatalogExercise, sets: number): void {
+      const safeSets = sanitizeSetCount(sets);
       for (const { muscle, fraction } of muscleCreditsForExercise(exercise)) {
-        addCredit(muscle, sets, fraction);
+        addCredit(muscle, safeSets, fraction);
       }
     },
 
     debitVolume(exercise: CatalogExercise, sets: number): void {
+      const safeSets = sanitizeSetCount(sets);
       for (const { muscle, fraction } of muscleCreditsForExercise(exercise)) {
-        removeCredit(muscle, sets, fraction);
+        removeCredit(muscle, safeSets, fraction);
       }
     },
 
     projectSets(exercise: CatalogExercise, sets: number): ReadonlyMap<string, number> {
+      const safeSets = sanitizeSetCount(sets);
       const projected = new Map<string, number>();
       for (const { muscle, fraction } of muscleCreditsForExercise(exercise)) {
         const current = volumeByMuscle.get(muscle) ?? 0;
-        projected.set(muscle, current + sets * fraction);
+        projected.set(muscle, current + safeSets * fraction);
       }
       return projected;
     },
 
     canAddSets(exercise: CatalogExercise, sets: number): CanAddSetsResult {
-      if (sets <= 0) {
+      const safeSets = sanitizeSetCount(sets);
+      if (safeSets <= 0) {
         return {
           allowed: true,
           projected: tracker.projectSets(exercise, 0),
@@ -212,7 +225,7 @@ export function createWeeklyVolumeTracker(
         };
       }
 
-      const projected = tracker.projectSets(exercise, sets);
+      const projected = tracker.projectSets(exercise, safeSets);
       const limit = tracker.isRecoveryMode ? MEV : MRV_HARD;
       for (const [muscle, total] of projected) {
         if (total > limit) {
@@ -232,7 +245,7 @@ export function createWeeklyVolumeTracker(
         allowed: true,
         projected,
         projectedVolume: projected.get(exercise.primary_muscle) ?? 0,
-        clampedSets: sets,
+        clampedSets: safeSets,
       };
     },
   };

@@ -39,7 +39,9 @@ const SCORE_REPEAT_COMPOUND_PENALTY = 350;
 const SCORE_CONSECUTIVE_AXIAL_PENALTY = 1000;
 const SCORE_DUP_MATCH_BONUS = 650;
 const FINISHER_MIN_REMAINING_SECONDS = 5 * 60;
-const FINISHER_MAX_SETS_PER_PICK = 36;
+const MAX_FINISHER_SETS = 4;
+const MINIMUM_VIABLE_WORKOUT_EXERCISE_COUNT = 2;
+const MINIMUM_VIABLE_WORKOUT_SETS = 2;
 
 const TOO_BASIC_FOR_ADVANCED = new Set([
   'goblet_squat',
@@ -293,6 +295,14 @@ function applyShoulderLedger(
   };
 }
 
+function prescribedSetsForSlot(slot: SolverSlot, exercise: CatalogExercise): number {
+  const requestedSets = Math.max(0, slot.defaultSets);
+  if (exercise.movement_pattern === 'isolation' || slot.slotId.includes('finisher')) {
+    return Math.min(requestedSets, MAX_FINISHER_SETS);
+  }
+  return requestedSets;
+}
+
 function collectCandidates(
   day: SplitDayKey,
   catalog: ExerciseCatalog,
@@ -301,7 +311,7 @@ function collectCandidates(
   state: SolverState,
   tracker: WeeklyVolumeTracker,
   currentDayIndex: number | undefined,
-  options: { ignoreCnsBudget?: boolean; ignoreMrv?: boolean } = {},
+  options: { ignoreCnsBudget?: boolean; ignoreMastery?: boolean; ignoreMrv?: boolean } = {},
 ): CatalogExercise[] {
   const candidates: CatalogExercise[] = [];
 
@@ -316,7 +326,7 @@ function collectCandidates(
     if (!matchesMovementPattern(exercise, slot.requiredPatterns)) continue;
     if (!matchesPrimaryMuscleHint(exercise, slot.primaryMuscleHint)) continue;
     if (!matchesIsolationSlot(exercise, slot.isolationOnly)) continue;
-    if (constraints.iron_mastery >= 4) {
+    if (!options.ignoreMastery && constraints.iron_mastery >= 4) {
       if (TOO_BASIC_FOR_ADVANCED.has(exercise.slug)) continue;
       // Elite athletes still use "basic" isolations as finishers; filter only for non-isolation compounds/patterns.
       if (exercise.movement_pattern !== 'isolation' && exercise.complexity_level <= 2) continue;
@@ -366,6 +376,16 @@ function pickBestCandidate(
       return {
         exercise: overheadPress,
         score: scoreExerciseCandidate(overheadPress, tracker, constraints, state, currentDayIndex),
+      };
+    }
+  }
+
+  if (slot?.slotId === 'chest_compound_a') {
+    const benchPress = candidates.find((candidate) => candidate.slug === 'barbell_bench_press');
+    if (benchPress) {
+      return {
+        exercise: benchPress,
+        score: scoreExerciseCandidate(benchPress, tracker, constraints, state, currentDayIndex),
       };
     }
   }
@@ -437,18 +457,24 @@ function pickLowCnsFinisher(
 function maybeIncreaseExistingLowCnsIsolation(
   picks: SolverResult[],
   catalog: ExerciseCatalog,
+  tracker: WeeklyVolumeTracker,
 ): boolean {
+  let selectedExercise: CatalogExercise | null = null;
   const candidate = picks.find((pick) => {
     const exercise = catalog.byId.get(pick.exerciseId);
+    selectedExercise = exercise ?? null;
     return (
       exercise?.movement_pattern === 'isolation' &&
       exercise.cns_fatigue_cost <= 2 &&
-      pick.prescribedSets < FINISHER_MAX_SETS_PER_PICK
+      pick.prescribedSets < MAX_FINISHER_SETS
     );
   });
 
   if (!candidate) return false;
-  candidate.prescribedSets += 1;
+  candidate.prescribedSets = Math.min(candidate.prescribedSets + 1, MAX_FINISHER_SETS);
+  if (selectedExercise) {
+    tracker.creditVolume(selectedExercise, 1);
+  }
   candidate.intensity_technique = candidate.intensity_technique ?? FINISHER_TECHNIQUE.intensity_technique;
   candidate.technique_params = candidate.technique_params ?? FINISHER_TECHNIQUE.technique_params;
   return true;
@@ -484,7 +510,7 @@ export function solveDaySlots(
     if (!selection) continue;
 
     const { exercise, score } = selection;
-    const prescribedSets = slot.defaultSets;
+    const prescribedSets = prescribedSetsForSlot(slot, exercise);
 
     tracker.creditVolume(exercise, prescribedSets);
     usedExerciseIds.add(exercise.id);
@@ -502,13 +528,54 @@ export function solveDaySlots(
     });
   }
 
+  if (picks.length === 0) {
+    for (const slot of slots) {
+      const fallbackSlot: SolverSlot = {
+        ...slot,
+        defaultSets: MINIMUM_VIABLE_WORKOUT_SETS,
+      };
+      const stateForSlot: SolverState = {
+        ...initialState,
+        usedExerciseIds,
+        sessionCnsAccum,
+      };
+      const candidates = collectCandidates(day, catalog, fallbackSlot, constraints, stateForSlot, tracker, currentDayIndex, {
+        ignoreCnsBudget: true,
+        ignoreMastery: true,
+        ignoreMrv: true,
+      });
+      const selection = pickBestCandidate(candidates, tracker, constraints, stateForSlot, currentDayIndex, fallbackSlot);
+      if (!selection) continue;
+
+      const { exercise, score } = selection;
+      const prescribedSets = Math.min(prescribedSetsForSlot(fallbackSlot, exercise), MINIMUM_VIABLE_WORKOUT_SETS);
+
+      tracker.creditVolume(exercise, prescribedSets);
+      usedExerciseIds.add(exercise.id);
+      sessionCnsAccum += exercise.cns_fatigue_cost;
+      shoulderSets = applyShoulderLedger(shoulderSets, exercise, prescribedSets);
+      dayHadAxialLoad ||= isAxialLoadExercise(exercise);
+
+      picks.push({
+        slotId: `${fallbackSlot.slotId}_minimum_viable`,
+        exerciseId: exercise.id,
+        prescribedSets,
+        score,
+        intensity_technique: fallbackSlot.intensity_technique,
+        technique_params: fallbackSlot.technique_params,
+      });
+
+      if (picks.length >= MINIMUM_VIABLE_WORKOUT_EXERCISE_COUNT) break;
+    }
+  }
+
   let estimatedSeconds = estimateSessionSeconds(picks, catalog);
   const targetSeconds = Math.max(0, constraints.available_time_minutes) * 60;
   let finisherIndex = 0;
   const finisherHints = resolveFinisherHints(day, slots);
 
   while (targetSeconds - estimatedSeconds > FINISHER_MIN_REMAINING_SECONDS && finisherIndex < 48) {
-    if (picks.length >= 7 && maybeIncreaseExistingLowCnsIsolation(picks, catalog)) {
+    if (picks.length >= 7 && maybeIncreaseExistingLowCnsIsolation(picks, catalog, tracker)) {
       estimatedSeconds = estimateSessionSeconds(picks, catalog);
       finisherIndex += 1;
       continue;
@@ -532,13 +599,15 @@ export function solveDaySlots(
 
     if (finisher) {
       const { exercise, slot, score } = finisher;
+      const prescribedSets = prescribedSetsForSlot(slot, exercise);
+      tracker.creditVolume(exercise, prescribedSets);
       usedExerciseIds.add(exercise.id);
       sessionCnsAccum += exercise.cns_fatigue_cost;
-      shoulderSets = applyShoulderLedger(shoulderSets, exercise, slot.defaultSets);
+      shoulderSets = applyShoulderLedger(shoulderSets, exercise, prescribedSets);
       picks.push({
         slotId: slot.slotId,
         exerciseId: exercise.id,
-        prescribedSets: slot.defaultSets,
+        prescribedSets,
         score,
         intensity_technique: slot.intensity_technique,
         technique_params: slot.technique_params,
@@ -548,7 +617,7 @@ export function solveDaySlots(
       continue;
     }
 
-    if (!maybeIncreaseExistingLowCnsIsolation(picks, catalog)) break;
+    if (!maybeIncreaseExistingLowCnsIsolation(picks, catalog, tracker)) break;
     estimatedSeconds = estimateSessionSeconds(picks, catalog);
     finisherIndex += 1;
   }
