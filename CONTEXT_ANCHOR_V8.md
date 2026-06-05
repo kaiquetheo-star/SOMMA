@@ -20,7 +20,7 @@ SOMMA is now focused exclusively on:
 | Pillar | Status | Purpose |
 |--------|--------|---------|
 | **Iron** | Active | Musculacao, hypertrophy, strength, progressive overload, load telemetry |
-| **Nutrition** | Placeholder / next pillar | Nutrition goals, biomarker direction, future analytics surface |
+| **Nutrition** | Placeholder / next pillar | Nutrition goals, recovery direction, future analytics surface |
 
 Removed from active code:
 
@@ -74,7 +74,7 @@ app/
 ├── (tabs)/
 │   ├── _layout.tsx           # Home · Nutrition · Command
 │   ├── home.tsx              # Daily Command: Iron block + Nutrition placeholder
-│   ├── analytics.tsx         # Nutrition/Biomarkers/Passport surface
+│   ├── analytics.tsx         # Nutrition/Consistency/Passport surface
 │   └── profile.tsx           # Command Center
 └── (workout)/
     ├── _layout.tsx
@@ -204,7 +204,7 @@ Deprecated catalogs are ignored by active code:
 | Surface | File | Current responsibility |
 |---------|------|------------------------|
 | Daily Command | `app/(tabs)/home.tsx` | Weekly strip, Iron block cards, Nutrition placeholder, clinical review |
-| Nutrition | `app/(tabs)/analytics.tsx` | Passport, biomarkers, Iron telemetry detail, future nutrition surface |
+| Nutrition | `app/(tabs)/analytics.tsx` | Passport, consistency, Iron telemetry detail, future nutrition surface |
 | Command | `app/(tabs)/profile.tsx` | Iron frequency, Iron time budget, Nutrition placeholder controls |
 | Iron workout | `app/(workout)/iron.tsx` | Exercise execution, target load, RIR gate, set logging |
 | Readiness | `app/(workout)/daily_scan.tsx` | Subjective readiness; low score reduces Iron loads |

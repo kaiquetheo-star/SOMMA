@@ -183,5 +183,9 @@ export async function resolveBlockPreviewLabel(block: GameplanBlock): Promise<st
     return block.nutrition.note;
   }
 
+  if (block.longevity) {
+    return `${block.longevity.mobility_focus} · ${block.longevity.cardio_prescription}`;
+  }
+
   return block.subtitle;
 }

@@ -114,7 +114,7 @@ Class-A individuals, biohackers, and high performers who value extreme personali
 
 **REQ-2.4 [Empty state]:** Incomplete foundation shall show an interactive card routing to Foundation Scan—not a dead, non-clickable panel.
 
-**REQ-2.5 [Mastery / Analytics]:** Constellation map and biomarker charts per roadmap; session reset and sign-out live under Analytics.
+**REQ-2.5 [Mastery / Analytics]:** Constellation map and consistency charts per roadmap; session reset and sign-out live under Analytics.
 
 ### 3.3 Workout engine (execution)
 
@@ -158,7 +158,7 @@ Class-A individuals, biohackers, and high performers who value extreme personali
 
 **REQ-5.1 [Unified Constellation]:** Draggable star map, achievement nodes (future).
 
-**REQ-5.2 [Biological Passport UI]:** Edit and visualize passport fields + biomarkers + exam uploads (future charts).
+**REQ-5.2 [Biological Passport UI]:** Edit and visualize passport fields + consistency and recovery signals.
 
 ---
 
@@ -464,7 +464,7 @@ Workout players **shall** resolve IDs against library tables (implementation roa
 
 ### 5.8 Planned tables (not yet migrated)
 
-- `user_rituals`, `biomarkers`, `user_exams`, `user_achievements`, Supabase Storage buckets
+- `user_rituals`, `user_achievements`
 
 ## 6. API & communication
 
@@ -558,7 +558,7 @@ Progress indicator: `FoundationProgress` (3 segments).
 - Sign out → `resetStore()` → `/(auth)`
 - Reset profile → sign out + clear → `/(auth)`
 - Reset local foundation → `resetStore()` → `/(auth)/foundation`
-- Future: edit biological passport, biomarker charts
+- Future: edit biological passport, consistency and recovery charts
 
 #### Mastery — `/(tabs)/mastery`
 

@@ -55,7 +55,7 @@ export function generateStubGameplan(
         id: 'block-nutrition-placeholder',
         pillar: 'nutrition',
         title: 'Nutrition Placeholder',
-        subtitle: 'Fueling and biomarker guidance coming soon',
+        subtitle: 'Fueling and recovery guidance coming soon',
         duration_minutes: 5,
         order: order++,
         nutrition: {

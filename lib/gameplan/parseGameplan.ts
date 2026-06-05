@@ -11,12 +11,13 @@ import type {
   DailyGameplan,
   GameplanBlock,
   IronBlockPrescription,
+  LongevityBlockPrescription,
   LoadingProtocol,
   MicrocycleDay,
   WorkoutPillar,
 } from '@/types/gameplan';
 
-const VALID_PILLARS: WorkoutPillar[] = ['iron', 'nutrition'];
+const VALID_PILLARS: WorkoutPillar[] = ['iron', 'nutrition', 'spirit', 'longevity'];
 
 function isWorkoutPillar(value: unknown): value is WorkoutPillar {
   return typeof value === 'string' && VALID_PILLARS.includes(value as WorkoutPillar);
@@ -87,6 +88,34 @@ function parseIronPrescription(raw: unknown): IronBlockPrescription | undefined 
   };
 }
 
+function parseLongevityPrescription(raw: unknown): LongevityBlockPrescription | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const record = raw as Record<string, unknown>;
+  const mobilityCues = Array.isArray(record.mobility_cues)
+    ? record.mobility_cues.filter((cue): cue is string => typeof cue === 'string')
+    : [];
+
+  return {
+    pillar: 'longevity',
+    title: 'Manutenção Biológica',
+    duration_minutes:
+      typeof record.duration_minutes === 'number' ? record.duration_minutes : 12,
+    mobility_focus:
+      typeof record.mobility_focus === 'string'
+        ? record.mobility_focus
+        : 'Mobilidade Global e Respiração',
+    mobility_cues: mobilityCues,
+    core_exercise:
+      typeof record.core_exercise === 'string'
+        ? record.core_exercise
+        : 'Deadbug com respiração diafragmática',
+    cardio_prescription:
+      typeof record.cardio_prescription === 'string'
+        ? record.cardio_prescription
+        : '10 min Caminhada leve em Zona 2',
+  };
+}
+
 export function parseGameplanBlocks(blocksRaw: unknown): GameplanBlock[] {
   if (!Array.isArray(blocksRaw)) return [];
 
@@ -107,8 +136,10 @@ export function parseGameplanBlocks(blocksRaw: unknown): GameplanBlock[] {
     };
 
     const iron = parseIronPrescription(block.iron);
+    const longevity = parseLongevityPrescription(block.longevity);
 
     if (iron) parsed.iron = iron;
+    if (longevity) parsed.longevity = longevity;
     if (block.pillar === 'nutrition') {
       parsed.nutrition = {
         goal: typeof block.nutrition_goal === 'string' ? block.nutrition_goal : null,

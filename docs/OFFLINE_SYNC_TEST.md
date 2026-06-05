@@ -4,7 +4,7 @@ Manual verification for offline-first queue drain and Elite Coach catalog integr
 
 ## Prerequisites
 
-- Migrations `001`–`011` applied in Supabase (see §Migration checklist)
+- Migrations `001`–`010` applied in Supabase (see §Migration checklist)
 - Seeds in order: `seed.sql` → `seed_hypertrophy.sql` → `seed_combat_tactical.sql` → `seed_flow_spirit_healer.sql`
 - `generate_daily_protocol` deployed with `OPENROUTER_API_KEY`
 - Test account with completed Foundation Scan
@@ -18,7 +18,6 @@ Manual verification for offline-first queue drain and Elite Coach catalog integr
 | 8 | `008_iron_biomechanics.sql` | `library_exercises.primary_muscle`, `cns_fatigue_cost` |
 | 9 | `009_library_combat_tactical.sql` | `library_combat.tactical_focus` |
 | 10 | `010_library_flow_spirit_healer.sql` | `target_recovery_zones`, `complexity_tier` |
-| 11 | `011_biomarkers.sql` | `biomarker_readings`, `biomarker_documents`, Storage `biomarker-labs` |
 
 ### Catalog row counts (SQL Editor)
 

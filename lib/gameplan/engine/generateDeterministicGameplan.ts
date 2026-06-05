@@ -42,6 +42,7 @@ import { pruneIronBlocksInMicrocycle } from '@/lib/gameplan/engine/volumePruning
 import { fetchLibraryExercises } from '@/lib/catalog/library';
 import { sanitizeMicrocycleIronVolume } from '@/lib/gameplan/microcycleValidation';
 import { applyIntensityStrategies } from '@/lib/gameplan/engine/iron/IntensityStrategyEngine';
+import { generateLongevityAddon } from '@/lib/gameplan/engine/longevityMapper';
 import type { BiologicalProfile } from '@/types/biological';
 import type {
   DailyGameplan,
@@ -102,6 +103,30 @@ function totalTrainingDuration(day: MicrocycleDay): number {
   return day.blocks
     .filter((block) => block.pillar === 'iron')
     .reduce((sum, block) => sum + block.duration_minutes, 0);
+}
+
+function injectLongevityAddons(microcycle: MicrocycleDay[]): MicrocycleDay[] {
+  return microcycle.map((day) => {
+    const ironBlock = day.blocks.find((block) => block.pillar === 'iron');
+    if (!ironBlock) return day;
+
+    const longevity = generateLongevityAddon(day.day_index, day.focus_label);
+    const longevityBlock: GameplanBlock = {
+      id: `block-d${day.day_index}-longevity`,
+      pillar: 'longevity',
+      title: longevity.title,
+      subtitle: `${longevity.mobility_focus} · ${longevity.cardio_prescription}`,
+      duration_minutes: longevity.duration_minutes,
+      order: ironBlock.order + 1,
+      status: 'pending',
+      longevity,
+    };
+
+    return {
+      ...day,
+      blocks: [...day.blocks, longevityBlock].sort((a, b) => a.order - b.order),
+    };
+  });
 }
 
 function restSecondsFromCns(cns: number | null): number {
@@ -442,6 +467,7 @@ export async function generateDeterministicGameplan(
   );
 
   orderedMicrocycle = sanitizeMicrocycleIronVolume(orderedMicrocycle);
+  orderedMicrocycle = injectLongevityAddons(orderedMicrocycle);
   orderedMicrocycle = appendNutritionTargets(orderedMicrocycle, input.biological);
 
   const todayIndex = getDayIndexForDate(protocolDate, week_start_date);

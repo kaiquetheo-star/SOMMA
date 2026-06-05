@@ -10,11 +10,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BiomarkerGrid } from '@/components/analytics/BiomarkerGrid';
+import { ConsistencyCalendar } from '@/components/analytics/ConsistencyCalendar';
 import { LoadTelemetryStrip } from '@/components/iron/LoadTelemetryStrip';
 import { BiologicalPassportSummary } from '@/components/analytics/BiologicalPassportSummary';
 import { BiologicalPassportForm } from '@/components/foundation/BiologicalPassportForm';
-import { useBiomarkerVault } from '@/hooks/useBiomarkerVault';
+import { DamageControlToggle } from '@/components/sanctuary/DamageControlToggle';
 import { useSommaStore } from '@/store/useSommaStore';
 import {
   initialBiologicalProfile,
@@ -30,10 +30,13 @@ export default function AnalyticsScreen() {
   const setUserBiological = useSommaStore((state) => state.setUserBiological);
   const resetStore = useSommaStore((state) => state.resetStore);
   const performanceLogs = useSommaStore((state) => state.performance_logs);
+  const weeklyMicrocycle = useSommaStore((state) => state.weeklyMicrocycle);
+  const selectedDayIndex = useSommaStore((state) => state.selectedDayIndex);
+  const damageControlActiveDates = useSommaStore((state) => state.damageControlActiveDates);
+  const toggleDamageControlDate = useSommaStore((state) => state.toggleDamageControlDate);
 
   const [draft, setDraft] = useState<BiologicalProfile>(storedBiological);
   const [saving, setSaving] = useState(false);
-  const biomarkerVault = useBiomarkerVault({ enabled: true });
 
   useEffect(() => {
     setDraft(storedBiological);
@@ -76,6 +79,10 @@ export default function AnalyticsScreen() {
 
   const hasChanges =
     JSON.stringify(draft) !== JSON.stringify(storedBiological ?? initialBiologicalProfile);
+  const selectedDate =
+    weeklyMicrocycle?.find((day) => day.day_index === selectedDayIndex)?.date ??
+    new Date().toISOString().slice(0, 10);
+  const damageControlActive = damageControlActiveDates.includes(selectedDate);
 
   const handleResetDevice = async () => {
     await resetStore();
@@ -97,11 +104,16 @@ export default function AnalyticsScreen() {
         <Text className="mt-3 font-display-bold text-3xl text-[#E8E4DC]">Your markers</Text>
         <Text className="mt-4 font-body text-sm leading-6 text-[#8A9488]">
           Anthropometric baseline, weekly training frequency, and per-pillar goals for the clinic
-          coaches, plus your biomarker vault preview.
+          coaches, plus consistency signals from your local training record.
         </Text>
 
         <View className="mt-8 gap-8">
             <BiologicalPassportSummary profile={draft} />
+
+            <ConsistencyCalendar
+              performanceLogs={performanceLogs}
+              weeklyMicrocycle={weeklyMicrocycle}
+            />
 
             <LoadTelemetryStrip
               performanceLogs={performanceLogs}
@@ -109,16 +121,24 @@ export default function AnalyticsScreen() {
               variant="detail"
             />
 
-            <BiomarkerGrid
-              latest={biomarkerVault.latest}
-              documents={biomarkerVault.documents}
-              loading={biomarkerVault.loading}
-              uploading={biomarkerVault.uploading}
-              error={biomarkerVault.error}
-              onLogReading={biomarkerVault.logReading}
-              onUploadLab={biomarkerVault.uploadLab}
-              onRefresh={biomarkerVault.refresh}
+            <DamageControlToggle
+              date={selectedDate}
+              active={damageControlActive}
+              onToggle={() => toggleDamageControlDate(selectedDate)}
             />
+
+            <View className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
+              <Text className="font-body text-[10px] uppercase tracking-[0.35em] text-[#6B7568]">
+                Future Signal Layer
+              </Text>
+              <Text className="mt-3 font-display text-2xl leading-8 text-[#E8E4DC]">
+                Biological optimization, simplified
+              </Text>
+              <Text className="mt-3 font-body text-sm leading-6 text-[#8A9488]">
+                Biological optimization is driven by consistent training, nutrition, and recovery.
+                Advanced biomarker tracking is coming in a future update.
+              </Text>
+            </View>
 
             <View className="gap-4">
               <Text className="font-body text-[10px] uppercase tracking-[0.35em] text-[#6B7568]">

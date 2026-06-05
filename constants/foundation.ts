@@ -18,7 +18,7 @@ export const PILLAR_OPTIONS: PillarOption[] = [
   {
     id: 'nutrition',
     label: 'Nutrition',
-    subtitle: 'Fueling · biomarkers · body composition',
+    subtitle: 'Fueling · recovery · body composition',
     preference: { iron: 60, nutrition: 40 },
   },
 ];

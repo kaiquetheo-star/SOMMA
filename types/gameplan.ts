@@ -1,7 +1,7 @@
 import type { ClinicalReviewTrigger } from '@/types/clinical';
 import type { ExerciseCueCard, ExerciseTempo } from '@/types/catalog';
 
-export type WorkoutPillar = 'iron' | 'nutrition' | 'spirit';
+export type WorkoutPillar = 'iron' | 'nutrition' | 'spirit' | 'longevity';
 
 export type GameplanBlockStatus = 'pending' | 'active' | 'completed';
 
@@ -69,13 +69,24 @@ export interface NutritionTarget {
   water_ml: number;
   peri_workout_carb_ratio: 0.65;
   hydration_focus: HydrationFocus;
+  note?: string;
 }
 
 export interface SpiritBlockPrescription {
-  mode: 'breathwork';
+  mode: 'breathwork' | 'active_recovery';
   tempo_id: string;
   duration_minutes: number;
   prescribed_reason: string;
+}
+
+export interface LongevityBlockPrescription {
+  pillar: 'longevity';
+  title: 'Manutenção Biológica';
+  duration_minutes: number;
+  mobility_focus: string;
+  mobility_cues: string[];
+  core_exercise: string;
+  cardio_prescription: string;
 }
 
 export interface GameplanBlock {
@@ -86,10 +97,14 @@ export interface GameplanBlock {
   duration_minutes: number;
   order: number;
   status: GameplanBlockStatus;
+  completed_at?: string;
   iron?: IronBlockPrescription;
   nutrition?: NutritionBlockPrescription;
   spirit?: SpiritBlockPrescription;
+  longevity?: LongevityBlockPrescription;
 }
+
+export type WorkoutBlock = GameplanBlock;
 
 /** One day in the 7-day Head Coach microcycle (day_index 1 = Monday … 7 = Sunday) */
 export interface MicrocycleDay {

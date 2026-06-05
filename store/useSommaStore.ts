@@ -17,6 +17,11 @@ import { applyReadinessAutoregulationToMicrocycle } from '@/lib/gameplan/engine/
 import type { ClinicalExitInterview } from '@/types/clinical';
 import { fetchLibraryExercises } from '@/lib/catalog/library';
 import { buildWorkoutSessionSummary } from '@/lib/workout/buildSessionSummary';
+import {
+  applyDamageControl,
+  injectMetabolicFlushBlock,
+  restoreDamageControlTarget,
+} from '@/lib/physics/damageControl';
 import type { BiologicalProfile } from '@/types/biological';
 import {
   DEFAULT_TRAINING_DAYS_PER_WEEK,
@@ -75,7 +80,11 @@ export interface UserFoundation {
 }
 
 function applyGameplanToState(gameplan: DailyGameplan, source: SommaState['gameplan_source']) {
-  const weeklyMicrocycle = sanitizeMicrocycleIronVolume(gameplan.microcycle);
+  const state = useSommaStore.getState();
+  const weeklyMicrocycle = applyDamageControlToMicrocycle(
+    sanitizeMicrocycleIronVolume(gameplan.microcycle),
+    state.damageControlActiveDates,
+  );
   return {
     weeklyMicrocycle,
     protocolDate: gameplan.date,
@@ -84,6 +93,58 @@ function applyGameplanToState(gameplan: DailyGameplan, source: SommaState['gamep
     selectedDayIndex: getTodayDayIndex(gameplan.week_start_date),
     gameplan_source: source,
   };
+}
+
+function applyDamageControlToMicrocycle(
+  microcycle: MicrocycleDay[],
+  activeDates: readonly string[],
+): MicrocycleDay[] {
+  const active = new Set(activeDates);
+
+  return microcycle.map((day) => {
+    const date = day.date;
+    const shouldApply = Boolean(date && active.has(date));
+    const existingFlush = day.blocks.find((block) => block.id === `block-d${day.day_index}-metabolic-flush`);
+    const blocksWithoutFlush = day.blocks.filter((block) => block.id !== `block-d${day.day_index}-metabolic-flush`);
+    const normalizedBlocks = blocksWithoutFlush.map((block) => {
+      if (block.pillar !== 'nutrition' || !block.nutrition?.nutrition_target) return block;
+
+      const target = shouldApply
+        ? applyDamageControl(block.nutrition.nutrition_target)
+        : restoreDamageControlTarget(block.nutrition.nutrition_target);
+
+      return {
+        ...block,
+        subtitle: `${target.total_calories} kcal · ${target.carbs_g}g C · ${target.protein_g}g P · ${target.fat_g}g F`,
+        nutrition: {
+          ...block.nutrition,
+          note: target.note
+            ? `${target.note} · Water ${target.water_ml}ml`
+            : `Peri-workout carbs: ${Math.round(target.carbs_g * target.peri_workout_carb_ratio)}g · Water ${target.water_ml}ml`,
+          nutrition_target: target,
+        },
+      };
+    });
+
+    if (!shouldApply) {
+      return {
+        ...day,
+        blocks: normalizedBlocks.sort((a, b) => a.order - b.order),
+      };
+    }
+
+    const maxOrder = normalizedBlocks.reduce((max, block) => Math.max(max, block.order), -1);
+    const flushBlock = {
+      ...injectMetabolicFlushBlock(day.day_index),
+      order: maxOrder + 1,
+      status: existingFlush?.status ?? 'pending',
+    };
+
+    return {
+      ...day,
+      blocks: [...normalizedBlocks, flushBlock].sort((a, b) => a.order - b.order),
+    };
+  });
 }
 
 function mergeBlockStatuses(
@@ -101,11 +162,47 @@ function mergeBlockStatuses(
       blocks: blocks.map((block) => {
         const wasCompleted = previous
           .flatMap((prevDay) => prevDay.blocks ?? [])
-          .find((prev) => prev.id === block.id)?.status;
-        return wasCompleted === 'completed' ? { ...block, status: 'completed' as const } : block;
+          .find((prev) => prev.id === block.id);
+        return wasCompleted?.status === 'completed'
+          ? {
+              ...block,
+              status: 'completed' as const,
+              completed_at: wasCompleted.completed_at,
+            }
+          : block;
       }),
     };
   });
+}
+
+function markBlockCompletedInMicrocycle(
+  microcycle: MicrocycleDay[] | null,
+  blockId: string,
+  completedAt: string,
+): MicrocycleDay[] | null {
+  if (!microcycle) return microcycle;
+
+  let completedDayIndex: number | null = null;
+  const withBlockComplete = microcycle.map((day) => {
+    let dayContainsBlock = false;
+    const blocks = (day.blocks ?? []).map((block) => {
+      if (block.id !== blockId) return block;
+      dayContainsBlock = true;
+      return {
+        ...block,
+        status: 'completed' as const,
+        completed_at: block.completed_at ?? completedAt,
+      };
+    });
+
+    if (!dayContainsBlock) return { ...day, blocks };
+    completedDayIndex = day.day_index;
+    return { ...day, blocks };
+  });
+
+  return completedDayIndex == null
+    ? withBlockComplete
+    : markDayCompletedIfReady(withBlockComplete, completedDayIndex);
 }
 
 export { getMicrocycleDay } from '@/lib/gameplan/microcycleWeek';
@@ -200,7 +297,9 @@ interface SommaState {
   /** Daily readiness scan (Clinical Law II) — calendar date when last completed */
   readinessScanDate: string | null;
   subjectiveReadiness: number | null;
+  damageControlActiveDates: string[];
   setSelectedDayIndex: (dayIndex: number) => void;
+  toggleDamageControlDate: (date: string) => void;
   needsDailyReadinessScan: () => boolean;
   applySubjectiveReadiness: (score: number) => void;
   submitClinicalExitInterview: (interview: ClinicalExitInterview) => Promise<void>;
@@ -288,6 +387,7 @@ export const useSommaStore = create<SommaState>()(
       selectedDayIndex: getTodayDayIndex(),
       readinessScanDate: null,
       subjectiveReadiness: null,
+      damageControlActiveDates: [],
       performance_logs: [],
       performanceQueue: [],
       performance_syncing: false,
@@ -328,6 +428,21 @@ export const useSommaStore = create<SommaState>()(
       setSelectedDayIndex: (dayIndex) =>
         set({
           selectedDayIndex: Math.min(7, Math.max(1, Math.round(dayIndex))),
+        }),
+
+      toggleDamageControlDate: (date) =>
+        set((state) => {
+          const active = new Set(state.damageControlActiveDates);
+          if (active.has(date)) active.delete(date);
+          else active.add(date);
+
+          const damageControlActiveDates = [...active].sort();
+          return {
+            damageControlActiveDates,
+            weeklyMicrocycle: state.weeklyMicrocycle
+              ? applyDamageControlToMicrocycle(state.weeklyMicrocycle, damageControlActiveDates)
+              : state.weeklyMicrocycle,
+          };
         }),
 
       needsDailyReadinessScan: () => {
@@ -450,6 +565,15 @@ export const useSommaStore = create<SommaState>()(
       setBlockStatus: (blockId, status) =>
         set((state) => {
           if (!state.weeklyMicrocycle) return state;
+          if (status === 'completed') {
+            return {
+              weeklyMicrocycle: markBlockCompletedInMicrocycle(
+                state.weeklyMicrocycle,
+                blockId,
+                new Date().toISOString(),
+              ),
+            };
+          }
 
           return {
             weeklyMicrocycle: state.weeklyMicrocycle.map((day) => ({
@@ -463,19 +587,11 @@ export const useSommaStore = create<SommaState>()(
 
       completeBlock: (blockId) =>
         set((state) => {
-          if (!state.weeklyMicrocycle) return state;
-
-          const withBlockComplete = state.weeklyMicrocycle.map((day) => ({
-            ...day,
-            blocks: (day.blocks ?? []).map((block) =>
-              block.id === blockId ? { ...block, status: 'completed' as const } : block,
-            ),
-          }));
-
           return {
-            weeklyMicrocycle: markDayCompletedIfReady(
-              withBlockComplete,
-              state.selectedDayIndex,
+            weeklyMicrocycle: markBlockCompletedInMicrocycle(
+              state.weeklyMicrocycle,
+              blockId,
+              new Date().toISOString(),
             ),
           };
         }),
@@ -642,7 +758,15 @@ export const useSommaStore = create<SommaState>()(
         } catch (err) {
           console.warn('[SOMMA] Local recalibration failed:', err);
         } finally {
-          set({ performance_syncing: false });
+          const completedAt = new Date().toISOString();
+          set((current) => ({
+            performance_syncing: false,
+            weeklyMicrocycle: markBlockCompletedInMicrocycle(
+              current.weeklyMicrocycle,
+              input.block_id,
+              completedAt,
+            ),
+          }));
         }
       },
 
@@ -697,6 +821,7 @@ export const useSommaStore = create<SommaState>()(
           selectedDayIndex: getTodayDayIndex(),
           readinessScanDate: null,
           subjectiveReadiness: null,
+          damageControlActiveDates: [],
           performance_logs: [],
           performanceQueue: [],
           performance_syncing: false,
@@ -755,6 +880,7 @@ export const useSommaStore = create<SommaState>()(
         selectedDayIndex: state.selectedDayIndex,
         readinessScanDate: state.readinessScanDate,
         subjectiveReadiness: state.subjectiveReadiness,
+        damageControlActiveDates: state.damageControlActiveDates,
         performance_logs: state.performance_logs,
         performanceQueue: state.performanceQueue,
         lastWorkoutSummary: state.lastWorkoutSummary,
@@ -791,6 +917,9 @@ export const useSommaStore = create<SommaState>()(
         if (!state.performanceQueue) {
           state.performanceQueue = [];
         }
+        if (!state.damageControlActiveDates) {
+          state.damageControlActiveDates = [];
+        }
 
         if (!state.weeklyMicrocycle) {
           const legacyPlan = legacy.currentGameplan ?? legacy.daily_gameplan;
@@ -819,7 +948,10 @@ export const useSommaStore = create<SommaState>()(
         const expectedTraining =
           state.user_biological.training_days_per_week ?? DEFAULT_TRAINING_DAYS_PER_WEEK;
         if (state.weeklyMicrocycle) {
-          state.weeklyMicrocycle = sanitizeMicrocycleIronVolume(state.weeklyMicrocycle);
+          state.weeklyMicrocycle = applyDamageControlToMicrocycle(
+            sanitizeMicrocycleIronVolume(state.weeklyMicrocycle),
+            state.damageControlActiveDates,
+          );
         }
 
         if (

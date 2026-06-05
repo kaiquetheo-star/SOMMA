@@ -193,7 +193,7 @@ export default function ProfileScreen() {
                 Nutrition
               </Text>
               <Text className="mt-3 font-body text-sm leading-6 text-[#8A9488]">
-                Future nutrition and biomarker controls will live here.
+                Future nutrition and recovery controls will live here.
               </Text>
             </View>
 
