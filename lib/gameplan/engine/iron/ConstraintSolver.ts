@@ -42,6 +42,7 @@ const FINISHER_MIN_REMAINING_SECONDS = 5 * 60;
 const MAX_FINISHER_SETS = 4;
 const MINIMUM_VIABLE_WORKOUT_EXERCISE_COUNT = 2;
 const MINIMUM_VIABLE_WORKOUT_SETS = 2;
+const MINIMUM_FULL_WORKOUT_EXERCISE_COUNT = 4;
 
 const TOO_BASIC_FOR_ADVANCED = new Set([
   'goblet_squat',
@@ -322,7 +323,12 @@ function collectCandidates(
   state: SolverState,
   tracker: WeeklyVolumeTracker,
   currentDayIndex: number | undefined,
-  options: { ignoreCnsBudget?: boolean; ignoreMastery?: boolean; ignoreMrv?: boolean } = {},
+  options: {
+    ignoreCnsBudget?: boolean;
+    ignoreMastery?: boolean;
+    ignoreMrv?: boolean;
+    ignoreRecoveryMode?: boolean;
+  } = {},
 ): CatalogExercise[] {
   const candidates: CatalogExercise[] = [];
 
@@ -388,6 +394,7 @@ function collectCandidates(
 
     // Regra 2.2/2.3: recovery mode keeps only low-CNS, low-impact options.
     if (
+      !options.ignoreRecoveryMode &&
       (tracker.isRecoveryMode || state.isRecoveryMode) &&
       (exercise.cns_fatigue_cost > 2 || isAxialLoadExercise(exercise) || isLumbarShearExercise(exercise))
     ) {
@@ -537,6 +544,36 @@ function maybeIncreaseExistingLowCnsIsolation(
   return true;
 }
 
+function pushSolverPick(
+  picks: SolverResult[],
+  exercise: CatalogExercise,
+  slot: SolverSlot,
+  prescribedSets: number,
+  score: number,
+  state: {
+    usedExerciseIds: Set<string>;
+    sessionCnsAccum: number;
+    shoulderSets: ShoulderVolumeLedger;
+    dayHadAxialLoad: boolean;
+  },
+  tracker: WeeklyVolumeTracker,
+): void {
+  tracker.creditVolume(exercise, prescribedSets);
+  state.usedExerciseIds.add(exercise.id);
+  state.sessionCnsAccum += exercise.cns_fatigue_cost;
+  state.shoulderSets = applyShoulderLedger(state.shoulderSets, exercise, prescribedSets);
+  state.dayHadAxialLoad ||= isAxialLoadExercise(exercise);
+
+  picks.push({
+    slotId: slot.slotId,
+    exerciseId: exercise.id,
+    prescribedSets,
+    score,
+    intensity_technique: slot.intensity_technique,
+    technique_params: slot.technique_params,
+  });
+}
+
 /**
  * Deterministic slot filler — no RNG. Mutates `tracker` and returns an updated `SolverState`.
  */
@@ -554,12 +591,18 @@ export function solveDaySlots(
   let shoulderSets = { ...initialState.shoulderSets };
   const picks: SolverResult[] = [];
   let dayHadAxialLoad = false;
+  const mutableState = {
+    usedExerciseIds,
+    sessionCnsAccum,
+    shoulderSets,
+    dayHadAxialLoad,
+  };
 
   for (const slot of slots) {
     const stateForSlot: SolverState = {
       ...initialState,
-      usedExerciseIds,
-      sessionCnsAccum,
+      usedExerciseIds: mutableState.usedExerciseIds,
+      sessionCnsAccum: mutableState.sessionCnsAccum,
     };
     const candidates = collectCandidates(day, catalog, slot, constraints, stateForSlot, tracker, currentDayIndex);
 
@@ -568,21 +611,52 @@ export function solveDaySlots(
 
     const { exercise, score } = selection;
     const prescribedSets = prescribedSetsForSlot(slot, exercise);
+    pushSolverPick(picks, exercise, slot, prescribedSets, score, mutableState, tracker);
+  }
 
-    tracker.creditVolume(exercise, prescribedSets);
-    usedExerciseIds.add(exercise.id);
-    sessionCnsAccum += exercise.cns_fatigue_cost;
-    shoulderSets = applyShoulderLedger(shoulderSets, exercise, prescribedSets);
-    dayHadAxialLoad ||= isAxialLoadExercise(exercise);
+  if (picks.length > 0 && picks.length < MINIMUM_FULL_WORKOUT_EXERCISE_COUNT) {
+    const filledSlotIds = new Set(picks.map((pick) => pick.slotId));
+    for (const slot of slots) {
+      if (picks.length >= MINIMUM_FULL_WORKOUT_EXERCISE_COUNT) break;
+      if (filledSlotIds.has(slot.slotId)) continue;
 
-    picks.push({
-      slotId: slot.slotId,
-      exerciseId: exercise.id,
-      prescribedSets,
-      score,
-      intensity_technique: slot.intensity_technique,
-      technique_params: slot.technique_params,
-    });
+      const deloadSlot: SolverSlot = {
+        ...slot,
+        defaultSets: Math.min(3, Math.max(MINIMUM_VIABLE_WORKOUT_SETS, slot.defaultSets)),
+      };
+      const stateForSlot: SolverState = {
+        ...initialState,
+        usedExerciseIds: mutableState.usedExerciseIds,
+        sessionCnsAccum: mutableState.sessionCnsAccum,
+        isRecoveryMode: false,
+      };
+      const candidates = collectCandidates(
+        day,
+        catalog,
+        deloadSlot,
+        constraints,
+        stateForSlot,
+        tracker,
+        currentDayIndex,
+        {
+          ignoreCnsBudget: true,
+          ignoreMrv: true,
+          ignoreRecoveryMode: true,
+        },
+      );
+      const selection = pickBestCandidate(candidates, tracker, constraints, stateForSlot, currentDayIndex, deloadSlot);
+      if (!selection) continue;
+
+      pushSolverPick(
+        picks,
+        selection.exercise,
+        { ...deloadSlot, slotId: `${deloadSlot.slotId}_partial_rescue` },
+        Math.min(prescribedSetsForSlot(deloadSlot, selection.exercise), 3),
+        selection.score,
+        mutableState,
+        tracker,
+      );
+    }
   }
 
   if (picks.length === 0) {
@@ -593,34 +667,29 @@ export function solveDaySlots(
       };
       const stateForSlot: SolverState = {
         ...initialState,
-        usedExerciseIds,
-        sessionCnsAccum,
+        usedExerciseIds: mutableState.usedExerciseIds,
+        sessionCnsAccum: mutableState.sessionCnsAccum,
       };
       const candidates = collectCandidates(day, catalog, fallbackSlot, constraints, stateForSlot, tracker, currentDayIndex, {
         ignoreCnsBudget: true,
         ignoreMastery: true,
         ignoreMrv: true,
+        ignoreRecoveryMode: true,
       });
       const selection = pickBestCandidate(candidates, tracker, constraints, stateForSlot, currentDayIndex, fallbackSlot);
       if (!selection) continue;
 
       const { exercise, score } = selection;
       const prescribedSets = Math.min(prescribedSetsForSlot(fallbackSlot, exercise), MINIMUM_VIABLE_WORKOUT_SETS);
-
-      tracker.creditVolume(exercise, prescribedSets);
-      usedExerciseIds.add(exercise.id);
-      sessionCnsAccum += exercise.cns_fatigue_cost;
-      shoulderSets = applyShoulderLedger(shoulderSets, exercise, prescribedSets);
-      dayHadAxialLoad ||= isAxialLoadExercise(exercise);
-
-      picks.push({
-        slotId: `${fallbackSlot.slotId}_minimum_viable`,
-        exerciseId: exercise.id,
+      pushSolverPick(
+        picks,
+        exercise,
+        { ...fallbackSlot, slotId: `${fallbackSlot.slotId}_minimum_viable` },
         prescribedSets,
         score,
-        intensity_technique: fallbackSlot.intensity_technique,
-        technique_params: fallbackSlot.technique_params,
-      });
+        mutableState,
+        tracker,
+      );
 
       if (picks.length >= MINIMUM_VIABLE_WORKOUT_EXERCISE_COUNT) break;
     }
@@ -640,8 +709,8 @@ export function solveDaySlots(
 
     const stateForFinisher: SolverState = {
       ...initialState,
-      usedExerciseIds,
-      sessionCnsAccum,
+      usedExerciseIds: mutableState.usedExerciseIds,
+      sessionCnsAccum: mutableState.sessionCnsAccum,
     };
     const finisher = pickLowCnsFinisher(
       day,
@@ -657,18 +726,7 @@ export function solveDaySlots(
     if (finisher) {
       const { exercise, slot, score } = finisher;
       const prescribedSets = prescribedSetsForSlot(slot, exercise);
-      tracker.creditVolume(exercise, prescribedSets);
-      usedExerciseIds.add(exercise.id);
-      sessionCnsAccum += exercise.cns_fatigue_cost;
-      shoulderSets = applyShoulderLedger(shoulderSets, exercise, prescribedSets);
-      picks.push({
-        slotId: slot.slotId,
-        exerciseId: exercise.id,
-        prescribedSets,
-        score,
-        intensity_technique: slot.intensity_technique,
-        technique_params: slot.technique_params,
-      });
+      pushSolverPick(picks, exercise, slot, prescribedSets, score, mutableState, tracker);
       finisherIndex += 1;
       estimatedSeconds = estimateSessionSeconds(picks, catalog);
       continue;
@@ -690,10 +748,10 @@ export function solveDaySlots(
       usedExerciseIds,
       weeklyVolume,
       synergistLoad,
-      sessionCnsAccum,
-      shoulderSets,
+      sessionCnsAccum: mutableState.sessionCnsAccum,
+      shoulderSets: mutableState.shoulderSets,
       previousDayIndex: currentDayIndex ?? initialState.previousDayIndex,
-      previousDayHadAxialLoad: dayHadAxialLoad,
+      previousDayHadAxialLoad: mutableState.dayHadAxialLoad,
       isRecoveryMode: tracker.isRecoveryMode || initialState.isRecoveryMode,
     },
   };

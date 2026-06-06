@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { WeeklyStrip } from '@/components/WeeklyStrip';
+import { GameplanBlockCard } from '@/components/sanctuary/GameplanBlockCard';
 import { LoadingFallback } from '@/components/routing/LoadingFallback';
 import { useStoreHydrated } from '@/hooks/useStoreHydrated';
 import { useWorkoutNavigation } from '@/hooks/useWorkoutNavigation';
@@ -128,6 +129,7 @@ export default function DailyCommandScreen() {
   const selectedDay = getMicrocycleDay(weeklyMicrocycle, activeDayIndex);
   const ironBlock = findIronBlock(selectedDay);
   const ironExercises = ironBlock?.iron?.exercises ?? [];
+  const ancillaryBlocks = (selectedDay?.blocks ?? []).filter((block) => block.pillar !== 'iron');
   const isToday = activeDayIndex === todayDayIndex;
 
   const foundationComplete = hasCompletedFoundationScan({
@@ -273,65 +275,82 @@ export default function DailyCommandScreen() {
         ) : null}
 
         {!gameplanError && ironExercises.length > 0 ? (
-          <View className="gap-4">
-            {ironExercises.map((exercise, index) => (
-              <View
-                key={`${exercise.exercise_id}-${index}`}
-                className="rounded-3xl border border-white/10 bg-white/[0.045] p-5"
-              >
-                <View className="flex-row items-start justify-between gap-4">
-                  <View className="min-w-0 flex-1">
-                    <Text className="font-body text-[10px] uppercase tracking-[0.26em] text-[#6B7568]">
-                      Exercise {index + 1}
-                    </Text>
-                    <Text className="mt-2 font-body-semibold text-xl leading-7 text-[#E8E4DC]">
-                      {displayExerciseName(exercise)}
-                    </Text>
-                  </View>
-                  <View className="rounded-xl border border-[#BFA06A]/30 bg-[#BFA06A]/10 px-3 py-2">
-                    <Text className="font-body-bold text-xs uppercase tracking-[0.12em] text-[#BFA06A]">
-                      {exercise.target_sets} x {formatRepTarget(exercise)}
-                    </Text>
-                  </View>
-                </View>
-
-                <View className="mt-4 rounded-2xl border border-white/8 bg-[#0A0E0C]/70 px-4 py-4">
-                  <View className="flex-row items-center justify-between gap-3">
-                    <Text className="font-body text-[10px] uppercase tracking-[0.28em] text-[#6B7568]">
-                      Tempo
-                    </Text>
-                    <Text className="font-body-bold text-sm tracking-[0.2em] text-[#BFA06A]">
-                      {formatTempo(exercise)}
-                    </Text>
-                  </View>
-
-                  {exercise.cue_card ? (
-                    <View className="mt-4 gap-3">
-                      <Text className="font-body text-sm leading-6 text-[#C8C4BC]">
-                        <Text className="font-body-bold text-[#BFA06A]">Setup: </Text>
-                        {exercise.cue_card.setup}
+          <View className="gap-5">
+            <View className="gap-4">
+              {ironExercises.map((exercise, index) => (
+                <View
+                  key={`${exercise.exercise_id}-${index}`}
+                  className="rounded-3xl border border-white/10 bg-white/[0.045] p-5"
+                >
+                  <View className="flex-row items-start justify-between gap-4">
+                    <View className="min-w-0 flex-1">
+                      <Text className="font-body text-[10px] uppercase tracking-[0.26em] text-[#6B7568]">
+                        Exercise {index + 1}
                       </Text>
-                      <Text className="font-body text-sm leading-6 text-[#C8C4BC]">
-                        <Text className="font-body-bold text-[#BFA06A]">Vector: </Text>
-                        {exercise.cue_card.vector}
-                      </Text>
-                      <Text className="font-body text-sm leading-6 text-[#C8C4BC]">
-                        <Text className="font-body-bold text-[#BFA06A]">Catch: </Text>
-                        {exercise.cue_card.catch}
-                      </Text>
-                      <Text className="font-body text-sm leading-6 text-[#8A9488]">
-                        <Text className="font-body-bold text-[#BFA06A]">Anti-pattern: </Text>
-                        {exercise.cue_card.anti_pattern}
+                      <Text className="mt-2 font-body-semibold text-xl leading-7 text-[#E8E4DC]">
+                        {displayExerciseName(exercise)}
                       </Text>
                     </View>
-                  ) : (
-                    <Text className="mt-4 font-body text-sm leading-6 text-[#8A9488]">
-                      Control the eccentric, own the catch, and stop when technique degrades.
-                    </Text>
-                  )}
+                    <View className="rounded-xl border border-[#BFA06A]/30 bg-[#BFA06A]/10 px-3 py-2">
+                      <Text className="font-body-bold text-xs uppercase tracking-[0.12em] text-[#BFA06A]">
+                        {exercise.target_sets} x {formatRepTarget(exercise)}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View className="mt-4 rounded-2xl border border-white/8 bg-[#0A0E0C]/70 px-4 py-4">
+                    <View className="flex-row items-center justify-between gap-3">
+                      <Text className="font-body text-[10px] uppercase tracking-[0.28em] text-[#6B7568]">
+                        Tempo
+                      </Text>
+                      <Text className="font-body-bold text-sm tracking-[0.2em] text-[#BFA06A]">
+                        {formatTempo(exercise)}
+                      </Text>
+                    </View>
+
+                    {exercise.cue_card ? (
+                      <View className="mt-4 gap-3">
+                        <Text className="font-body text-sm leading-6 text-[#C8C4BC]">
+                          <Text className="font-body-bold text-[#BFA06A]">Setup: </Text>
+                          {exercise.cue_card.setup}
+                        </Text>
+                        <Text className="font-body text-sm leading-6 text-[#C8C4BC]">
+                          <Text className="font-body-bold text-[#BFA06A]">Vector: </Text>
+                          {exercise.cue_card.vector}
+                        </Text>
+                        <Text className="font-body text-sm leading-6 text-[#C8C4BC]">
+                          <Text className="font-body-bold text-[#BFA06A]">Catch: </Text>
+                          {exercise.cue_card.catch}
+                        </Text>
+                        <Text className="font-body text-sm leading-6 text-[#8A9488]">
+                          <Text className="font-body-bold text-[#BFA06A]">Anti-pattern: </Text>
+                          {exercise.cue_card.anti_pattern}
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text className="mt-4 font-body text-sm leading-6 text-[#8A9488]">
+                        Control the eccentric, own the catch, and stop when technique degrades.
+                      </Text>
+                    )}
+                  </View>
                 </View>
+              ))}
+            </View>
+
+            {ancillaryBlocks.length > 0 ? (
+              <View className="gap-3">
+                <Text className="font-body text-[10px] uppercase tracking-[0.3em] text-[#6B7568]">
+                  Biological Maintenance
+                </Text>
+                {ancillaryBlocks.map((block) => (
+                  <GameplanBlockCard
+                    key={block.id}
+                    block={block}
+                    onPress={block.pillar === 'longevity' ? () => undefined : () => openBlock(block)}
+                  />
+                ))}
               </View>
-            ))}
+            ) : null}
           </View>
         ) : !gameplanError ? (
           <View className="rounded-3xl border border-white/10 bg-white/[0.035] px-6 py-10">

@@ -107,8 +107,11 @@ function totalTrainingDuration(day: MicrocycleDay): number {
 
 function injectLongevityAddons(microcycle: MicrocycleDay[]): MicrocycleDay[] {
   return microcycle.map((day) => {
+    if (day.is_rest_day) return day;
+    if (day.blocks.some((block) => block.pillar === 'longevity')) return day;
+
     const ironBlock = day.blocks.find((block) => block.pillar === 'iron');
-    if (!ironBlock) return day;
+    const order = ironBlock ? ironBlock.order + 1 : day.blocks.length;
 
     const longevity = generateLongevityAddon(day.day_index, day.focus_label);
     const longevityBlock: GameplanBlock = {
@@ -117,7 +120,7 @@ function injectLongevityAddons(microcycle: MicrocycleDay[]): MicrocycleDay[] {
       title: longevity.title,
       subtitle: `${longevity.mobility_focus} · ${longevity.cardio_prescription}`,
       duration_minutes: longevity.duration_minutes,
-      order: ironBlock.order + 1,
+      order,
       status: 'pending',
       longevity,
     };
