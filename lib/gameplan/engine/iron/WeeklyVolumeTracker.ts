@@ -89,8 +89,9 @@ function computeAcwr(
 
   if (acuteLoad <= 0 || chronicLoad <= 0) return null;
 
-  // Regra 2.2: ACWR = acute 7d load / chronic 28d weekly average.
-  const chronicWeeklyAverage = chronicLoad / 4;
+  // Regra 2.2: ACWR = acute 7d load / chronic 21d weekly average.
+  // The caller supplies a 21-day chronic window, so the weekly average is three weeks.
+  const chronicWeeklyAverage = chronicLoad / 3;
   if (chronicWeeklyAverage <= 0) return null;
 
   return Math.round((acuteLoad / chronicWeeklyAverage) * 100) / 100;
@@ -226,7 +227,7 @@ export function createWeeklyVolumeTracker(
       }
 
       const projected = tracker.projectSets(exercise, safeSets);
-      const limit = tracker.isRecoveryMode ? MEV : MRV_HARD;
+      const limit = MRV_HARD;
       for (const [muscle, total] of projected) {
         if (total > limit) {
           return {
@@ -234,9 +235,7 @@ export function createWeeklyVolumeTracker(
             projected,
             projectedVolume: total,
             clampedSets: 0,
-            reason: tracker.isRecoveryMode
-              ? `${muscle} would reach ${total.toFixed(1)} effective sets (> ${MEV} recovery cap)`
-              : `${muscle} would reach ${total.toFixed(1)} effective sets (> ${MRV_HARD} MRV)`,
+            reason: `${muscle} would reach ${total.toFixed(1)} effective sets (> ${MRV_HARD} MRV)`,
           };
         }
       }

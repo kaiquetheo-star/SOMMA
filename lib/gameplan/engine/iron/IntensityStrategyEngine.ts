@@ -1,4 +1,5 @@
 import { IntensityTechnique } from '@/types/catalog';
+import { supportsAdvancedMetabolicTechnique } from '@/lib/catalog/tacticalEnrichment';
 import type { BiologicalProfile, TrainingExperienceLevel } from '@/types/biological';
 import type { MicrocycleDay, IronExercisePrescription } from '@/types/gameplan';
 import type { PerformanceLogEntry } from '@/types/performance';
@@ -48,6 +49,14 @@ function compatibleWith(
 ): boolean {
   const slug = exercise.slug ?? '';
   const row = slug ? catalog.get(slug) : null;
+  if (
+    (technique === IntensityTechnique.DROP_SET || technique === IntensityTechnique.MYO_REPS) &&
+    row &&
+    !supportsAdvancedMetabolicTechnique(row)
+  ) {
+    return false;
+  }
+
   if (row?.intensity_compatibility?.includes(technique)) return true;
 
   if (technique === IntensityTechnique.DROP_SET) {

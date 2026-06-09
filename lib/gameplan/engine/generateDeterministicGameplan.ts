@@ -40,6 +40,7 @@ import { MESOCYCLE_DAYS, WEEKLY_VOLUME_DAYS } from '@/lib/gameplan/engine/consta
 import { buildGenerationContext } from '@/lib/gameplan/engine/generation';
 import { pruneIronBlocksInMicrocycle } from '@/lib/gameplan/engine/volumePruning';
 import { fetchLibraryExercises } from '@/lib/catalog/library';
+import { buildExerciseCatalog } from '@/lib/gameplan/engine/iron/catalog/ExerciseCatalog';
 import { sanitizeMicrocycleIronVolume } from '@/lib/gameplan/microcycleValidation';
 import { applyIntensityStrategies } from '@/lib/gameplan/engine/iron/IntensityStrategyEngine';
 import { generateLongevityAddon } from '@/lib/gameplan/engine/longevityMapper';
@@ -61,6 +62,17 @@ export interface GenerateDeterministicGameplanInput {
   performanceLogs: PerformanceLogEntry[];
   /** Optional override for today's date (tests) */
   protocolDate?: string;
+}
+
+type BiologicalWithMesocycleWeek = BiologicalProfile & {
+  mesocycle_week?: number | null;
+};
+
+function resolveMesocycleWeek(biological: BiologicalProfile): number | null {
+  const mesocycleWeek = (biological as BiologicalWithMesocycleWeek).mesocycle_week;
+  return typeof mesocycleWeek === 'number' && Number.isFinite(mesocycleWeek)
+    ? mesocycleWeek
+    : null;
 }
 
 function todayDateKey(): string {
@@ -178,9 +190,13 @@ function buildMinimumViableIronExercises(
   equipment: EquipmentTag[],
   blockedJointProfiles: readonly string[],
   focusLabel: string,
+  excludedExerciseIds: ReadonlySet<string> = new Set(),
 ): IronExercisePrescription[] {
   return catalog
-    .filter((exercise) => isMinimumViableCandidate(exercise, equipment, blockedJointProfiles))
+    .filter((exercise) =>
+      !excludedExerciseIds.has(exercise.id) &&
+      isMinimumViableCandidate(exercise, equipment, blockedJointProfiles),
+    )
     .sort((a, b) => {
       const scoreDelta = candidateScoreForFocus(b, focusLabel) - candidateScoreForFocus(a, focusLabel);
       if (scoreDelta !== 0) return scoreDelta;
@@ -198,6 +214,7 @@ function buildMinimumViableIronExercises(
       target_weight_kg: null,
       rest_seconds: restSecondsFromCns(exercise.cns_fatigue_cost),
       alternative_exercise_id: null,
+      diagnostic_reason: 'minimum_viable_path_absolute_last_resort',
       progression_note: 'Minimum viable deload fallback: MRV/CNS relaxed to avoid an empty training day.',
       execution_technique: 'Standard',
     }));
@@ -209,10 +226,51 @@ function injectMinimumViableIronWorkouts(
   equipment: EquipmentTag[],
   blockedJointProfiles: readonly string[],
 ): MicrocycleDay[] {
+  const minimumExercisesForDay = (day: MicrocycleDay, hasRescueDiagnostic: boolean): number => {
+    if (hasRescueDiagnostic) return 2;
+    return day.is_rest_day ? 0 : 4;
+  };
+
   return microcycle.map((day) => {
     if (day.is_rest_day) return day;
     const blocks = day.blocks.map((block) => {
-      if (block.pillar !== 'iron' || (block.iron?.exercises?.length ?? 0) > 0) return block;
+      const existingExercises = block.iron?.exercises ?? [];
+      const hasRescueDiagnostic = existingExercises.some((exercise) =>
+        /rescue|minimum_viable|injury_constraint/.test(exercise.diagnostic_reason ?? ''),
+      );
+      const shouldForceMinimumViable = hasRescueDiagnostic || existingExercises.length < 2;
+      const minimumExerciseCount = minimumExercisesForDay(day, shouldForceMinimumViable);
+      if (
+        block.pillar === 'iron' &&
+        existingExercises.length > 0 &&
+        (shouldForceMinimumViable || existingExercises.length < minimumExerciseCount)
+      ) {
+        const normalizedExisting = shouldForceMinimumViable
+          ? existingExercises.map((exercise) => ({
+              ...exercise,
+              target_sets: 2,
+              diagnostic_reason: exercise.diagnostic_reason ?? 'minimum_viable_path_absolute_last_resort',
+            }))
+          : existingExercises;
+        const excluded = new Set(normalizedExisting.map((exercise) => exercise.exercise_id));
+        const fillers = buildMinimumViableIronExercises(
+          catalog,
+          equipment,
+          blockedJointProfiles,
+          day.focus_label,
+          excluded,
+        ).slice(0, Math.max(0, minimumExerciseCount - normalizedExisting.length));
+
+        return {
+          ...block,
+          iron: {
+            ...block.iron,
+            exercises: [...normalizedExisting, ...fillers],
+          },
+        };
+      }
+
+      if (block.pillar !== 'iron' || (block.iron?.exercises?.length ?? 0) >= 2) return block;
 
       const exercises = buildMinimumViableIronExercises(
         catalog,
@@ -321,6 +379,7 @@ export async function generateDeterministicGameplan(
   const ironLogs7d = filterIronLogsLastDays(flatLogs, WEEKLY_VOLUME_DAYS);
   const loadSnapshot = computeTrainingLoadSnapshot(input.performanceLogs, {
     goalIron: input.biological.goal_iron,
+    mesocycleWeek: resolveMesocycleWeek(input.biological),
   });
   const { rpe: yesterdayMainRpe } = yesterdayEffectiveRpe(input.performanceLogs);
 
@@ -469,7 +528,10 @@ export async function generateDeterministicGameplan(
     catalog,
   );
 
-  orderedMicrocycle = sanitizeMicrocycleIronVolume(orderedMicrocycle);
+  orderedMicrocycle = sanitizeMicrocycleIronVolume(orderedMicrocycle, {
+    biological: input.biological,
+    catalog: buildExerciseCatalog(catalog),
+  });
   orderedMicrocycle = injectLongevityAddons(orderedMicrocycle);
   orderedMicrocycle = appendNutritionTargets(orderedMicrocycle, input.biological);
 

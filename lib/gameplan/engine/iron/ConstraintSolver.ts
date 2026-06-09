@@ -4,9 +4,17 @@ import {
   MRV_SOFT,
   type WeeklyVolumeTracker,
 } from '@/lib/gameplan/engine/iron/WeeklyVolumeTracker';
+import { supportsAdvancedMetabolicTechnique } from '@/lib/catalog/tacticalEnrichment';
 import { classifyShoulderRegion } from '@/lib/gameplan/engine/iron/taxonomy/shoulderRegions';
 import { matchesMuscleSlotHint } from '@/lib/gameplan/engine/iron/taxonomy/muscleSlotHints';
 import { isXFrameBlacklisted } from '@/lib/gameplan/engine/iron/xFrameBias';
+import {
+  calculateVolumeBudget,
+  isCompoundExercise,
+  resolveEffectiveMesocyclePhase,
+  type VolumeBudget,
+  type VolumeExecutionTechnique,
+} from '@/lib/gameplan/engine/iron/volumePeriodization';
 import type { IronMovementPattern } from '@/lib/gameplan/engine/iron/taxonomy/movementPatterns';
 import type {
   CatalogExercise,
@@ -38,11 +46,21 @@ const SCORE_MASTERY_COMPLEXITY_BONUS = 60;
 const SCORE_REPEAT_COMPOUND_PENALTY = 350;
 const SCORE_CONSECUTIVE_AXIAL_PENALTY = 1000;
 const SCORE_DUP_MATCH_BONUS = 650;
+const SCORE_RECOVERY_LOW_STABILITY_BOOST = 12000;
+const SCORE_RECOVERY_MEDIUM_STABILITY_BOOST = 1500;
+const SCORE_RECOVERY_HIGH_STABILITY_PENALTY = 2500;
+const HIGH_CNS_FATIGUE_SCORE = 70;
+const MAX_DAILY_AXIAL_LOAD = 6;
 const FINISHER_MIN_REMAINING_SECONDS = 5 * 60;
-const MAX_FINISHER_SETS = 4;
 const MINIMUM_VIABLE_WORKOUT_EXERCISE_COUNT = 2;
 const MINIMUM_VIABLE_WORKOUT_SETS = 2;
 const MINIMUM_FULL_WORKOUT_EXERCISE_COUNT = 4;
+
+function minimumViableDiagnosticReason(constraints: SolverConstraints): string {
+  return constraints.blockedJointProfiles.length > 0
+    ? 'injury_constraint'
+    : 'minimum_viable_path_absolute_last_resort';
+}
 
 const TOO_BASIC_FOR_ADVANCED = new Set([
   'goblet_squat',
@@ -110,6 +128,7 @@ export function createInitialSolverState(tracker: WeeklyVolumeTracker): SolverSt
     synergistLoad,
     isRecoveryMode: tracker.isRecoveryMode,
     sessionCnsAccum: 0,
+    sessionAxialLoad: 0,
     shoulderSets: { anterior: 0, lateral: 0, posterior: 0 },
     previousDayIndex: null,
     previousDayHadAxialLoad: false,
@@ -159,7 +178,7 @@ function matchesIsolationSlot(exercise: CatalogExercise, isolationOnly: boolean 
 }
 
 export function isAxialLoadExercise(exercise: CatalogExercise): boolean {
-  return exercise.joint_stress_profile === 'spinal_axial_load' || AXIAL_LOAD_SLUGS.has(exercise.slug);
+  return (exercise.axial_loading ?? 0) >= 3 || exercise.joint_stress_profile === 'spinal_axial_load' || AXIAL_LOAD_SLUGS.has(exercise.slug);
 }
 
 function isLumbarShearExercise(exercise: CatalogExercise): boolean {
@@ -248,6 +267,56 @@ function dupFocusBonus(exercise: CatalogExercise, constraints?: Pick<SolverConst
   return 0;
 }
 
+function isHighFatigueContext(
+  tracker: WeeklyVolumeTracker,
+  state: Pick<SolverState, 'isRecoveryMode'> | undefined,
+  constraints?: Pick<SolverConstraints, 'cns_fatigue_score'>,
+): boolean {
+  return (
+    tracker.isRecoveryMode ||
+    state?.isRecoveryMode === true ||
+    (constraints?.cns_fatigue_score ?? 0) >= HIGH_CNS_FATIGUE_SCORE
+  );
+}
+
+function recoveryStabilityScore(exercise: CatalogExercise): number {
+  if (exercise.stability_demand === 'low') return SCORE_RECOVERY_LOW_STABILITY_BOOST;
+  if (exercise.stability_demand === 'medium') return SCORE_RECOVERY_MEDIUM_STABILITY_BOOST;
+  if (exercise.stability_demand === 'high') return -SCORE_RECOVERY_HIGH_STABILITY_PENALTY;
+  return 0;
+}
+
+function advancedTechniqueAllowed(
+  technique: IntensityTechnique | undefined,
+  exercise: CatalogExercise,
+): boolean {
+  if (technique !== 'myo_reps' && technique !== 'drop_set') return true;
+  return supportsAdvancedMetabolicTechnique(exercise);
+}
+
+function projectedAxialLoadAllowed(exercise: CatalogExercise, state: Pick<SolverState, 'sessionAxialLoad'>): boolean {
+  const axialLoading = exercise.axial_loading ?? (isAxialLoadExercise(exercise) ? 3 : 0);
+  if (axialLoading < 3) return true;
+  return state.sessionAxialLoad + axialLoading <= MAX_DAILY_AXIAL_LOAD;
+}
+
+function tacticalOrderRank(exercise: CatalogExercise): number {
+  switch (exercise.tactical_role) {
+    case 'primary_compound':
+      return 0;
+    case 'secondary_compound':
+      return 1;
+    case 'pre_exhaust':
+      return 2;
+    case 'isolation_metabolic':
+      return 3;
+    case 'corrective':
+      return 4;
+    default:
+      return exercise.movement_pattern === 'isolation' ? 3 : 1;
+  }
+}
+
 /**
  * Heuristic score — higher is better. Auditable coach rules:
  * - Regra 1.1: X-Frame priority dominates selection (+selection_score × 1000).
@@ -258,8 +327,8 @@ function dupFocusBonus(exercise: CatalogExercise, constraints?: Pick<SolverConst
 export function scoreExerciseCandidate(
   exercise: CatalogExercise,
   tracker: WeeklyVolumeTracker,
-  constraints?: Pick<SolverConstraints, 'iron_mastery' | 'dailyIronFocus'>,
-  state?: Pick<SolverState, 'usedExerciseIds' | 'previousDayHadAxialLoad' | 'previousDayIndex'>,
+  constraints?: Pick<SolverConstraints, 'iron_mastery' | 'dailyIronFocus' | 'cns_fatigue_score'>,
+  state?: Pick<SolverState, 'usedExerciseIds' | 'previousDayHadAxialLoad' | 'previousDayIndex' | 'isRecoveryMode'>,
   currentDayIndex?: number,
 ): number {
   let score = exercise.selection_score * SCORE_X_FRAME_WEIGHT;
@@ -276,6 +345,10 @@ export function scoreExerciseCandidate(
 
   score -= SCORE_CNS_PENALTY * exercise.cns_fatigue_cost;
   score += dupFocusBonus(exercise, constraints);
+
+  if (isHighFatigueContext(tracker, state, constraints)) {
+    score += recoveryStabilityScore(exercise);
+  }
 
   if (state?.usedExerciseIds.has(exercise.id)) {
     score -= SCORE_REPEAT_COMPOUND_PENALTY;
@@ -307,12 +380,52 @@ function applyShoulderLedger(
   };
 }
 
-function prescribedSetsForSlot(slot: SolverSlot, exercise: CatalogExercise): number {
+function solverTechniqueFromBudget(technique: VolumeExecutionTechnique | undefined): IntensityTechnique | undefined {
+  if (!technique || technique === 'Standard') return undefined;
+  if (technique === 'Myo-Reps') return 'myo_reps';
+  if (technique === 'Drop-Set') return 'drop_set';
+  return 'rest_pause';
+}
+
+function volumeBudgetForExercise(
+  exercise: CatalogExercise,
+  constraints: Pick<SolverConstraints, 'mesocycle_phase' | 'mesocycle_week' | 'cns_fatigue_score'>,
+): { budget: VolumeBudget; phase: ReturnType<typeof resolveEffectiveMesocyclePhase> } {
+  const phase = resolveEffectiveMesocyclePhase(constraints.mesocycle_phase, constraints.mesocycle_week);
+  return {
+    phase,
+    budget: calculateVolumeBudget(
+      exercise,
+      phase,
+      isCompoundExercise(exercise),
+      constraints.cns_fatigue_score ?? 0,
+    ),
+  };
+}
+
+function prescribedSetsForSlot(
+  slot: SolverSlot,
+  exercise: CatalogExercise,
+  constraints: Pick<SolverConstraints, 'mesocycle_phase' | 'mesocycle_week' | 'cns_fatigue_score'>,
+): { prescribedSets: number; budget: VolumeBudget; phase: ReturnType<typeof resolveEffectiveMesocyclePhase> } {
   const requestedSets = Math.max(0, slot.defaultSets);
-  if (exercise.movement_pattern === 'isolation' || slot.slotId.includes('finisher')) {
-    return Math.min(requestedSets, MAX_FINISHER_SETS);
-  }
-  return requestedSets;
+  const { budget, phase } = volumeBudgetForExercise(exercise, constraints);
+  const prescribedSets = Math.min(Math.max(budget.minSets, requestedSets), budget.maxSets);
+  return { prescribedSets, budget, phase };
+}
+
+function diagnosticReasonForPrescribedSets(
+  slot: SolverSlot,
+  exercise: CatalogExercise,
+  prescribedSets: number,
+  phase: ReturnType<typeof resolveEffectiveMesocyclePhase>,
+  budget: VolumeBudget,
+  explicitReason?: string,
+): string | undefined {
+  if (explicitReason) return explicitReason;
+  if (prescribedSets >= slot.defaultSets) return undefined;
+  if (prescribedSets === budget.maxSets) return `volume_budget_max_${phase}`;
+  return 'solver_volume_reduction';
 }
 
 function collectCandidates(
@@ -380,6 +493,25 @@ function collectCandidates(
       continue;
     }
 
+    if (!advancedTechniqueAllowed(slot.intensity_technique, exercise)) {
+      logCandidateRejection(slot, exercise, `técnica ${slot.intensity_technique} exige baixa estabilidade ou resistência constante`);
+      continue;
+    }
+
+    if (!projectedAxialLoadAllowed(exercise, state)) {
+      logCandidateRejection(
+        slot,
+        exercise,
+        `proteção lombar bloqueia carga axial diária ${state.sessionAxialLoad} + ${exercise.axial_loading ?? 3}`,
+      );
+      continue;
+    }
+
+    if (createsConsecutiveAxialLoad(exercise, state, currentDayIndex)) {
+      logCandidateRejection(slot, exercise, 'carga axial em dias consecutivos');
+      continue;
+    }
+
     // Regra 1.3: deterministic waist-protection blacklist.
     if (isXFrameBlacklisted(exercise) || isLoadedObliqueExercise(exercise)) {
       logCandidateRejection(slot, exercise, 'blacklist X-Frame/oblíquo carregado');
@@ -392,17 +524,17 @@ function collectCandidates(
       continue;
     }
 
-    // Regra 2.2/2.3: recovery mode keeps only low-CNS, low-impact options.
+    // Regra 2.2/2.3: recovery mode blocks spinal stress, while scoring strongly favors stable machines/cables.
     if (
       !options.ignoreRecoveryMode &&
-      (tracker.isRecoveryMode || state.isRecoveryMode) &&
-      (exercise.cns_fatigue_cost > 2 || isAxialLoadExercise(exercise) || isLumbarShearExercise(exercise))
+      isHighFatigueContext(tracker, state, constraints) &&
+      ((exercise.axial_loading ?? 0) >= 3 || isLumbarShearExercise(exercise))
     ) {
-      logCandidateRejection(slot, exercise, 'recovery mode bloqueia CNS alto/axial/lumbar shear');
+      logCandidateRejection(slot, exercise, 'recovery/high fatigue bloqueia axial alto/lumbar shear');
       continue;
     }
 
-    const setsToAdd = slot.defaultSets;
+    const { prescribedSets: setsToAdd } = prescribedSetsForSlot(slot, exercise, constraints);
     const volumeCheck = tracker.canAddSets(exercise, setsToAdd);
     if (!options.ignoreMrv && !volumeCheck.allowed) {
       logCandidateRejection(slot, exercise, volumeCheck.reason ?? 'MRV_HARD atingido');
@@ -522,20 +654,24 @@ function maybeIncreaseExistingLowCnsIsolation(
   picks: SolverResult[],
   catalog: ExerciseCatalog,
   tracker: WeeklyVolumeTracker,
+  constraints: Pick<SolverConstraints, 'mesocycle_phase' | 'mesocycle_week' | 'cns_fatigue_score'>,
 ): boolean {
   let selectedExercise: CatalogExercise | null = null;
   const candidate = picks.find((pick) => {
     const exercise = catalog.byId.get(pick.exerciseId);
     selectedExercise = exercise ?? null;
+    const budget = exercise ? volumeBudgetForExercise(exercise, constraints).budget : null;
     return (
       exercise?.movement_pattern === 'isolation' &&
       exercise.cns_fatigue_cost <= 2 &&
-      pick.prescribedSets < MAX_FINISHER_SETS
+      budget != null &&
+      pick.prescribedSets < budget.maxSets
     );
   });
 
   if (!candidate) return false;
-  candidate.prescribedSets = Math.min(candidate.prescribedSets + 1, MAX_FINISHER_SETS);
+  const budget = selectedExercise ? volumeBudgetForExercise(selectedExercise, constraints).budget : null;
+  candidate.prescribedSets = Math.min(candidate.prescribedSets + 1, budget?.maxSets ?? candidate.prescribedSets + 1);
   if (selectedExercise) {
     tracker.creditVolume(selectedExercise, 1);
   }
@@ -555,22 +691,61 @@ function pushSolverPick(
     sessionCnsAccum: number;
     shoulderSets: ShoulderVolumeLedger;
     dayHadAxialLoad: boolean;
+    sessionAxialLoad: number;
   },
   tracker: WeeklyVolumeTracker,
+  diagnosticReason?: string,
+  budget?: VolumeBudget,
+  phase?: ReturnType<typeof resolveEffectiveMesocyclePhase>,
 ): void {
   tracker.creditVolume(exercise, prescribedSets);
   state.usedExerciseIds.add(exercise.id);
   state.sessionCnsAccum += exercise.cns_fatigue_cost;
+  state.sessionAxialLoad += exercise.axial_loading ?? (isAxialLoadExercise(exercise) ? 3 : 0);
   state.shoulderSets = applyShoulderLedger(state.shoulderSets, exercise, prescribedSets);
   state.dayHadAxialLoad ||= isAxialLoadExercise(exercise);
+
+  const slotTechnique = advancedTechniqueAllowed(slot.intensity_technique, exercise)
+    ? slot.intensity_technique
+    : undefined;
+  const budgetTechnique = advancedTechniqueAllowed(solverTechniqueFromBudget(budget?.executionTechnique), exercise)
+    ? solverTechniqueFromBudget(budget?.executionTechnique)
+    : undefined;
 
   picks.push({
     slotId: slot.slotId,
     exerciseId: exercise.id,
     prescribedSets,
     score,
-    intensity_technique: slot.intensity_technique,
-    technique_params: slot.technique_params,
+    diagnostic_reason: diagnosticReasonForPrescribedSets(
+      slot,
+      exercise,
+      prescribedSets,
+      phase ?? 'maintenance',
+      budget ?? {
+        minSets: prescribedSets,
+        maxSets: prescribedSets,
+        targetRepRange: `${exercise.default_reps}-${exercise.default_reps}`,
+        targetRIR: 2,
+        executionTechnique: 'Standard',
+      },
+      diagnosticReason,
+    ),
+    intensity_technique: slotTechnique ?? budgetTechnique,
+    technique_params: slotTechnique ? slot.technique_params : undefined,
+    targetRepRange: budget?.targetRepRange,
+    targetRIR: budget?.targetRIR,
+  });
+}
+
+function sortPicksTactically(picks: readonly SolverResult[], catalog: ExerciseCatalog): readonly SolverResult[] {
+  return [...picks].sort((a, b) => {
+    const exerciseA = catalog.byId.get(a.exerciseId);
+    const exerciseB = catalog.byId.get(b.exerciseId);
+    const rankA = exerciseA ? tacticalOrderRank(exerciseA) : 99;
+    const rankB = exerciseB ? tacticalOrderRank(exerciseB) : 99;
+    if (rankA !== rankB) return rankA - rankB;
+    return picks.indexOf(a) - picks.indexOf(b);
   });
 }
 
@@ -588,12 +763,14 @@ export function solveDaySlots(
 ): { picks: readonly SolverResult[]; state: SolverState } {
   const usedExerciseIds = new Set(initialState.usedExerciseIds);
   let sessionCnsAccum = initialState.sessionCnsAccum;
+  let sessionAxialLoad = initialState.sessionAxialLoad;
   let shoulderSets = { ...initialState.shoulderSets };
   const picks: SolverResult[] = [];
   let dayHadAxialLoad = false;
   const mutableState = {
     usedExerciseIds,
     sessionCnsAccum,
+    sessionAxialLoad,
     shoulderSets,
     dayHadAxialLoad,
   };
@@ -603,6 +780,7 @@ export function solveDaySlots(
       ...initialState,
       usedExerciseIds: mutableState.usedExerciseIds,
       sessionCnsAccum: mutableState.sessionCnsAccum,
+      sessionAxialLoad: mutableState.sessionAxialLoad,
     };
     const candidates = collectCandidates(day, catalog, slot, constraints, stateForSlot, tracker, currentDayIndex);
 
@@ -610,8 +788,8 @@ export function solveDaySlots(
     if (!selection) continue;
 
     const { exercise, score } = selection;
-    const prescribedSets = prescribedSetsForSlot(slot, exercise);
-    pushSolverPick(picks, exercise, slot, prescribedSets, score, mutableState, tracker);
+    const { prescribedSets, budget, phase } = prescribedSetsForSlot(slot, exercise, constraints);
+    pushSolverPick(picks, exercise, slot, prescribedSets, score, mutableState, tracker, undefined, budget, phase);
   }
 
   if (picks.length > 0 && picks.length < MINIMUM_FULL_WORKOUT_EXERCISE_COUNT) {
@@ -628,6 +806,7 @@ export function solveDaySlots(
         ...initialState,
         usedExerciseIds: mutableState.usedExerciseIds,
         sessionCnsAccum: mutableState.sessionCnsAccum,
+        sessionAxialLoad: mutableState.sessionAxialLoad,
         isRecoveryMode: false,
       };
       const candidates = collectCandidates(
@@ -651,16 +830,23 @@ export function solveDaySlots(
         picks,
         selection.exercise,
         { ...deloadSlot, slotId: `${deloadSlot.slotId}_partial_rescue` },
-        Math.min(prescribedSetsForSlot(deloadSlot, selection.exercise), 3),
+        Math.min(
+          prescribedSetsForSlot(deloadSlot, selection.exercise, constraints).prescribedSets,
+          MINIMUM_VIABLE_WORKOUT_SETS,
+        ),
         selection.score,
         mutableState,
         tracker,
+        'partial_rescue_constraints',
+        prescribedSetsForSlot(deloadSlot, selection.exercise, constraints).budget,
+        prescribedSetsForSlot(deloadSlot, selection.exercise, constraints).phase,
       );
     }
   }
 
-  if (picks.length === 0) {
+  if (slots.length > 1 && picks.length < MINIMUM_VIABLE_WORKOUT_EXERCISE_COUNT) {
     for (const slot of slots) {
+      if (picks.length >= MINIMUM_VIABLE_WORKOUT_EXERCISE_COUNT) break;
       const fallbackSlot: SolverSlot = {
         ...slot,
         defaultSets: MINIMUM_VIABLE_WORKOUT_SETS,
@@ -669,6 +855,7 @@ export function solveDaySlots(
         ...initialState,
         usedExerciseIds: mutableState.usedExerciseIds,
         sessionCnsAccum: mutableState.sessionCnsAccum,
+        sessionAxialLoad: mutableState.sessionAxialLoad,
       };
       const candidates = collectCandidates(day, catalog, fallbackSlot, constraints, stateForSlot, tracker, currentDayIndex, {
         ignoreCnsBudget: true,
@@ -680,7 +867,8 @@ export function solveDaySlots(
       if (!selection) continue;
 
       const { exercise, score } = selection;
-      const prescribedSets = Math.min(prescribedSetsForSlot(fallbackSlot, exercise), MINIMUM_VIABLE_WORKOUT_SETS);
+      const { prescribedSets: fallbackSets, budget, phase } = prescribedSetsForSlot(fallbackSlot, exercise, constraints);
+      const prescribedSets = Math.min(fallbackSets, MINIMUM_VIABLE_WORKOUT_SETS);
       pushSolverPick(
         picks,
         exercise,
@@ -689,6 +877,9 @@ export function solveDaySlots(
         score,
         mutableState,
         tracker,
+        minimumViableDiagnosticReason(constraints),
+        budget,
+        phase,
       );
 
       if (picks.length >= MINIMUM_VIABLE_WORKOUT_EXERCISE_COUNT) break;
@@ -701,7 +892,7 @@ export function solveDaySlots(
   const finisherHints = resolveFinisherHints(day, slots);
 
   while (targetSeconds - estimatedSeconds > FINISHER_MIN_REMAINING_SECONDS && finisherIndex < 48) {
-    if (picks.length >= 7 && maybeIncreaseExistingLowCnsIsolation(picks, catalog, tracker)) {
+    if (picks.length >= 7 && maybeIncreaseExistingLowCnsIsolation(picks, catalog, tracker, constraints)) {
       estimatedSeconds = estimateSessionSeconds(picks, catalog);
       finisherIndex += 1;
       continue;
@@ -711,6 +902,7 @@ export function solveDaySlots(
       ...initialState,
       usedExerciseIds: mutableState.usedExerciseIds,
       sessionCnsAccum: mutableState.sessionCnsAccum,
+      sessionAxialLoad: mutableState.sessionAxialLoad,
     };
     const finisher = pickLowCnsFinisher(
       day,
@@ -725,14 +917,14 @@ export function solveDaySlots(
 
     if (finisher) {
       const { exercise, slot, score } = finisher;
-      const prescribedSets = prescribedSetsForSlot(slot, exercise);
-      pushSolverPick(picks, exercise, slot, prescribedSets, score, mutableState, tracker);
+      const { prescribedSets, budget, phase } = prescribedSetsForSlot(slot, exercise, constraints);
+      pushSolverPick(picks, exercise, slot, prescribedSets, score, mutableState, tracker, undefined, budget, phase);
       finisherIndex += 1;
       estimatedSeconds = estimateSessionSeconds(picks, catalog);
       continue;
     }
 
-    if (!maybeIncreaseExistingLowCnsIsolation(picks, catalog, tracker)) break;
+    if (!maybeIncreaseExistingLowCnsIsolation(picks, catalog, tracker, constraints)) break;
     estimatedSeconds = estimateSessionSeconds(picks, catalog);
     finisherIndex += 1;
   }
@@ -743,12 +935,13 @@ export function solveDaySlots(
   };
 
   return {
-    picks,
+    picks: sortPicksTactically(picks, catalog),
     state: {
       usedExerciseIds,
       weeklyVolume,
       synergistLoad,
       sessionCnsAccum: mutableState.sessionCnsAccum,
+      sessionAxialLoad: mutableState.sessionAxialLoad,
       shoulderSets: mutableState.shoulderSets,
       previousDayIndex: currentDayIndex ?? initialState.previousDayIndex,
       previousDayHadAxialLoad: mutableState.dayHadAxialLoad,

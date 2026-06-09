@@ -1,5 +1,6 @@
 import { Text, View } from 'react-native';
 
+import { SelectionTile } from '@/components/foundation/SelectionTile';
 import { TrainingFrequencySelect } from '@/components/foundation/TrainingFrequencySelect';
 import { ValueStepper } from '@/components/iron/ValueStepper';
 import {
@@ -7,6 +8,7 @@ import {
   FIXED_GOAL_IRON,
   FIXED_HEIGHT_CM,
   FIXED_NUTRITION_GOAL,
+  type MesocyclePhase,
   type BiologicalProfile,
 } from '@/types/biological';
 
@@ -15,8 +17,36 @@ interface BiologicalPassportFormProps {
   onChange: (patch: Partial<BiologicalProfile>) => void;
 }
 
+const MESOCYCLE_PHASE_OPTIONS: Array<{
+  id: MesocyclePhase;
+  label: string;
+  subtitle: string;
+}> = [
+  {
+    id: 'bulking',
+    label: 'Bulking',
+    subtitle: 'Ganhando massa, superavit calorico',
+  },
+  {
+    id: 'cutting',
+    label: 'Cutting',
+    subtitle: 'Perdendo gordura, deficit calorico',
+  },
+  {
+    id: 'maintenance',
+    label: 'Manutencao',
+    subtitle: 'Mantendo peso atual',
+  },
+  {
+    id: 'deload',
+    label: 'Deload',
+    subtitle: 'Semana de recuperacao ativa',
+  },
+];
+
 export function BiologicalPassportForm({ value, onChange }: BiologicalPassportFormProps) {
   const age = ageFromDateOfBirth(value.date_of_birth);
+  const selectedMesocyclePhase = value.mesocycle_phase ?? 'maintenance';
 
   return (
     <View className="gap-6">
@@ -76,6 +106,29 @@ export function BiologicalPassportForm({ value, onChange }: BiologicalPassportFo
           onChange({ training_days_per_week, frequency_iron: training_days_per_week })
         }
       />
+
+      <View className="gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-5">
+        <View>
+          <Text className="font-body text-[10px] uppercase tracking-[0.35em] text-matte-gold/70">
+            Mesocycle phase
+          </Text>
+          <Text className="mt-2 font-body text-xs leading-5 text-[#6B7568]">
+            Controls weekly Iron volume: compounds stay moderate, isolations can climb during cutting,
+            and deload reduces systemic load.
+          </Text>
+        </View>
+
+        {MESOCYCLE_PHASE_OPTIONS.map((option) => (
+          <SelectionTile
+            key={option.id}
+            label={option.label}
+            subtitle={option.subtitle}
+            selected={selectedMesocyclePhase === option.id}
+            onPress={() => onChange({ mesocycle_phase: option.id })}
+            accessibilityLabel={`Select ${option.label} mesocycle phase`}
+          />
+        ))}
+      </View>
     </View>
   );
 }

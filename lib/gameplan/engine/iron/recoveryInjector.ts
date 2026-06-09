@@ -3,6 +3,7 @@ import type { GameplanBlock, MicrocycleDay } from '@/types/gameplan';
 import type { TrainingLoadSnapshot } from '@/lib/physics/loadTelemetry';
 
 const HEALER_REASON = 'High systemic fatigue detected. Downregulate CNS.';
+const CLINICAL_EXTREME_FATIGUE = 9;
 
 function resolveAcwr(telemetry: TrainingLoadSnapshot): number | null {
   return telemetry.acwr ?? telemetry.pillars.iron.acwr ?? null;
@@ -30,7 +31,11 @@ function createSpiritBlock(day: MicrocycleDay): GameplanBlock {
   };
 }
 
-function cloneBlockWithDeload(block: GameplanBlock, shouldDeload: boolean): GameplanBlock {
+function cloneBlockWithDeload(
+  block: GameplanBlock,
+  diagnosticReason: string | null,
+): GameplanBlock {
+  const shouldDeload = diagnosticReason != null;
   if (!shouldDeload || !block.iron) return { ...block };
 
   // Regra 5.4: automatic deload preserves the movement pattern while halving volume and reducing load.
@@ -45,9 +50,23 @@ function cloneBlockWithDeload(block: GameplanBlock, shouldDeload: boolean): Game
           exercise.target_weight_kg != null
             ? Math.round(exercise.target_weight_kg * 0.85 * 10) / 10
             : null,
+        diagnostic_reason: diagnosticReason,
       })),
     },
   };
+}
+
+function deloadDiagnosticReason(
+  telemetry: TrainingLoadSnapshot,
+  biological: UserBiological,
+): string | null {
+  if (telemetry.is_deload_week === true) {
+    return 'deload_mesocycle_week_4';
+  }
+  if ((biological.clinical_exit_interview?.perceived_fatigue ?? 0) >= CLINICAL_EXTREME_FATIGUE) {
+    return 'deload_clinical_exit_interview';
+  }
+  return null;
 }
 
 function shouldInjectHealerZone(
@@ -64,12 +83,12 @@ export function injectRecoveryProtocols(
   telemetry: TrainingLoadSnapshot,
   biological: UserBiological,
 ): MicrocycleDay[] {
-  const shouldDeload = telemetry.is_deload_week === true;
+  const deloadReason = deloadDiagnosticReason(telemetry, biological);
   const needsHealer = shouldInjectHealerZone(telemetry, biological);
 
   const cloned = microcycle.map((day) => ({
     ...day,
-    blocks: day.blocks.map((block) => cloneBlockWithDeload(block, shouldDeload)),
+    blocks: day.blocks.map((block) => cloneBlockWithDeload(block, deloadReason)),
   }));
 
   if (!needsHealer) return cloned;

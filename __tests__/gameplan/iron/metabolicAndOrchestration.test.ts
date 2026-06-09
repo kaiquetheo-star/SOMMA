@@ -108,17 +108,20 @@ describe('metabolic telemetry and final orchestration', () => {
     expect(target.water_ml).toBe(80 * 50 + 60 * 15);
   });
 
-  it('C: injects a Healer Zone block when ACWR spikes', () => {
+  it('C: injects Healer Zone on ACWR spikes without deloading main compounds', () => {
     const injected = injectRecoveryProtocols(
       microcycleFixture(),
       telemetry({ acwr: 1.6 }),
-      athlete80(),
+      athlete80({ baseline_stress_level: 3 }),
     );
     const spiritBlocks = injected.flatMap((day) =>
       day.blocks.filter((block) => block.spirit?.tempo_id === 'tempo_478'),
     );
+    const mainExercise = injected[0]?.blocks[0]?.iron?.exercises[0];
 
     expect(spiritBlocks).toHaveLength(1);
+    expect(mainExercise?.target_sets).toBe(4);
+    expect(mainExercise?.diagnostic_reason).toBeUndefined();
     expect(spiritBlocks[0]?.spirit?.tempo_id).toBe('tempo_478');
     expect(spiritBlocks[0]?.spirit?.prescribed_reason).toBe(
       'High systemic fatigue detected. Downregulate CNS.',
@@ -135,5 +138,6 @@ describe('metabolic telemetry and final orchestration', () => {
 
     expect(exercise?.target_sets).toBe(2);
     expect(exercise?.target_weight_kg).toBe(85);
+    expect(exercise?.diagnostic_reason).toBe('deload_mesocycle_week_4');
   });
 });

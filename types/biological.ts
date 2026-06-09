@@ -8,6 +8,10 @@ export type TrainingExperienceLevel =
   | 'INTERMEDIATE'
   | 'ADVANCED';
 
+export type MesocyclePhase = 'bulking' | 'cutting' | 'maintenance' | 'deload';
+
+export type MesocycleGoal = 'strength' | 'hypertrophy' | 'metabolic_conditioning';
+
 /** Biological Passport — maps to anthropometric, Iron and nutrition steering fields */
 export interface BiologicalProfile {
   date_of_birth: string | null;
@@ -33,6 +37,12 @@ export interface BiologicalProfile {
   frequency_iron: number | null;
   /** Rolling CNS fatigue 0–100 from performance sync */
   cns_fatigue_score: number | null;
+  /** Annual macro phase for Iron volume periodization. */
+  mesocycle_phase?: MesocyclePhase | null;
+  /** Current mesocycle week (1–6). Weeks 4/6 force deload volume. */
+  mesocycle_week?: number | null;
+  /** Primary adaptation target for the current mesocycle. */
+  mesocycle_goal?: MesocycleGoal | null;
   /** Month 1 exit interview — calibrates Month 2 target loads */
   clinical_exit_interview: ClinicalExitInterview | null;
   /** User-reported body fat estimate (%) for timeline calculation */
@@ -81,6 +91,9 @@ export const initialBiologicalProfile: BiologicalProfile = {
   iron_mastery: 5,
   frequency_iron: DEFAULT_FREQUENCY_IRON,
   cns_fatigue_score: 0,
+  mesocycle_phase: 'maintenance',
+  mesocycle_week: 1,
+  mesocycle_goal: 'hypertrophy',
   clinical_exit_interview: null,
   current_body_fat_estimate: null,
   hormonal_transition: false,
@@ -107,6 +120,9 @@ export function withFixedBiologicalProfile(
     experience_level: profile?.experience_level ?? initialBiologicalProfile.experience_level,
     iron_mastery: profile?.iron_mastery ?? initialBiologicalProfile.iron_mastery,
     cns_fatigue_score: profile?.cns_fatigue_score ?? initialBiologicalProfile.cns_fatigue_score,
+    mesocycle_phase: profile?.mesocycle_phase ?? initialBiologicalProfile.mesocycle_phase,
+    mesocycle_week: profile?.mesocycle_week ?? initialBiologicalProfile.mesocycle_week,
+    mesocycle_goal: profile?.mesocycle_goal ?? initialBiologicalProfile.mesocycle_goal,
     clinical_exit_interview:
       profile?.clinical_exit_interview ?? initialBiologicalProfile.clinical_exit_interview,
     current_body_fat_estimate:

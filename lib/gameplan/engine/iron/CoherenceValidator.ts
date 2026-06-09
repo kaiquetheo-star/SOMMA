@@ -1,4 +1,5 @@
 import { scoreExerciseCandidate } from '@/lib/gameplan/engine/iron/ConstraintSolver';
+import { supportsAdvancedMetabolicTechnique } from '@/lib/catalog/tacticalEnrichment';
 import { PPL_DAY_SLOTS } from '@/lib/gameplan/engine/iron/splits/pplSplit';
 import { classifyShoulderRegion } from '@/lib/gameplan/engine/iron/taxonomy/shoulderRegions';
 import {
@@ -24,7 +25,7 @@ export const SHOULDER_BALANCE_RATIO = 0.6;
 export const PUSH_PULL_RATIO_MIN = 0.85;
 export const PUSH_PULL_RATIO_MAX = 1.15;
 
-const MAX_CORRECTION_ROUNDS = 5;
+const MAX_CORRECTION_ROUNDS = 16;
 const MAX_ISOLATION_SETS_PER_PICK = 4;
 
 const FLEXIBLE_RATIO_SLOT_IDS = new Set(['chest_iso', 'chest_compound_b', 'triceps_b']);
@@ -440,6 +441,7 @@ function fixShoulderImbalance(
   const candidates = catalog.exercises
     .filter((exercise) => exercise.movement_pattern === 'isolation')
     .filter((exercise) => exercise.cns_fatigue_cost <= 2)
+    .filter((exercise) => supportsAdvancedMetabolicTechnique(exercise))
     .filter((exercise) => SHOULDER_FIX_PRIMARY_MUSCLES.has(exercise.primary_muscle))
     .filter((exercise) => !exclude.has(exercise.id))
     .filter(
@@ -507,14 +509,16 @@ function fixShoulderImbalance(
     if (exercise && addableSets > 0 && tracker.canAddSets(exercise, addableSets).allowed) {
       tracker.creditVolume(exercise, addableSets);
       pick.prescribedSets += addableSets;
-      pick.intensity_technique = pick.intensity_technique ?? 'myo_reps';
-      pick.technique_params = pick.technique_params ?? {
-        activationReps: 15,
-        miniSets: 3,
-        miniSetReps: 5,
-        intraSetRestSeconds: 20,
-        note: 'Shoulder 3D correction by added volume; compounds preserved.',
-      };
+      if (supportsAdvancedMetabolicTechnique(exercise)) {
+        pick.intensity_technique = pick.intensity_technique ?? 'myo_reps';
+        pick.technique_params = pick.technique_params ?? {
+          activationReps: 15,
+          miniSets: 3,
+          miniSetReps: 5,
+          intraSetRestSeconds: 20,
+          note: 'Shoulder 3D correction by added volume; compounds preserved.',
+        };
+      }
       swaps.push({
         fromExerciseId: '',
         toExerciseId: exercise.id,

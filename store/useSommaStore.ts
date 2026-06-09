@@ -7,7 +7,10 @@ import { fetchDailyGameplan } from '@/lib/gameplan/fetchDailyGameplan';
 import { isGameplanFetchError } from '@/lib/gameplan/gameplanErrors';
 import { isProtocolDateStale } from '@/lib/gameplan/generateStubGameplan';
 import { normalizePersistedSnapshot, type SommaPersistedSnapshot } from '@/lib/local/backup';
-import { recalibrateFromPerformanceQueue } from '@/lib/local/recalibrate';
+import {
+  mergePerformanceLogsWithQueue,
+  recalibrateFromPerformanceQueue,
+} from '@/lib/local/recalibrate';
 import {
   isDegenerateMicrocycle,
   sanitizeMicrocycleIronVolume,
@@ -521,13 +524,18 @@ export const useSommaStore = create<SommaState>()(
         set({ gameplan_loading: true, gameplan_error: null });
 
         try {
+          const performanceLogs = mergePerformanceLogsWithQueue(
+            state.performance_logs,
+            state.performanceQueue,
+          );
+
           const result = await fetchDailyGameplan({
             focus,
             equipment: state.user_environment.available_equipment,
             forceRefresh: options?.forceRefresh ?? false,
             biological: state.user_biological,
             userStats: state.user_stats,
-            performanceLogs: state.performance_logs,
+            performanceLogs,
           });
 
           set({
@@ -699,9 +707,11 @@ export const useSommaStore = create<SommaState>()(
           session,
           created_at: new Date().toISOString(),
         };
+        const pendingQueue = [...state.performanceQueue, queueItem];
+        const processedQueueIds = new Set(pendingQueue.map((item) => item.id));
 
         set({
-          performanceQueue: [...state.performanceQueue, queueItem],
+          performanceQueue: pendingQueue,
           performance_syncing: true,
         });
 
@@ -710,7 +720,7 @@ export const useSommaStore = create<SommaState>()(
 
         try {
           if (focus) {
-            const result = await recalibrateFromPerformanceQueue([queueItem], {
+            const result = await recalibrateFromPerformanceQueue(pendingQueue, {
               focus,
               equipment,
               biological: get().user_biological,
@@ -730,7 +740,7 @@ export const useSommaStore = create<SommaState>()(
                   { ...result.gameplan, microcycle: mergedMicrocycle },
                   result.source ?? 'local',
                 ),
-                performanceQueue: get().performanceQueue.filter((item) => item.id !== queueItem.id),
+                performanceQueue: get().performanceQueue.filter((item) => !processedQueueIds.has(item.id)),
               };
               if (result.cns_fatigue_score != null) {
                 patch.user_biological = {
@@ -744,7 +754,7 @@ export const useSommaStore = create<SommaState>()(
 
             if (result.processedCount > 0) {
               const patch: Partial<SommaState> = {
-                performanceQueue: get().performanceQueue.filter((item) => item.id !== queueItem.id),
+                performanceQueue: get().performanceQueue.filter((item) => !processedQueueIds.has(item.id)),
               };
               if (result.cns_fatigue_score != null) {
                 patch.user_biological = {

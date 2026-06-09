@@ -163,6 +163,11 @@ function toCatalogExercise(row: LibraryExercise): CatalogExercise | null {
     selection_score: enriched.selection_score,
     tempo: enriched.tempo,
     cue_card: enriched.cue_card,
+    tactical_role: enriched.tactical_role,
+    stability_demand: enriched.stability_demand,
+    axial_loading: enriched.axial_loading,
+    resistance_profile: enriched.resistance_profile,
+    specific_cues: enriched.specific_cues,
   };
 }
 

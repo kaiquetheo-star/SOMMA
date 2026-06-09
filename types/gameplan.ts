@@ -1,5 +1,12 @@
 import type { ClinicalReviewTrigger } from '@/types/clinical';
-import type { ExerciseCueCard, ExerciseTempo } from '@/types/catalog';
+import type {
+  AxialLoading,
+  ExerciseCueCard,
+  ExerciseTempo,
+  ResistanceProfile,
+  StabilityDemand,
+  TacticalExerciseRole,
+} from '@/types/catalog';
 
 export type WorkoutPillar = 'iron' | 'nutrition' | 'spirit' | 'longevity';
 
@@ -46,6 +53,13 @@ export interface IronExercisePrescription {
   tempo?: ExerciseTempo;
   /** Regra 4.2: Text-Only Elite biomechanical cue payload. */
   cue_card?: ExerciseCueCard;
+  /** V9 tactical metadata surfaced for audits and coach UI. */
+  tactical_role?: TacticalExerciseRole;
+  stability_demand?: StabilityDemand;
+  axial_loading?: AxialLoading;
+  resistance_profile?: ResistanceProfile;
+  /** Audit trail for any solver/recovery volume reduction. */
+  diagnostic_reason?: string;
 }
 
 export interface IronBlockPrescription {

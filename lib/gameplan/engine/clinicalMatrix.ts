@@ -10,6 +10,7 @@ export interface ClinicalExerciseMeta {
   primary_muscle?: string | null;
   movement_pattern?: string | null;
   cns_fatigue_cost?: number | null;
+  tactical_role?: string | null;
 }
 
 function blob(meta: ClinicalExerciseMeta | undefined): string {
@@ -66,10 +67,15 @@ export function classifyClinicalPhase(
 ): ClinicalPhase {
   const slug = normalizeSlug(meta?.slug ?? '');
   const prereqSet = new Set(prerequisiteSlugs.map(normalizeSlug));
+  const tacticalRole = meta?.tactical_role;
 
   if (slug && prereqSet.has(slug)) return 1;
 
   if (isCoreFinisher(meta)) return 5;
+  if (tacticalRole === 'primary_compound') return 2;
+  if (tacticalRole === 'secondary_compound') return 3;
+  if (tacticalRole === 'isolation_metabolic' || tacticalRole === 'pre_exhaust') return 4;
+  if (tacticalRole === 'corrective') return 5;
   if (isIsolation(meta)) return 4;
   if (isHeavyCompound(meta)) return 2;
   if (isSecondaryCompound(meta)) return 3;

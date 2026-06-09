@@ -80,6 +80,13 @@ function ironLogWithSetCount(exerciseId: string, setCount: number): EnginePerfor
   };
 }
 
+function ironLog(exerciseId: string, timestamp: string): EnginePerformanceRow {
+  return {
+    ...ironLogWithSetCount(exerciseId, 1),
+    timestamp,
+  };
+}
+
 const LOW_CNS_ISOLATIONS: LibraryExercise[] = Array.from({ length: 8 }, (_, index) =>
   mockExercise({
     id: `ex-low-cns-iso-${index}`,
@@ -131,6 +138,19 @@ const CABLE_FLY = mockExercise({
   movement_pattern: 'isolation',
   primary_muscle: 'chest',
   cns_fatigue_cost: 1,
+});
+
+const BARBELL_BENCH_PRESS = mockExercise({
+  id: 'ex-barbell-bench-press',
+  slug: 'barbell_bench_press',
+  name: 'Barbell Bench Press',
+  movement_pattern: 'push',
+  primary_muscle: 'chest',
+  synergist_muscles: ['triceps', 'front_delts'],
+  cns_fatigue_cost: 4,
+  equipment_required: ['barbell', 'full_gym'],
+  default_sets: 4,
+  default_reps: 8,
 });
 
 describe('Iron patch validation: Finisher Hard Cap', () => {
@@ -220,15 +240,73 @@ describe('Iron patch validation: Minimum Viable Workout Fallback', () => {
     // not an empty workout screen that abandons the training day.
     expect(exercises).toHaveLength(2);
     expect(exercises.every((exercise) => exercise.target_sets === 2)).toBe(true);
+    expect(exercises.every((exercise) => exercise.diagnostic_reason === 'injury_constraint')).toBe(true);
     expect(exercises.map((exercise) => exercise.exercise?.slug).sort()).toEqual([
       'lat_pulldown',
       'push_up',
     ]);
     expect(exercises.every((exercise) => exercise.exercise?.joint_stress_profile !== 'spinal_axial_load')).toBe(true);
   });
+
+  it('does not turn ACWR recovery mode into a 2-set bench deload', () => {
+    const catalog = buildExerciseCatalog([BARBELL_BENCH_PRESS]);
+    const acuteLogs = Array.from({ length: 18 }, (_, index) =>
+      ironLog('ex-barbell-bench-press', `2026-06-${String(index + 1).padStart(2, '0')}T10:00:00.000Z`),
+    );
+    const chronicLogs = Array.from({ length: 30 }, (_, index) =>
+      ironLog('ex-barbell-bench-press', `2026-05-${String(index + 1).padStart(2, '0')}T10:00:00.000Z`),
+    );
+    const tracker = createWeeklyVolumeTracker(catalog, acuteLogs, chronicLogs, {
+      ...initialBiologicalProfile,
+      baseline_stress_level: 3,
+    });
+    const slots: SolverSlot[] = [
+      {
+        slotId: 'chest_compound_a',
+        day: 'push',
+        requiredPatterns: ['push'],
+        primaryMuscleHint: 'chest',
+        defaultSets: 4,
+      },
+    ];
+
+    const { picks } = solveDaySlots(
+      'push',
+      slots,
+      catalog,
+      defaultConstraints(),
+      createInitialSolverState(tracker),
+      tracker,
+    );
+
+    expect(tracker.isRecoveryMode).toBe(true);
+    expect(picks).toHaveLength(1);
+    expect(picks[0]?.prescribedSets).toBe(4);
+    expect(picks[0]?.diagnostic_reason).toBeUndefined();
+  });
 });
 
 describe('Iron patch validation: Tracker Sanitization & Anti-Poisoning', () => {
+  it('computes ACWR from a 21-day chronic window as a 3-week average', () => {
+    const catalog = buildExerciseCatalog([CABLE_FLY]);
+    const acuteLogs = Array.from({ length: 18 }, (_, index) =>
+      ironLog('ex-cable-fly', `2026-06-${String(index + 1).padStart(2, '0')}T10:00:00.000Z`),
+    );
+    const chronicLogs = Array.from({ length: 54 }, (_, index) =>
+      ironLog('ex-cable-fly', `2026-05-${String((index % 21) + 1).padStart(2, '0')}T10:00:00.000Z`),
+    );
+
+    const tracker = createWeeklyVolumeTracker(
+      catalog,
+      acuteLogs,
+      chronicLogs,
+      initialBiologicalProfile,
+    );
+
+    expect(tracker.acwr).toBe(1);
+    expect(tracker.isRecoveryMode).toBe(false);
+  });
+
   it('caps a 30-set anomaly at 8 sets so chronic volume does not poison the next prescription', () => {
     const catalog = buildExerciseCatalog([CABLE_FLY]);
     const anomalousLog = ironLogWithSetCount('ex-cable-fly', 30);

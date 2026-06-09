@@ -103,6 +103,9 @@ function buildConstraints(
       masteryFromExperience(input.biological.experience_level),
     available_time_minutes: input.availableMinutes,
     weekStartDate: input.weekStartDate,
+    cns_fatigue_score: input.biological.cns_fatigue_score,
+    mesocycle_phase: input.biological.mesocycle_phase,
+    mesocycle_week: input.biological.mesocycle_week,
   };
 }
 
@@ -144,8 +147,11 @@ function applyDraftToDayBlocks(
         exerciseId: pick.exerciseId,
         prescribedSets: pick.prescribedSets,
         score: 0,
+        diagnostic_reason: pick.diagnostic_reason,
         intensity_technique: pick.intensity_technique,
         technique_params: pick.technique_params,
+        targetRepRange: pick.targetRepRange,
+        targetRIR: pick.targetRIR,
       };
       const dailyFocus = getDailyIronFocus(block.ironSlotIndex + 1, block.splitDay);
       return [
@@ -198,6 +204,7 @@ export function generateIronMicrocycle(input: GenerateIronMicrocycleInput): Iron
     solverState = {
       ...solverState,
       sessionCnsAccum: 0,
+      sessionAxialLoad: 0,
       shoulderSets: { anterior: 0, lateral: 0, posterior: 0 },
     };
 
@@ -216,8 +223,11 @@ export function generateIronMicrocycle(input: GenerateIronMicrocycleInput): Iron
       slotId: pick.slotId,
       exerciseId: pick.exerciseId,
       prescribedSets: pick.prescribedSets,
+      diagnostic_reason: pick.diagnostic_reason,
       intensity_technique: pick.intensity_technique,
       technique_params: pick.technique_params,
+      targetRepRange: pick.targetRepRange,
+      targetRIR: pick.targetRIR,
     }));
 
     draft.push({ day: splitDay, picks: planPicks });

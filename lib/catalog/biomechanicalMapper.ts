@@ -1,4 +1,5 @@
 import { calculateSelectionScore } from '@/lib/gameplan/engine/iron/xFrameBias';
+import { enrichWithTacticalData } from '@/lib/catalog/tacticalEnrichment';
 import type {
   CatalogExercise,
   ExerciseFailureType,
@@ -120,25 +121,27 @@ function defaultAntiPattern(exercise: LibraryExercise): string {
 }
 
 export function enrichExerciseWithCues(rawExercise: LibraryExercise): CatalogExercise {
-  const instructions = rawExercise.biomechanical_instructions;
-  const tempo = parseTempo(instructions.tempo) ?? defaultTempo(rawExercise);
+  const tacticalExercise = enrichWithTacticalData(rawExercise);
+  const instructions = tacticalExercise.biomechanical_instructions;
+  const specificCues = tacticalExercise.specific_cues;
+  const tempo = parseTempo(instructions.tempo) ?? defaultTempo(tacticalExercise);
   const failureType = parseFailureType(
     instructions.failure_type,
-    defaultFailureType(rawExercise),
+    defaultFailureType(tacticalExercise),
   );
 
   return {
-    ...rawExercise,
-    selection_score: calculateSelectionScore(rawExercise),
+    ...tacticalExercise,
+    selection_score: calculateSelectionScore(tacticalExercise),
     tempo,
     cue_card: {
-      setup: cueValue(instructions, ['setup'], defaultSetup(rawExercise)),
-      vector: cueValue(instructions, ['vector', 'concentric'], defaultVector(rawExercise)),
-      catch: cueValue(instructions, ['catch', 'eccentric'], defaultCatch(rawExercise)),
-      anti_pattern: cueValue(
+      setup: specificCues?.setup ?? cueValue(instructions, ['setup'], defaultSetup(tacticalExercise)),
+      vector: specificCues?.execution ?? cueValue(instructions, ['vector', 'concentric'], defaultVector(tacticalExercise)),
+      catch: cueValue(instructions, ['catch', 'eccentric'], defaultCatch(tacticalExercise)),
+      anti_pattern: specificCues?.common_mistake ?? cueValue(
         instructions,
         ['anti_pattern', 'safety', 'regression'],
-        defaultAntiPattern(rawExercise),
+        defaultAntiPattern(tacticalExercise),
       ),
       failure_type: failureType,
     },

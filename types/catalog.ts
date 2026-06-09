@@ -60,6 +60,33 @@ export type ExerciseTempo = [number, number, string | number, number];
 
 export type ExerciseFailureType = 'technical' | 'concentric';
 
+export type TacticalExerciseRole =
+  | 'primary_compound'
+  | 'secondary_compound'
+  | 'isolation_metabolic'
+  | 'pre_exhaust'
+  | 'corrective';
+
+export type StabilityDemand = 'high' | 'medium' | 'low';
+
+export type AxialLoading = 0 | 1 | 2 | 3 | 4 | 5;
+
+export type ResistanceProfile = 'ascending' | 'descending' | 'constant' | 'bell_shaped';
+
+export interface SpecificExerciseCues {
+  setup: string;
+  execution: string;
+  common_mistake: string;
+}
+
+export interface TacticalCatalogMetadata {
+  tactical_role?: TacticalExerciseRole;
+  stability_demand?: StabilityDemand;
+  axial_loading?: AxialLoading;
+  resistance_profile?: ResistanceProfile;
+  specific_cues?: SpecificExerciseCues;
+}
+
 export enum IntensityTechnique {
   STANDARD = 'STANDARD',
   MYO_REPS = 'MYO_REPS',
@@ -154,10 +181,10 @@ export interface LibraryExerciseBase {
 
 
 
-export type LibraryExercise = LibraryExerciseBase & IronExerciseBiomechanics;
+export type LibraryExercise = LibraryExerciseBase & IronExerciseBiomechanics & TacticalCatalogMetadata;
 
 
-export type CatalogExercise = LibraryExercise & XFrameCatalogMetadata;
+export type CatalogExercise = LibraryExercise & XFrameCatalogMetadata & TacticalCatalogMetadata;
 
 
 

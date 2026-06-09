@@ -1,4 +1,11 @@
-import type { MicrocycleDay } from '@/types/gameplan';
+import type { IronExercisePrescription, MicrocycleDay } from '@/types/gameplan';
+import type { BiologicalProfile } from '@/types/biological';
+import type { CatalogExercise, ExerciseCatalog } from '@/lib/gameplan/engine/iron/types';
+import {
+  calculateVolumeBudget,
+  isCompoundExercise,
+  resolveEffectiveMesocyclePhase,
+} from '@/lib/gameplan/engine/iron/volumePeriodization';
 
 const MAX_FINISHER_OR_ISOLATION_SETS = 4;
 const MAX_REASONABLE_SETS_PER_EXERCISE = 8;
@@ -51,15 +58,91 @@ function sanitizeTargetSets(exercise: {
   return Math.min(safe, MAX_REASONABLE_SETS_PER_EXERCISE);
 }
 
-export function sanitizeMicrocycleIronVolume(microcycle: MicrocycleDay[]): MicrocycleDay[] {
+export interface MicrocycleIronVolumeSanitizeContext {
+  biological?: Pick<
+    BiologicalProfile,
+    'mesocycle_phase' | 'mesocycle_week' | 'cns_fatigue_score'
+  > | null;
+  catalog?: Pick<ExerciseCatalog, 'byId' | 'bySlug'> | ReadonlyMap<string, CatalogExercise> | null;
+}
+
+function resolveCatalogExercise(
+  exercise: { exercise_id: string; slug?: string },
+  catalog: MicrocycleIronVolumeSanitizeContext['catalog'],
+): CatalogExercise | null {
+  if (!catalog) return null;
+  if ('get' in catalog) {
+    return catalog.get(exercise.exercise_id) ?? (exercise.slug ? catalog.get(exercise.slug) : undefined) ?? null;
+  }
+  return catalog.byId.get(exercise.exercise_id) ?? (exercise.slug ? catalog.bySlug.get(exercise.slug) : undefined) ?? null;
+}
+
+function sanitizeTargetSetsWithBudget(
+  exercise: IronExercisePrescription,
+  context?: MicrocycleIronVolumeSanitizeContext,
+): IronExercisePrescription {
+  const catalogExercise = resolveCatalogExercise(exercise, context?.catalog);
+  if (!catalogExercise || !context?.biological) {
+    return {
+      ...exercise,
+      target_sets: sanitizeTargetSets(exercise),
+    };
+  }
+
+  const requested = Number(exercise.target_sets);
+  const safe = Number.isFinite(requested) ? Math.max(1, Math.round(requested)) : 1;
+  const diagnostic = normalizedToken(exercise.diagnostic_reason);
+  const isForcedLowVolume =
+    diagnostic.includes('deload') ||
+    diagnostic.includes('rescue') ||
+    diagnostic.includes('minimum_viable') ||
+    diagnostic.includes('injury_constraint');
+  const mesocyclePhase = diagnostic.includes('deload')
+    ? 'deload'
+    : resolveEffectiveMesocyclePhase(
+        context.biological.mesocycle_phase,
+        context.biological.mesocycle_week,
+      );
+  const budget = calculateVolumeBudget(
+    catalogExercise,
+    mesocyclePhase,
+    isCompoundExercise(catalogExercise),
+    context.biological.cns_fatigue_score ?? 0,
+  );
+
+  if (safe > budget.maxSets) {
+    return {
+      ...exercise,
+      target_sets: budget.maxSets,
+      diagnostic_reason: `Sanitized: ${safe} sets exceeded budget max of ${budget.maxSets} for ${mesocyclePhase}`,
+    };
+  }
+
+  if (safe < budget.minSets && mesocyclePhase !== 'deload' && !isForcedLowVolume) {
+    return {
+      ...exercise,
+      target_sets: budget.minSets,
+      diagnostic_reason: `Adjusted to minimum: ${budget.minSets} sets for ${mesocyclePhase} phase`,
+    };
+  }
+
+  return {
+    ...exercise,
+    target_sets: safe,
+  };
+}
+
+export function sanitizeMicrocycleIronVolume(
+  microcycle: MicrocycleDay[],
+  context?: MicrocycleIronVolumeSanitizeContext,
+): MicrocycleDay[] {
   return microcycle.map((day) => ({
     ...day,
     blocks: (day.blocks ?? []).map((block) => {
       if (block.pillar !== 'iron' || !block.iron) return block;
-      const exercises = (block.iron.exercises ?? []).map((exercise) => ({
-        ...exercise,
-        target_sets: sanitizeTargetSets(exercise),
-      }));
+      const exercises = (block.iron.exercises ?? []).map((exercise) =>
+        sanitizeTargetSetsWithBudget(exercise, context),
+      );
       return {
         ...block,
         iron: {

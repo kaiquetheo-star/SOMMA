@@ -1,4 +1,5 @@
 import { resolveIronGoalType, type IronGoalType } from '@/lib/physics/rmCalculator';
+import { isDeloadMesocycleWeek } from '@/lib/gameplan/engine/clinicalLaws';
 import type { PerformanceLogEntry, WorkoutPillarLog } from '@/types/performance';
 
 /** Map observed RIR (0–4) to session RPE scale (1–10). */
@@ -239,6 +240,7 @@ function buildPillarMetrics(
 export interface ComputeTrainingLoadOptions {
   now?: number;
   goalIron?: string | null;
+  mesocycleWeek?: number | null;
 }
 
 export function computeTrainingLoadSnapshot(
@@ -247,6 +249,7 @@ export function computeTrainingLoadSnapshot(
 ): TrainingLoadSnapshot {
   const now = typeof options === 'number' ? options : (options.now ?? Date.now());
   const goalIron = typeof options === 'number' ? null : options.goalIron;
+  const mesocycleWeek = typeof options === 'number' ? null : options.mesocycleWeek;
   const ironGoal = resolveIronGoalType(goalIron);
   const ironAcwrThresholds = resolveAcwrThresholds(goalIron);
 
@@ -262,7 +265,7 @@ export function computeTrainingLoadSnapshot(
     computedAt: new Date(now).toISOString(),
     pillars: { iron },
     acwr: iron.acwr,
-    is_deload_week: false,
+    is_deload_week: mesocycleWeek != null ? isDeloadMesocycleWeek(mesocycleWeek) : false,
     globalRpeMean: mean(globalSamples) != null ? Math.round(mean(globalSamples)! * 10) / 10 : null,
     ironGoal,
     ironAcwrThresholds,

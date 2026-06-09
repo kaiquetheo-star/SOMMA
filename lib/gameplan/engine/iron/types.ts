@@ -4,10 +4,16 @@ import type {
   ExerciseTempo,
   IntensityTechnique as CatalogIntensityTechnique,
   JointStressProfile,
+  AxialLoading,
+  ResistanceProfile,
+  SpecificExerciseCues,
+  StabilityDemand,
+  TacticalExerciseRole,
 } from '@/types/catalog';
 import type { EnginePerformanceRow } from '@/lib/gameplan/engine/performanceLogs';
 import type { EquipmentTag } from '@/store/useSommaStore';
 import type { DailyIronFocus } from '@/lib/gameplan/engine/iron/dupLogic';
+import type { MesocyclePhase } from '@/types/biological';
 
 export type SplitDayKey = 'push' | 'pull' | 'legs';
 
@@ -53,6 +59,11 @@ export interface CatalogExercise {
   selection_score: number;
   tempo: ExerciseTempo;
   cue_card: ExerciseCueCard;
+  tactical_role?: TacticalExerciseRole;
+  stability_demand?: StabilityDemand;
+  axial_loading?: AxialLoading;
+  resistance_profile?: ResistanceProfile;
+  specific_cues?: SpecificExerciseCues;
 }
 
 export interface ExerciseCatalog {
@@ -98,6 +109,12 @@ export interface SolverConstraints {
   previousDayWasHiit?: boolean;
   usedExerciseIds?: ReadonlySet<string>;
   dailyIronFocus?: DailyIronFocus;
+  /** Profile readiness score, 0-100. High values bias stable machine/cable work. */
+  cns_fatigue_score?: number | null;
+  /** Current mesocycle phase for dynamic volume budgets. */
+  mesocycle_phase?: MesocyclePhase | null;
+  /** Current mesocycle week. Weeks 4/6 force deload budgets. */
+  mesocycle_week?: number | null;
 }
 
 export interface SolverState {
@@ -106,6 +123,7 @@ export interface SolverState {
   synergistLoad: SynergistLoadMatrix;
   isRecoveryMode: boolean;
   sessionCnsAccum: number;
+  sessionAxialLoad: number;
   shoulderSets: ShoulderVolumeLedger;
   previousDayIndex: number | null;
   previousDayHadAxialLoad: boolean;
@@ -116,8 +134,11 @@ export interface SolverResult {
   exerciseId: string;
   prescribedSets: number;
   score: number;
+  diagnostic_reason?: string;
   intensity_technique?: IntensityTechnique;
   technique_params?: TechniqueParams;
+  targetRepRange?: string;
+  targetRIR?: number;
 }
 
 /** One prescribed exercise in a PPL microcycle day (pre-gameplan / engine draft). */
@@ -125,8 +146,11 @@ export interface MicrocyclePick {
   slotId: string;
   exerciseId: string;
   prescribedSets: number;
+  diagnostic_reason?: string;
   intensity_technique?: IntensityTechnique;
   technique_params?: TechniqueParams;
+  targetRepRange?: string;
+  targetRIR?: number;
 }
 
 /** Draft iron day — validated and corrected before `DailyGameplan` serialization. */

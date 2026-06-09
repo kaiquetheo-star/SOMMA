@@ -123,11 +123,21 @@ export function mapToIronPrescription(
   goalIron: string | null,
   dailyFocus: DailyIronFocus | null = null,
 ): IronExercisePrescription {
-  const { targetReps, targetRir, lo, hi } = repRangeForDupFocus(
+  const periodizedRange = !dailyFocus && solverResult.targetRepRange
+    ? solverResult.targetRepRange
+        .split('-')
+        .map((value) => Number.parseInt(value, 10))
+        .filter((value) => Number.isFinite(value))
+    : undefined;
+  const fallback = repRangeForDupFocus(
     exercise,
     solverResult.prescribedSets,
     dailyFocus,
   );
+  const lo = periodizedRange?.[0] ?? fallback.lo;
+  const hi = periodizedRange?.[1] ?? fallback.hi;
+  const targetReps = hi;
+  const targetRir = solverResult.targetRIR ?? fallback.targetRir;
   const samples = engineRowsToSamples(recentLogs);
   const resolvedE1rm = e1rm ?? estimateBestE1RMFromLogs(samples, exercise.id);
   const dayFocus = dailyFocus?.focus ?? 'metabolic_hypertrophy';
@@ -160,6 +170,7 @@ export function mapToIronPrescription(
     slug: exercise.slug,
     display_name: beautifyCatalogName(exercise.name),
     target_sets: solverResult.prescribedSets,
+    diagnostic_reason: solverResult.diagnostic_reason,
     target_reps: targetReps,
     target_rep_range: `${lo}-${hi} @ ${targetRir} RIR`,
     target_rir: targetRir,
@@ -170,6 +181,10 @@ export function mapToIronPrescription(
     // Regra 4.1 + Regra 5.1: DUP cadence overrides catalog default for the day stimulus.
     tempo: dailyFocus?.defaultTempo ?? exercise.tempo,
     cue_card: mapToExerciseCueCard(exercise, dayFocus),
+    tactical_role: exercise.tactical_role,
+    stability_demand: exercise.stability_demand,
+    axial_loading: exercise.axial_loading,
+    resistance_profile: exercise.resistance_profile,
   };
 }
 

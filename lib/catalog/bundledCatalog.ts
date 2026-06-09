@@ -6,6 +6,7 @@ import type {
 } from '@/types/catalog';
 import { IntensityTechnique as Technique } from '@/types/catalog';
 import { enrichExerciseWithCues } from '@/lib/catalog/biomechanicalMapper';
+import { FULL_BUNDLED_EXERCISES } from '@/lib/catalog/bundledCatalog.full';
 import { normalizePrimaryMuscle } from '@/lib/catalog/primaryMuscle';
 
 function iron(
@@ -53,7 +54,7 @@ function iron(
   };
 }
 
-const BUNDLED_EXERCISES: LibraryExercise[] = [
+const FALLBACK_BUNDLED_EXERCISES: LibraryExercise[] = [
   // —— Push / chest compounds ——
   iron('barbell_bench_press', 'Barbell Bench Press', 'chest', 'push'),
   iron('dumbbell_bench_press', 'Dumbbell Bench Press', 'chest', 'push', ['dumbbells', 'full_gym']),
@@ -175,10 +176,15 @@ const BUNDLED_EXERCISES: LibraryExercise[] = [
 ];
 
 export function getBundledExercises(): CatalogExercise[] {
-  return BUNDLED_EXERCISES.map(enrichExerciseWithCues);
+  const source = FULL_BUNDLED_EXERCISES.length > 0
+    ? FULL_BUNDLED_EXERCISES
+    : FALLBACK_BUNDLED_EXERCISES;
+  return source.map(enrichExerciseWithCues);
 }
 
 export function getBundledExerciseCount(): number {
-  return BUNDLED_EXERCISES.length;
+  return FULL_BUNDLED_EXERCISES.length > 0
+    ? FULL_BUNDLED_EXERCISES.length
+    : FALLBACK_BUNDLED_EXERCISES.length;
 }
 
