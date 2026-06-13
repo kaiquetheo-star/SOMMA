@@ -101,6 +101,15 @@ const AXIAL_LOAD_SLUGS = new Set([
   'barbell_romanian_deadlift',
 ]);
 
+const POSTERIOR_HINGE_PRIORITY = [
+  'romanian_deadlift',
+  'stiff_leg_deadlift',
+  'stiff_legged_deadlifts',
+  'dumbbell_stiff_leg_deadlift',
+  'good_morning',
+  'barbell_hip_thrust',
+] as const;
+
 function resolveFinisherHints(day: SplitDayKey, slots: readonly SolverSlot[]): readonly string[] {
   if (day === 'push') {
     const isShoulderFocus = slots.some((slot) => slot.slotId === 'overhead_press' && slot.defaultSets >= 4);
@@ -745,6 +754,19 @@ export function pickBestCandidate(
       return {
         exercise: benchPress,
         score: scoreExerciseCandidate(benchPress, tracker, constraints, state, currentDayIndex),
+      };
+    }
+  }
+
+  if (slot?.category === 'hinge_compound') {
+    const prioritizedHinge = POSTERIOR_HINGE_PRIORITY
+      .map((slug) => candidates.find((candidate) => candidate.slug === slug))
+      .find((candidate): candidate is CatalogExercise => candidate != null);
+
+    if (prioritizedHinge) {
+      return {
+        exercise: prioritizedHinge,
+        score: scoreExerciseCandidate(prioritizedHinge, tracker, constraints, state, currentDayIndex),
       };
     }
   }

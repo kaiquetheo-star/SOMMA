@@ -111,6 +111,20 @@ const RULES: readonly TacticalRule[] = [
     resistance_profile: 'ascending',
   },
   {
+    slugs: ['barbell_overhead_press', 'overhead_barbell_press'],
+    tactical_role: 'primary_compound',
+    stability_demand: 'high',
+    axial_loading: 3,
+    resistance_profile: 'bell_shaped',
+  },
+  {
+    slugs: ['barbell_seated_behind_head_military_press', 'barbell_silverback_shrug'],
+    tactical_role: 'secondary_compound',
+    stability_demand: 'medium',
+    axial_loading: 2,
+    resistance_profile: 'bell_shaped',
+  },
+  {
     slugs: ['hack_squat', 'hack_squat_machine', 'sled_hack_squat', 'smith_hack_squat', 'leg_press', 'sled_45_leg_press'],
     nameIncludes: ['hack_squat', 'leg_press'],
     tactical_role: 'secondary_compound',

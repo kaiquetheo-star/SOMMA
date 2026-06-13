@@ -24,8 +24,13 @@ function complexityFromSlug(slug: string): ComplexityLevel | null {
     belt_squat: 3,
     sissy_squat: 4,
     barbell_back_squat: 4,
+    romanian_deadlift: 4,
     barbell_romanian_deadlift: 4,
+    dumbbell_stiff_leg_deadlift: 4,
     stiff_leg_deadlift: 4,
+    stiff_legged_deadlifts: 4,
+    good_morning: 4,
+    barbell_hip_thrust: 4,
     barbell_hip_hinge_good_morning: 5,
     rack_pull: 4,
     conventional_deadlift: 5,
@@ -48,6 +53,19 @@ function complexityFromSlug(slug: string): ComplexityLevel | null {
     face_pull: 2,
     cable_lateral_raise: 2,
     dumbbell_shrug: 3,
+  };
+
+  return MAP[slug] ?? null;
+}
+
+function movementPatternOverrideFromSlug(slug: string): IronMovementPattern | null {
+  const MAP: Record<string, IronMovementPattern> = {
+    romanian_deadlift: 'hinge',
+    dumbbell_stiff_leg_deadlift: 'hinge',
+    stiff_leg_deadlift: 'hinge',
+    stiff_legged_deadlifts: 'hinge',
+    good_morning: 'hinge',
+    barbell_hip_thrust: 'hinge',
   };
 
   return MAP[slug] ?? null;
@@ -135,7 +153,7 @@ function normalizeSynergists(raw: string[] | null | undefined): readonly string[
 
 function toCatalogExercise(row: LibraryExercise): CatalogExercise | null {
   const enriched = enrichExerciseWithCues(row);
-  const movement_pattern = normalizeMovementPattern(row.movement_pattern);
+  const movement_pattern = movementPatternOverrideFromSlug(row.slug) ?? normalizeMovementPattern(row.movement_pattern);
   const primary_muscle = normalizeCatalogMuscle(row.primary_muscle);
 
   if (!movement_pattern || !primary_muscle) return null;

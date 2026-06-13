@@ -491,7 +491,7 @@
                 "stability_demand": "low",
                 "axial_loading": 1,
                 "resistance_profile": "constant",
-                "slot_category": "back_vertical_pull"
+                "slot_category": "calf_raise"
               },
               {
                 "exercise_id": "4e80d3ff-95ef-5b78-8ec1-3ae727b4c70a",
@@ -646,7 +646,7 @@
           "id": "block-d4-iron",
           "pillar": "iron",
           "title": "Iron: Shoulders & Traps",
-          "subtitle": "Barbell Seated Behind Head Military Press · 45° Lateral Raises · Butterfly Reverse · Barbell Silverback Shrug · Bent-over Lateral Raises · Cable Lateral Raises (Single Arm)",
+          "subtitle": "Barbell Seated Behind Head Military Press · Barbell Silverback Shrug · 45° Lateral Raises · Butterfly Reverse · Bent-over Lateral Raises · Cable Lateral Raises (Single Arm)",
           "duration_minutes": 90,
           "order": 0,
           "status": "pending",
@@ -680,9 +680,40 @@
                 },
                 "tactical_role": "secondary_compound",
                 "stability_demand": "medium",
-                "axial_loading": 0,
+                "axial_loading": 2,
                 "resistance_profile": "bell_shaped",
                 "slot_category": "shoulder_overhead_press"
+              },
+              {
+                "exercise_id": "a8d87173-c968-55f9-bc85-cb2b3cfb1949",
+                "slug": "barbell_silverback_shrug",
+                "display_name": "Barbell Silverback Shrug",
+                "target_sets": 3,
+                "target_reps": 12,
+                "target_rep_range": "8-12 @ 2 RIR",
+                "target_rir": 2,
+                "target_weight_kg": null,
+                "rest_seconds": 105,
+                "progression_note": "Calibrate first set @ prescribed RIR",
+                "execution_technique": "Standard",
+                "tempo": [
+                  3,
+                  0,
+                  1,
+                  1
+                ],
+                "cue_card": {
+                  "setup": "1.",
+                  "vector": "Stand with your feet shoulder width apart holding the barbell with both hands in front just past shoulder width.",
+                  "catch": "Lower under control and keep tension on the target tissue.",
+                  "anti_pattern": "Stop if joint pain exceeds normal muscle fatigue.",
+                  "failure_type": "technical"
+                },
+                "tactical_role": "secondary_compound",
+                "stability_demand": "medium",
+                "axial_loading": 2,
+                "resistance_profile": "bell_shaped",
+                "slot_category": "trap_shrug"
               },
               {
                 "exercise_id": "79a167d9-da96-5e0a-8c9e-8344120ffa77",
@@ -713,7 +744,7 @@
                 "stability_demand": "medium",
                 "axial_loading": 0,
                 "resistance_profile": "descending",
-                "slot_category": "calf_raise"
+                "slot_category": "shoulder_lateral_raise"
               },
               {
                 "exercise_id": "316101e3-d84f-5e47-ac80-02913ccc5b51",
@@ -747,37 +778,6 @@
                 "slot_category": "shoulder_posterior_fly"
               },
               {
-                "exercise_id": "a8d87173-c968-55f9-bc85-cb2b3cfb1949",
-                "slug": "barbell_silverback_shrug",
-                "display_name": "Barbell Silverback Shrug",
-                "target_sets": 3,
-                "target_reps": 12,
-                "target_rep_range": "8-12 @ 2 RIR",
-                "target_rir": 2,
-                "target_weight_kg": null,
-                "rest_seconds": 105,
-                "progression_note": "Calibrate first set @ prescribed RIR",
-                "execution_technique": "Standard",
-                "tempo": [
-                  3,
-                  0,
-                  1,
-                  1
-                ],
-                "cue_card": {
-                  "setup": "1.",
-                  "vector": "Stand with your feet shoulder width apart holding the barbell with both hands in front just past shoulder width.",
-                  "catch": "Lower under control and keep tension on the target tissue.",
-                  "anti_pattern": "Stop if joint pain exceeds normal muscle fatigue.",
-                  "failure_type": "technical"
-                },
-                "tactical_role": "isolation_metabolic",
-                "stability_demand": "medium",
-                "axial_loading": 0,
-                "resistance_profile": "bell_shaped",
-                "slot_category": "trap_shrug"
-              },
-              {
                 "exercise_id": "6339694b-08c5-5414-a18a-5ad58d9c2413",
                 "slug": "bent_over_lateral_raises",
                 "display_name": "Bent-over Lateral Raises",
@@ -807,7 +807,7 @@
                 "stability_demand": "medium",
                 "axial_loading": 0,
                 "resistance_profile": "descending",
-                "slot_category": "calf_raise"
+                "slot_category": "shoulder_posterior_fly"
               },
               {
                 "exercise_id": "05d0fbd6-0905-575b-b8be-a09623afd1fc",
@@ -1030,7 +1030,7 @@
                 "stability_demand": "low",
                 "axial_loading": 0,
                 "resistance_profile": "constant",
-                "slot_category": "back_vertical_pull"
+                "slot_category": "biceps_curl"
               },
               {
                 "exercise_id": "ec3793f6-5cb7-5e55-9485-ccc927e975b8",
@@ -1154,13 +1154,44 @@
           "id": "block-d6-iron",
           "pillar": "iron",
           "title": "Iron: Legs (Posterior Focus)",
-          "subtitle": "Leg Curl · Barbell Hip Thrust · Calf Raises on Hackenschmitt Machine",
+          "subtitle": "Romanian Deadlift · Leg Curl · Barbell Hip Thrust · Calf Raises on Hackenschmitt Machine",
           "duration_minutes": 90,
           "order": 0,
           "status": "pending",
           "iron": {
             "routine_id": "iron_block-d6-iron",
             "exercises": [
+              {
+                "exercise_id": "6e2cbaae-9587-5bce-8521-ffc032308b2e",
+                "slug": "romanian_deadlift",
+                "display_name": "Romanian Deadlift",
+                "target_sets": 4,
+                "target_reps": 12,
+                "target_rep_range": "10-12 @ 2 RIR",
+                "target_rir": 2,
+                "target_weight_kg": null,
+                "rest_seconds": 180,
+                "progression_note": "Calibrate first set @ prescribed RIR",
+                "execution_technique": "Standard",
+                "tempo": [
+                  2,
+                  1,
+                  1,
+                  1
+                ],
+                "cue_card": {
+                  "setup": "DL from top to pos 2: https://www.youtube.com/watch?v=WtWtjViRsKo",
+                  "vector": "DL from top to pos 2: https://www.youtube.com/watch?v=WtWtjViRsKo",
+                  "catch": "Lower under control and keep tension on the target tissue.",
+                  "anti_pattern": "Stop if joint pain exceeds normal muscle fatigue.",
+                  "failure_type": "technical"
+                },
+                "tactical_role": "primary_compound",
+                "stability_demand": "high",
+                "axial_loading": 5,
+                "resistance_profile": "ascending",
+                "slot_category": "hinge_compound"
+              },
               {
                 "exercise_id": "96266361-222c-5250-bb33-af45164c5d06",
                 "slug": "leg_curl",
@@ -1190,7 +1221,7 @@
                 "stability_demand": "medium",
                 "axial_loading": 0,
                 "resistance_profile": "bell_shaped",
-                "slot_category": "biceps_curl"
+                "slot_category": "hamstring_curl"
               },
               {
                 "exercise_id": "778246eb-4324-589d-bd2e-fe243fb3aaeb",
@@ -1252,22 +1283,7 @@
                 "stability_demand": "low",
                 "axial_loading": 0,
                 "resistance_profile": "constant",
-                "slot_category": "back_vertical_pull"
-              },
-              {
-                "exercise_id": "71863b21-1ae8-57e1-98ae-51fa2597bfd6",
-                "slug": "assisted_prone_hamstring",
-                "display_name": "assisted prone hamstring",
-                "target_sets": 2,
-                "target_reps": 8,
-                "target_rep_range": "6-8 @ 3 RIR",
-                "target_rir": 3,
-                "target_weight_kg": null,
-                "rest_seconds": 105,
-                "alternative_exercise_id": null,
-                "diagnostic_reason": "minimum_viable_path_absolute_last_resort",
-                "progression_note": "Minimum viable deload fallback: MRV/CNS relaxed to avoid an empty training day.",
-                "execution_technique": "Standard"
+                "slot_category": "calf_raise_seated"
               }
             ]
           }
@@ -1532,6 +1548,6 @@
       }
     }
   ],
-  "generated_at": "2026-06-13T15:27:04.503Z",
+  "generated_at": "2026-06-13T16:18:04.783Z",
   "clinical_review_trigger": null
 }

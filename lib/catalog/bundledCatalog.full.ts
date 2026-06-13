@@ -27,6 +27,23 @@ type SlotCategory =
   | 'glute_isolation'
   | 'calf_raise_seated';
 
+const SLOT_CATEGORY_OVERRIDES: Record<string, SlotCategory> = {
+  leg_curl: 'hamstring_curl',
+  seated_leg_curl: 'hamstring_curl',
+  lying_leg_curl: 'hamstring_curl',
+  biceps_curl_machine: 'biceps_curl',
+  biceps_curl_with_cable: 'biceps_curl',
+  bayesian_curl: 'biceps_curl_long_head',
+  calf_press_using_leg_press_machine: 'calf_raise',
+  calf_raises_on_hackenschmitt_machine: 'calf_raise_seated',
+  standing_calf_raise: 'calf_raise',
+  '45_lateral_raises': 'shoulder_lateral_raise',
+  cable_lateral_raises_single_arm: 'shoulder_lateral_raise',
+  bent_over_lateral_raises: 'shoulder_posterior_fly',
+  butterfly_reverse: 'shoulder_posterior_fly',
+  face_pull: 'shoulder_posterior_fly',
+};
+
 const SLOT_CATEGORY_BY_SLUG: Record<string, SlotCategory> = {
   barbell_bench_press: 'chest_horizontal_press',
   barbell_bench_press_nb: 'chest_horizontal_press',
@@ -38359,6 +38376,9 @@ function exerciseSearchText(exercise: Pick<LibraryExercise, 'slug' | 'name'>): s
 }
 
 export function inferSlotCategory(exercise: LibraryExercise): SlotCategory {
+  const override = SLOT_CATEGORY_OVERRIDES[exercise.slug];
+  if (override) return override;
+
   const explicit = SLOT_CATEGORY_BY_SLUG[exercise.slug];
   if (explicit) return explicit;
 

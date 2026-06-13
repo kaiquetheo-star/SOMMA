@@ -37,5 +37,13 @@ export function matchesMuscleSlotHint(exercise: CatalogExercise, hint: string | 
     return exercise.primary_muscle === 'chest' || exercise.primary_muscle === 'upper_chest';
   }
 
+  if (hint === 'hamstrings') {
+    return (
+      exercise.primary_muscle === 'hamstrings' ||
+      exercise.synergist_muscles.includes('hamstrings') ||
+      /rdl|romanian|stiff_leg|deadlift|good_morning|hip_thrust/i.test(exercise.slug)
+    );
+  }
+
   return exercise.primary_muscle === hint;
 }
