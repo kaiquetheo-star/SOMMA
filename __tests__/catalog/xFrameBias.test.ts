@@ -84,10 +84,10 @@ describe('X-Frame catalog enrichment', () => {
     expect(enriched.selection_score).toBe(3.0);
     expect(enriched.tempo).toEqual([2, 0, 1, 0]);
     expect(enriched.cue_card).toEqual({
-      setup: 'Cable crosses behind body, soft elbows, lead with elbows.',
-      vector: 'Raise to shoulder height; constant tension.',
+      setup: 'Posicione o cabo atrás do corpo e mantenha o tronco quieto, com leve inclinação para longe da polia.',
+      vector: 'Mantenha o cotovelo levemente à frente da linha do tronco; puxe pela lateral, não para cima.',
       catch: '3s lower without trap takeover.',
-      anti_pattern: 'No swinging.',
+      anti_pattern: 'Não transforme a repetição em encolhimento de trapézio nem roube com balanço do quadril.',
       failure_type: 'concentric',
     });
   });
@@ -98,10 +98,10 @@ describe('X-Frame catalog enrichment', () => {
     expect(enriched.selection_score).toBeGreaterThanOrEqual(2.0);
     expect(enriched.tempo).toEqual([3, 1, 'X', 0]);
     expect(enriched.cue_card.failure_type).toBe('technical');
-    expect(enriched.cue_card.setup).toBe('High-bar or low-bar, brace 360°, heels hip-width.');
-    expect(enriched.cue_card.vector).toBe('Drive floor; hips and chest rise together.');
+    expect(enriched.cue_card.setup).toBe('Trave o brace 360 graus antes de destravar a barra e encontre pressão tripé nos pés.');
+    expect(enriched.cue_card.vector).toBe('Desça entre os quadris mantendo joelhos acompanhando os dedos e suba empurrando o chão.');
     expect(enriched.cue_card.catch).toBe('Sit between hips; knees track toes; neutral spine.');
-    expect(enriched.cue_card.anti_pattern).toBe('Safety bars set; avoid valgus collapse.');
+    expect(enriched.cue_card.anti_pattern).toBe('Não deixe a pelve apagar no fundo nem transforme a subida em bom-dia lombar.');
   });
 
   it('blocks weighted lateral-flexion waist-thickening patterns', () => {

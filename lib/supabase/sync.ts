@@ -64,6 +64,47 @@ function mapQueueItemToRow(userId: string, item: PerformanceQueueItem) {
     return mapIronSetQueueItemToRow(userId, item);
   }
 
+  if (item.type === 'session' && item.data) {
+    const exercises = item.data.exercises;
+    const allSets = exercises.flatMap((exercise) => exercise.sets);
+    const lastExercise = exercises[exercises.length - 1];
+    const lastSet = allSets[allSets.length - 1];
+    const legacyLastSet: IronSetLog | null = lastSet
+      ? {
+          set_index: lastSet.setIndex,
+          weight_kg: lastSet.weightKg,
+          reps: lastSet.reps,
+          target_reps: lastSet.targetReps ?? lastSet.reps,
+          target_rir: lastSet.targetRir ?? null,
+          reported_rir: lastSet.rir,
+          rir: lastSet.rir,
+          rest_seconds_used: lastSet.restSecondsUsed,
+          logged_at: lastSet.loggedAt,
+        }
+      : null;
+
+    return {
+      user_id: userId,
+      pillar: 'iron' as const,
+      exercise_id: toNullableUuid(lastExercise?.exerciseId),
+      block_id: item.data.blockId,
+      weight_used: lastSet?.weightKg ?? null,
+      reps_completed: lastSet?.reps ?? null,
+      rpe_score: legacyLastSet ? effectiveRpeFromSet(legacyLastSet) : null,
+      actual_rest_seconds: lastSet?.restSecondsUsed ?? null,
+      volume: allSets.reduce(
+        (sum, set) => sum + (set.weightKg > 0 ? set.weightKg * set.reps : set.reps),
+        0,
+      ),
+      payload: {
+        sync_kind: 'session',
+        type: 'session',
+        data: item.data,
+      },
+      timestamp: item.data.completedAt,
+    };
+  }
+
   const session = item.session;
   const input = item.input;
 

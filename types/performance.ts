@@ -15,7 +15,7 @@ export interface IronSetLog {
   logged_at: string;
 }
 
-export interface IronSessionLog {
+export interface LegacyIronSessionLog {
   block_id: string;
   exercise_name: string;
   exercise_id: string;
@@ -23,11 +23,47 @@ export interface IronSessionLog {
   completed_at: string;
 }
 
+export interface IronSessionSetLog {
+  setIndex: number;
+  weightKg: number;
+  reps: number;
+  rir: number;
+  restSecondsUsed: number;
+  loggedAt: string;
+  targetReps?: number;
+  targetRir?: number | null;
+}
+
+export interface IronSessionExerciseLog {
+  exerciseId: string;
+  exerciseSlug: string;
+  exerciseName?: string;
+  sets: IronSessionSetLog[];
+  completedAt: string;
+}
+
+export interface IronSessionLog {
+  sessionId: string;
+  blockId: string;
+  exercises: IronSessionExerciseLog[];
+  completedAt: string;
+}
+
+export interface PerformanceLog {
+  type: 'session';
+  data: IronSessionLog;
+}
+
 export interface PerformanceLogEntry {
   id: string;
+  /** New canonical contract. Optional only so persisted/test legacy rows remain readable. */
+  type?: 'session';
+  /** New canonical session payload. Optional only so persisted/test legacy rows remain readable. */
+  data?: IronSessionLog;
   pillar: WorkoutPillarLog;
   block_id: string;
-  iron?: IronSessionLog;
+  /** @deprecated Read from `data.exercises`; accepted only for persisted legacy rows. */
+  iron?: LegacyIronSessionLog;
   timestamp: string;
 }
 
@@ -48,6 +84,8 @@ export type PerformanceSyncKind = 'block_complete' | 'iron_set';
 
 export interface PerformanceQueueItem {
   id: string;
+  type?: 'session';
+  data?: IronSessionLog;
   kind?: PerformanceSyncKind;
   input: WorkoutCompletionInput;
   session: PerformanceLogEntry | null;
@@ -76,7 +114,37 @@ export interface WorkoutSessionSummary {
 export interface LogIronSetInput {
   block_id: string;
   exercise_id: string;
+  exercise_slug?: string;
   exercise_name: string;
   set: IronSetLog;
   target_rir?: number | null;
+}
+
+export function setsFromSessionExercise(exercise: IronSessionExerciseLog): IronSetLog[] {
+  return exercise.sets.map((set) => ({
+    set_index: set.setIndex,
+    weight_kg: set.weightKg,
+    reps: set.reps,
+    target_reps: set.targetReps ?? set.reps,
+    target_rir: set.targetRir ?? null,
+    reported_rir: set.rir,
+    rir: set.rir,
+    rest_seconds_used: set.restSecondsUsed,
+    logged_at: set.loggedAt,
+  }));
+}
+
+export function ironExercisesFromPerformanceLog(entry: PerformanceLogEntry): LegacyIronSessionLog[] {
+  if (entry.type === 'session' && entry.data?.exercises?.length) {
+    const session = entry.data;
+    return session.exercises.map((exercise) => ({
+      block_id: session.blockId,
+      exercise_id: exercise.exerciseId,
+      exercise_name: exercise.exerciseName ?? exercise.exerciseSlug,
+      sets: setsFromSessionExercise(exercise),
+      completed_at: exercise.completedAt,
+    }));
+  }
+
+  return entry.iron ? [entry.iron] : [];
 }

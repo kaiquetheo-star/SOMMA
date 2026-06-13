@@ -10,7 +10,11 @@ import {
 import { fetchLibraryExercises } from '@/lib/catalog/library';
 import { initialBiologicalProfile, type BiologicalProfile } from '@/types/biological';
 import type { IronExercisePrescription, MicrocycleDay } from '@/types/gameplan';
-import type { IronSetLog, PerformanceLogEntry } from '@/types/performance';
+import {
+  ironExercisesFromPerformanceLog,
+  type IronSetLog,
+  type PerformanceLogEntry,
+} from '@/types/performance';
 import { useSommaStore, type EquipmentTag, type FocusPreference, type UserStats } from '@/store/useSommaStore';
 
 vi.mock('react-native', () => ({
@@ -48,7 +52,7 @@ const userStats: UserStats = {
   iron_sessions_completed: 0,
   nutrition_checkins_completed: 0,
 };
-const trainingDays = [1, 2, 3, 5, 6, 7];
+const trainingDays = [1, 2, 3, 4, 5, 6];
 
 function biological(overrides: Partial<BiologicalProfile> = {}): BiologicalProfile {
   return {
@@ -184,6 +188,24 @@ describe('real user journey simulation', () => {
       expect(exercises.length, `day ${dayIndex}`).toBeGreaterThanOrEqual(4);
       expect(day?.blocks.some((block) => block.pillar === 'longevity')).toBe(true);
     }
+    expect(gameplan.microcycle.find((entry) => entry.day_index === 7)?.is_rest_day).toBe(true);
+
+    const shoulderDay = gameplan.microcycle.find((entry) => entry.day_index === 4);
+    expect(ironExercises(shoulderDay).some((exercise) =>
+      /shoulder|lateral|rear|face_pull|reverse|shrug/i.test(`${exercise.slug ?? ''} ${exercise.display_name ?? ''}`),
+    )).toBe(true);
+
+    const backDay = gameplan.microcycle.find((entry) => entry.day_index === 2);
+    const pulldownFamilyCount = ironExercises(backDay).filter((exercise) =>
+      /pulldown/i.test(`${exercise.slug ?? ''} ${exercise.display_name ?? ''}`),
+    ).length;
+    expect(pulldownFamilyCount).toBeLessThanOrEqual(1);
+
+    const posteriorLegDay = gameplan.microcycle.find((entry) => entry.day_index === 6);
+    const legCurlFamilyCount = ironExercises(posteriorLegDay).filter((exercise) =>
+      /leg_curl/i.test(exercise.slug ?? ''),
+    ).length;
+    expect(legCurlFamilyCount).toBeLessThanOrEqual(1);
 
     for (const day of gameplan.microcycle) {
       for (const exercise of ironExercises(day)) {
@@ -278,7 +300,11 @@ describe('real user journey simulation', () => {
       performanceLogs: state.performance_logs,
       protocolDate: '2026-06-08',
     });
-    const progressedExerciseIds = new Set(state.performance_logs.map((log) => log.iron?.exercise_id));
+    const progressedExerciseIds = new Set(
+      state.performance_logs.flatMap((log) =>
+        ironExercisesFromPerformanceLog(log).map((iron) => iron.exercise_id),
+      ),
+    );
     const progressed = next.microcycle
       .flatMap((day) => ironExercises(day))
       .filter((exercise) => progressedExerciseIds.has(exercise.exercise_id));

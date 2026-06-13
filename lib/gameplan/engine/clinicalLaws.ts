@@ -214,6 +214,12 @@ export function capIronExercisesForDeload<T>(exercises: T[], isDeload: boolean):
 /** CNS delta for a single performance queue item */
 export function cnsDeltaFromQueueItem(item: PerformanceQueueItem): number {
   if (item.kind === 'iron_set') return CNS_DELTA_IRON_SET;
+  if (item.type === 'session' && item.data) {
+    return item.data.exercises.reduce(
+      (sum, exercise) => sum + exercise.sets.length * CNS_DELTA_IRON_SET,
+      0,
+    );
+  }
 
   const pillar = item.input.pillar;
   if (pillar === 'iron') {

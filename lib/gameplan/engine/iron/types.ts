@@ -64,6 +64,8 @@ export interface CatalogExercise {
   axial_loading?: AxialLoading;
   resistance_profile?: ResistanceProfile;
   specific_cues?: SpecificExerciseCues;
+  /** ABCDEF specialization slot used to prevent conceptual duplicates. */
+  slot_category?: string;
 }
 
 export interface ExerciseCatalog {
@@ -85,6 +87,8 @@ export interface CatalogValidationIssue {
 export interface SolverSlot {
   slotId: string;
   day: SplitDayKey;
+  /** Specialization taxonomy used by ABCDEF splits for precise exercise matching. */
+  category?: string;
   requiredPatterns: readonly IronMovementPattern[];
   /** Optional muscle filter for slot (e.g. rear_delts) */
   primaryMuscleHint?: string;
@@ -127,6 +131,8 @@ export interface SolverState {
   shoulderSets: ShoulderVolumeLedger;
   previousDayIndex: number | null;
   previousDayHadAxialLoad: boolean;
+  /** Same-day conceptual movement families already selected. */
+  usedConceptKeys?: ReadonlySet<string>;
 }
 
 export interface SolverResult {

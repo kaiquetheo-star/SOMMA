@@ -12,6 +12,8 @@ export type MesocyclePhase = 'bulking' | 'cutting' | 'maintenance' | 'deload';
 
 export type MesocycleGoal = 'strength' | 'hypertrophy' | 'metabolic_conditioning';
 
+export type PreferredSplit = 'abcdef' | 'ppl_x2';
+
 /** Biological Passport — maps to anthropometric, Iron and nutrition steering fields */
 export interface BiologicalProfile {
   date_of_birth: string | null;
@@ -43,6 +45,8 @@ export interface BiologicalProfile {
   mesocycle_week?: number | null;
   /** Primary adaptation target for the current mesocycle. */
   mesocycle_goal?: MesocycleGoal | null;
+  /** Weekly Iron split template. ABCDEF is the X-Frame default; PPL x2 is legacy. */
+  preferred_split?: PreferredSplit | null;
   /** Month 1 exit interview — calibrates Month 2 target loads */
   clinical_exit_interview: ClinicalExitInterview | null;
   /** User-reported body fat estimate (%) for timeline calculation */
@@ -60,6 +64,7 @@ export const FIXED_HEIGHT_CM = 159;
 export const FIXED_GOAL_IRON = 'Hypertrophy';
 export const FIXED_NUTRITION_GOAL = 'Hypertrophy support';
 export const DEFAULT_FREQUENCY_IRON = 6;
+export const DEFAULT_PREFERRED_SPLIT: PreferredSplit = 'abcdef';
 
 export const TIME_BUDGET_PRESETS = [
   { id: '45', label: '45m', iron: 45 },
@@ -94,6 +99,7 @@ export const initialBiologicalProfile: BiologicalProfile = {
   mesocycle_phase: 'maintenance',
   mesocycle_week: 1,
   mesocycle_goal: 'hypertrophy',
+  preferred_split: DEFAULT_PREFERRED_SPLIT,
   clinical_exit_interview: null,
   current_body_fat_estimate: null,
   hormonal_transition: false,
@@ -123,6 +129,7 @@ export function withFixedBiologicalProfile(
     mesocycle_phase: profile?.mesocycle_phase ?? initialBiologicalProfile.mesocycle_phase,
     mesocycle_week: profile?.mesocycle_week ?? initialBiologicalProfile.mesocycle_week,
     mesocycle_goal: profile?.mesocycle_goal ?? initialBiologicalProfile.mesocycle_goal,
+    preferred_split: profile?.preferred_split ?? DEFAULT_PREFERRED_SPLIT,
     clinical_exit_interview:
       profile?.clinical_exit_interview ?? initialBiologicalProfile.clinical_exit_interview,
     current_body_fat_estimate:

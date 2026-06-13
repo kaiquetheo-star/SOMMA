@@ -7,6 +7,7 @@ import type {
   PerformanceLogEntry,
   WorkoutSessionSummary,
 } from '@/types/performance';
+import { ironExercisesFromPerformanceLog } from '@/types/performance';
 
 function todayDateKey(): string {
   return new Date().toISOString().slice(0, 10);
@@ -34,11 +35,13 @@ export function computeTotalVolumeKg(logs: PerformanceLogEntry[]): number {
   let total = 0;
 
   for (const log of logs) {
-    if (log.pillar === 'iron' && log.iron?.sets?.length) {
-      for (const set of log.iron.sets) {
+    if (log.pillar === 'iron') {
+      for (const iron of ironExercisesFromPerformanceLog(log)) {
+        for (const set of iron.sets) {
         if (set.weight_kg > 0 && set.reps > 0) {
           total += set.weight_kg * set.reps;
         }
+      }
       }
     }
   }
@@ -53,11 +56,12 @@ export function computeCnsFatigueTotal(
   let total = 0;
 
   for (const log of logs) {
-    if (log.pillar === 'iron' && log.iron) {
-      const meta = exerciseCatalog.find((row) => row.id === log.iron!.exercise_id);
-      const cns = meta?.cns_fatigue_cost ?? 3;
-      total += cns * log.iron.sets.length;
-      continue;
+    if (log.pillar === 'iron') {
+      for (const iron of ironExercisesFromPerformanceLog(log)) {
+        const meta = exerciseCatalog.find((row) => row.id === iron.exercise_id);
+        const cns = meta?.cns_fatigue_cost ?? 3;
+        total += cns * iron.sets.length;
+      }
     }
   }
 
@@ -71,7 +75,8 @@ function historicalLogsBeforeToday(
   return logs.filter(
     (log) =>
       log.timestamp.slice(0, 10) < todayDateKey() &&
-      (log.iron?.exercise_id === exerciseId || log.pillar === 'iron'),
+      (ironExercisesFromPerformanceLog(log).some((iron) => iron.exercise_id === exerciseId) ||
+        log.pillar === 'iron'),
   );
 }
 
@@ -83,13 +88,14 @@ export function detectE1rmUnlocks(
   const seen = new Set<string>();
 
   for (const log of dayLogs) {
-    if (!log.iron?.exercise_id || !log.iron.sets.length) continue;
-    const exerciseId = log.iron.exercise_id;
+    for (const iron of ironExercisesFromPerformanceLog(log)) {
+    if (!iron.exercise_id || !iron.sets.length) continue;
+    const exerciseId = iron.exercise_id;
     if (seen.has(exerciseId)) continue;
     seen.add(exerciseId);
 
     let bestToday = 0;
-    for (const set of log.iron.sets) {
+    for (const set of iron.sets) {
       const candidate = calculateE1RM(set.weight_kg, set.reps);
       if (candidate > bestToday) bestToday = candidate;
     }
@@ -98,16 +104,13 @@ export function detectE1rmUnlocks(
     const priorBest =
       estimateBestE1RMFromLogs(
         historicalLogsBeforeToday(allLogs, exerciseId).flatMap((entry) => {
-          if (!entry.iron) return [];
-          return [
-            {
-              exercise_id: entry.iron.exercise_id,
+          return ironExercisesFromPerformanceLog(entry).map((historicalIron) => ({
+              exercise_id: historicalIron.exercise_id,
               weight_used: null,
               reps_completed: null,
               timestamp: entry.timestamp,
-              payload: { iron: { exercise_id: entry.iron.exercise_id, sets: entry.iron.sets } },
-            },
-          ];
+              payload: { iron: { exercise_id: historicalIron.exercise_id, sets: historicalIron.sets } },
+            }));
         }),
         exerciseId,
       ) ?? null;
@@ -115,10 +118,11 @@ export function detectE1rmUnlocks(
     if (priorBest == null || bestToday > priorBest + 0.05) {
       unlocks.push({
         exercise_id: exerciseId,
-        exercise_name: log.iron.exercise_name,
+        exercise_name: iron.exercise_name,
         e1rm_kg: Math.round(bestToday * 10) / 10,
         previous_best_kg: priorBest != null ? Math.round(priorBest * 10) / 10 : null,
       });
+    }
     }
   }
 

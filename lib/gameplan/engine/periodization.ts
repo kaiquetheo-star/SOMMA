@@ -34,6 +34,7 @@ export function resolvePillarFrequencies(biological: BiologicalProfile): PillarF
 }
 
 export function spreadPillarDayIndices(count: number): number[] {
+  if (count === 6) return [1, 2, 3, 4, 5, 6];
   return spreadTrainingDayIndices(count);
 }
 

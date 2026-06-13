@@ -4,6 +4,7 @@ import type { LibraryExercise } from '@/lib/catalog/library';
 
 export interface ResolvedIronExerciseView {
   exercise_id: string;
+  exercise_slug: string;
   alternative_exercise_id: string | null;
   name: string;
   instructions: Record<string, string>;
@@ -49,6 +50,7 @@ export function resolveIronExerciseView(options: ResolveOptions): ResolvedIronEx
 
   return {
     exercise_id: exerciseId,
+    exercise_slug: prescription.slug ?? library?.slug ?? exerciseId,
     alternative_exercise_id: prescription.alternative_exercise_id ?? null,
     name: prescription.display_name ?? library?.name ?? fallbackName,
     instructions: library?.biomechanical_instructions ?? {},

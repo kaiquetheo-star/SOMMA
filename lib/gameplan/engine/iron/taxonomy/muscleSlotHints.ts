@@ -11,7 +11,8 @@ export function matchesMuscleSlotHint(exercise: CatalogExercise, hint: string | 
   if (hint === 'side_delts') {
     return (
       exercise.primary_muscle === 'side_delts' ||
-      (exercise.primary_muscle === 'shoulders' && /lateral/i.test(exercise.slug))
+      ((exercise.primary_muscle === 'shoulders' || exercise.primary_muscle === 'general') &&
+        /lateral|side/i.test(exercise.slug))
     );
   }
 
@@ -19,7 +20,8 @@ export function matchesMuscleSlotHint(exercise: CatalogExercise, hint: string | 
     return (
       exercise.primary_muscle === 'rear_delts' ||
       exercise.primary_muscle === 'rear delt' ||
-      (exercise.primary_muscle === 'shoulders' && /rear|reverse|face.pull|pec_deck/i.test(exercise.slug))
+      ((exercise.primary_muscle === 'shoulders' || exercise.primary_muscle === 'general') &&
+        /rear|reverse|face.pull|pec_deck|posterior/i.test(exercise.slug))
     );
   }
 

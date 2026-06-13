@@ -2,7 +2,10 @@ import { IntensityTechnique } from '@/types/catalog';
 import { supportsAdvancedMetabolicTechnique } from '@/lib/catalog/tacticalEnrichment';
 import type { BiologicalProfile, TrainingExperienceLevel } from '@/types/biological';
 import type { MicrocycleDay, IronExercisePrescription } from '@/types/gameplan';
-import type { PerformanceLogEntry } from '@/types/performance';
+import {
+  ironExercisesFromPerformanceLog,
+  type PerformanceLogEntry,
+} from '@/types/performance';
 import type { LibraryExercise } from '@/types/catalog';
 
 const DROP_SET_NOTE =
@@ -29,7 +32,9 @@ function normalizeExperience(level: TrainingExperienceLevel | null | undefined):
 
 function isAdvancedAthlete(biological: BiologicalProfile, logs: readonly PerformanceLogEntry[]): boolean {
   if (normalizeExperience(biological.experience_level) === 'advanced') return true;
-  return logs.some((log) => (log.iron?.sets?.length ?? 0) >= 5);
+  return logs.some((log) =>
+    ironExercisesFromPerformanceLog(log).some((iron) => iron.sets.length >= 5),
+  );
 }
 
 function appendNote(existing: string | undefined, note: string): string {

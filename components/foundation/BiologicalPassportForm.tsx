@@ -10,6 +10,7 @@ import {
   FIXED_NUTRITION_GOAL,
   type MesocyclePhase,
   type BiologicalProfile,
+  type PreferredSplit,
 } from '@/types/biological';
 
 interface BiologicalPassportFormProps {
@@ -44,9 +45,27 @@ const MESOCYCLE_PHASE_OPTIONS: Array<{
   },
 ];
 
+const PREFERRED_SPLIT_OPTIONS: Array<{
+  id: PreferredSplit;
+  label: string;
+  subtitle: string;
+}> = [
+  {
+    id: 'abcdef',
+    label: 'ABCDEF Specialization',
+    subtitle: 'Recommended for X-Frame: six unique specialized days + Day 7 recovery.',
+  },
+  {
+    id: 'ppl_x2',
+    label: 'PPL x2',
+    subtitle: 'Legacy push/pull/legs rotation repeated twice per week.',
+  },
+];
+
 export function BiologicalPassportForm({ value, onChange }: BiologicalPassportFormProps) {
   const age = ageFromDateOfBirth(value.date_of_birth);
   const selectedMesocyclePhase = value.mesocycle_phase ?? 'maintenance';
+  const selectedPreferredSplit = value.preferred_split ?? 'abcdef';
 
   return (
     <View className="gap-6">
@@ -106,6 +125,29 @@ export function BiologicalPassportForm({ value, onChange }: BiologicalPassportFo
           onChange({ training_days_per_week, frequency_iron: training_days_per_week })
         }
       />
+
+      <View className="gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-5">
+        <View>
+          <Text className="font-body text-[10px] uppercase tracking-[0.35em] text-matte-gold/70">
+            Preferred Split
+          </Text>
+          <Text className="mt-2 font-body text-xs leading-5 text-[#6B7568]">
+            Choose the weekly Iron architecture. ABCDEF is the default for shoulder width,
+            posterior balance, and non-redundant specialization.
+          </Text>
+        </View>
+
+        {PREFERRED_SPLIT_OPTIONS.map((option) => (
+          <SelectionTile
+            key={option.id}
+            label={option.label}
+            subtitle={option.subtitle}
+            selected={selectedPreferredSplit === option.id}
+            onPress={() => onChange({ preferred_split: option.id })}
+            accessibilityLabel={`Select ${option.label} preferred split`}
+          />
+        ))}
+      </View>
 
       <View className="gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-5">
         <View>

@@ -261,7 +261,7 @@ describe('SOMMA Iron comprehensive generation pipeline', () => {
     expect(gameplan.microcycle).toHaveLength(7);
 
     const restDays = gameplan.microcycle.filter((day) => day.is_rest_day);
-    expect(restDays.map((day) => day.day_index)).toEqual([4]);
+    expect(restDays.map((day) => day.day_index)).toEqual([7]);
 
     for (const day of gameplan.microcycle.filter((entry) => !entry.is_rest_day)) {
       // anchor_point.md: nenhum dia de treino pode chegar ao app sem bloco Iron executável.
@@ -269,14 +269,14 @@ describe('SOMMA Iron comprehensive generation pipeline', () => {
     }
 
     const legsA = gameplan.microcycle.find((day) => day.day_index === 3);
-    const legsB = gameplan.microcycle.find((day) => day.day_index === 7);
+    const legsB = gameplan.microcycle.find((day) => day.day_index === 6);
     expect(legsA).toBeDefined();
     expect(legsB).toBeDefined();
 
     // anchor_point.md: DUP Legs A = tensão mecânica pura, faixa pesada 5-8 reps.
     expect(ironExercises(legsA!).some((row) => /5-8/.test(row.target_rep_range ?? '') || row.target_reps <= 8)).toBe(true);
 
-    // anchor_point.md: DUP Legs B = estabilidade unilateral/stretch, faixa de hipertrofia 10-15 reps.
+    // ABCDEF: Legs B = posterior chain/stretch, faixa de hipertrofia 10-15 reps.
     expect(ironExercises(legsB!).some((row) => row.target_reps >= 10 && row.target_reps <= 15)).toBe(true);
 
     for (const day of gameplan.microcycle) {
@@ -286,7 +286,7 @@ describe('SOMMA Iron comprehensive generation pipeline', () => {
       expect(nutrition?.protein_g).toBe(Math.round(57 * 2.2));
     }
 
-    const pushCarbs = gameplan.microcycle.find((day) => /push/i.test(day.focus_label))?.blocks.find((block) => block.pillar === 'nutrition')?.nutrition?.nutrition_target?.carbs_g;
+    const pushCarbs = gameplan.microcycle.find((day) => /chest|push/i.test(day.focus_label))?.blocks.find((block) => block.pillar === 'nutrition')?.nutrition?.nutrition_target?.carbs_g;
     const legsCarbs = legsA?.blocks.find((block) => block.pillar === 'nutrition')?.nutrition?.nutrition_target?.carbs_g;
     const restCarbs = restDays[0]?.blocks.find((block) => block.pillar === 'nutrition')?.nutrition?.nutrition_target?.carbs_g;
 

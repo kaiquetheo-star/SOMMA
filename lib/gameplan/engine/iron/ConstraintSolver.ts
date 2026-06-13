@@ -55,6 +55,21 @@ const FINISHER_MIN_REMAINING_SECONDS = 5 * 60;
 const MINIMUM_VIABLE_WORKOUT_EXERCISE_COUNT = 2;
 const MINIMUM_VIABLE_WORKOUT_SETS = 2;
 const MINIMUM_FULL_WORKOUT_EXERCISE_COUNT = 4;
+const BODYWEIGHT_BLACKLIST = new Set([
+  'pull_up',
+  'chin_up',
+  'dip',
+  'push_up',
+  'bodyweight_squat',
+  'bodyweight_lunge',
+  'plank',
+  'muscle_up',
+  'pistol_squat',
+  'handstand_push_up',
+]);
+
+export type RedundancyExercise = CatalogExercise & { slot_category?: string };
+export type SolverStateWithSelection = SolverState & { selectedExercises?: readonly RedundancyExercise[] };
 
 function minimumViableDiagnosticReason(constraints: SolverConstraints): string {
   return constraints.blockedJointProfiles.length > 0
@@ -153,6 +168,34 @@ function equipmentSubsetAllowed(
   return exercise.equipment_required.some((tag) => available.includes(tag as EquipmentTag));
 }
 
+export function bodyweightExerciseAllowed(exercise: CatalogExercise, available: readonly EquipmentTag[]): boolean {
+  if (!available.includes('full_gym')) return true;
+  if (BODYWEIGHT_BLACKLIST.has(exercise.slug)) return false;
+
+  const text = exerciseSearchText(exercise);
+  return !/pull_?up|chin_?up|(^|_)dip(s)?(_|$)|push_?up|muscle_?up|pistol_?squat|handstand_?push/.test(text);
+}
+
+function exerciseWithSlotCategory(exercise: CatalogExercise, slot: SolverSlot): RedundancyExercise {
+  return slot.category ? { ...exercise, slot_category: slot.category } : exercise;
+}
+
+export function isRedundant(candidate: RedundancyExercise, alreadySelected: readonly RedundancyExercise[]): boolean {
+  return alreadySelected.some((selected) => {
+    if (candidate.slug === selected.slug) return true;
+
+    if (candidate.slot_category && candidate.slot_category === selected.slot_category) return true;
+
+    return (
+      candidate.slot_category != null &&
+      selected.slot_category != null &&
+      candidate.primary_muscle === selected.primary_muscle &&
+      candidate.movement_pattern === selected.movement_pattern &&
+      candidate.slot_category === selected.slot_category
+    );
+  });
+}
+
 function jointProfileAllowed(
   exercise: CatalogExercise,
   blockedJointProfiles: readonly string[],
@@ -175,6 +218,95 @@ function matchesPrimaryMuscleHint(exercise: CatalogExercise, hint: string | unde
 function matchesIsolationSlot(exercise: CatalogExercise, isolationOnly: boolean | undefined): boolean {
   if (!isolationOnly) return true;
   return exercise.movement_pattern === 'isolation';
+}
+
+function exerciseSearchText(exercise: CatalogExercise): string {
+  return `${exercise.slug} ${exercise.name}`.toLowerCase().replace(/[-\s]+/g, '_');
+}
+
+export function matchesSlotCategory(exercise: CatalogExercise, category: string | undefined): boolean {
+  if (!category) return true;
+  const text = exerciseSearchText(exercise);
+
+  switch (category) {
+    case 'chest_horizontal_press':
+      return exercise.movement_pattern === 'push' && /bench|chest_press|push_up|dip/.test(text) && !/incline|shoulder|overhead|military|landmine/.test(text);
+    case 'chest_incline_press':
+      return exercise.movement_pattern === 'push' && /incline|upper_chest/.test(text);
+    case 'chest_fly':
+      return exercise.movement_pattern === 'isolation' && /fly|pec_deck|crossover/.test(text);
+    case 'triceps_overhead':
+      return exercise.primary_muscle === 'triceps' && /overhead|skull|lying|french|extension/.test(text) && !/pushdown|pressdown/.test(text);
+    case 'triceps_pushdown':
+      return exercise.primary_muscle === 'triceps' && /pushdown|pressdown|dip|close_grip/.test(text);
+    case 'triceps_extension':
+      return exercise.primary_muscle === 'triceps' && /tricep|triceps|extension|pushdown|pressdown|skull|dip/.test(text);
+    case 'back_vertical_pull':
+      return exercise.movement_pattern === 'pull' && /pull_?down|pull_up|pullup|chin/.test(text);
+    case 'back_horizontal_row':
+      return exercise.movement_pattern === 'pull' && /row|(^|_)t_bar|pendlay|gorilla/.test(text);
+    case 'biceps_curl_long_head':
+      return exercise.primary_muscle === 'biceps' && /incline|bayesian|drag|curl/.test(text);
+    case 'biceps_curl_short_head':
+      return exercise.primary_muscle === 'biceps' && /preacher|spider|concentration|curl/.test(text);
+    case 'biceps_curl':
+      return exercise.primary_muscle === 'biceps' && /curl/.test(text);
+    case 'quad_compound':
+      return (exercise.movement_pattern === 'squat' || exercise.movement_pattern === 'lunge') && /squat|lunge|leg_press|hack|pendulum|bulgarian|split/.test(text);
+    case 'quad_isolation':
+      return exercise.primary_muscle === 'quads' && /extension/.test(text);
+    case 'adductor':
+      return exercise.primary_muscle === 'adductors' || /adductor|inner_thigh/.test(text);
+    case 'calf_raise':
+      return exercise.primary_muscle === 'calves' && /calf|raise/.test(text);
+    case 'calf_raise_seated':
+      return exercise.primary_muscle === 'calves' && /seated|calf|raise/.test(text);
+    case 'shoulder_overhead_press':
+      return exercise.movement_pattern === 'push' && /shoulder_press|overhead|military|arnold|landmine/.test(text);
+    case 'shoulder_lateral_raise':
+      return /lateral|side/.test(text) && /raise/.test(text);
+    case 'shoulder_posterior_fly':
+      return /rear|reverse|face_pull|pec_deck|delt_fly|posterior/.test(text);
+    case 'trap_shrug':
+      return exercise.primary_muscle === 'traps' || /shrug|trap/.test(text);
+    case 'forearm_isolation':
+      return exercise.primary_muscle === 'forearms' || /forearm|wrist|reverse_curl/.test(text);
+    case 'core_anti_extension':
+      return exercise.primary_muscle === 'core' && /crunch|ab|plank|rollout|stabilization|hanging_knee/.test(text);
+    case 'hinge_compound':
+      return exercise.movement_pattern === 'hinge' && /deadlift|rdl|romanian|hinge|hip_thrust|good_morning/.test(text);
+    case 'hamstring_curl':
+      return exercise.primary_muscle === 'hamstrings' && /leg_curl|hamstring.*curl|curl/.test(text);
+    case 'glute_isolation':
+      return (exercise.primary_muscle === 'glutes' || /glute|kickback|pull_through|abduction/.test(text)) && (exercise.movement_pattern === 'isolation' || exercise.movement_pattern === 'hinge');
+    default:
+      return true;
+  }
+}
+
+function conceptKeyForSlot(exercise: CatalogExercise, slot: SolverSlot): string | null {
+  if (!slot.category) return null;
+  const text = exerciseSearchText(exercise);
+
+  if (slot.category === 'back_vertical_pull') {
+    if (/pull_?down/.test(text)) return `${slot.category}:pulldown`;
+    if (/pull_up|pullup|chin/.test(text)) return `${slot.category}:pullup`;
+  }
+
+  if (slot.category === 'hamstring_curl') return `${slot.category}:leg_curl`;
+
+  if (slot.category === 'triceps_extension') {
+    if (/pushdown|pressdown/.test(text)) return `${slot.category}:pushdown`;
+    if (/overhead|skull|lying|french/.test(text)) return `${slot.category}:overhead_extension`;
+  }
+
+  if (slot.category === 'biceps_curl') {
+    if (/hammer/.test(text)) return `${slot.category}:hammer`;
+    if (/preacher|spider|concentration/.test(text)) return `${slot.category}:short_head`;
+    if (/incline|bayesian/.test(text)) return `${slot.category}:long_head`;
+  }
+
+  return null;
 }
 
 export function isAxialLoadExercise(exercise: CatalogExercise): boolean {
@@ -403,7 +535,7 @@ function volumeBudgetForExercise(
   };
 }
 
-function prescribedSetsForSlot(
+export function prescribedSetsForSlot(
   slot: SolverSlot,
   exercise: CatalogExercise,
   constraints: Pick<SolverConstraints, 'mesocycle_phase' | 'mesocycle_week' | 'cns_fatigue_score'>,
@@ -428,12 +560,12 @@ function diagnosticReasonForPrescribedSets(
   return 'solver_volume_reduction';
 }
 
-function collectCandidates(
+export function collectCandidates(
   day: SplitDayKey,
   catalog: ExerciseCatalog,
   slot: SolverSlot,
   constraints: SolverConstraints,
-  state: SolverState,
+  state: SolverStateWithSelection,
   tracker: WeeklyVolumeTracker,
   currentDayIndex: number | undefined,
   options: {
@@ -441,19 +573,41 @@ function collectCandidates(
     ignoreMastery?: boolean;
     ignoreMrv?: boolean;
     ignoreRecoveryMode?: boolean;
+    ignoreBodyweightBlacklist?: boolean;
+    allowSameSlotCategoryDifferentConcept?: boolean;
   } = {},
 ): CatalogExercise[] {
   const candidates: CatalogExercise[] = [];
 
   for (const exercise of catalog.exercises) {
+    const availableEquipment = constraints.available_equipment ?? constraints.equipment;
+    const candidateForRedundancy = exerciseWithSlotCategory(exercise, slot);
     const usedExerciseIds = new Set([
       ...state.usedExerciseIds,
       ...(constraints.usedExerciseIds ?? []),
     ]);
 
-    // Regra 4 / anti-duplicata: exact repeats are blocked deterministically.
+    if (!options.ignoreBodyweightBlacklist && !bodyweightExerciseAllowed(exercise, availableEquipment)) {
+      logCandidateRejection(slot, exercise, 'blacklist peso corporal com full_gym disponível');
+      continue;
+    }
+
+    // Regra 4 / anti-duplicata: exact repeats are blocked deterministically across the microcycle.
     if (usedExerciseIds.has(exercise.id)) {
       logCandidateRejection(slot, exercise, 'exercício já usado no microciclo');
+      continue;
+    }
+    const redundant = isRedundant(candidateForRedundancy, state.selectedExercises ?? []);
+    if (redundant && !options.allowSameSlotCategoryDifferentConcept) {
+      logCandidateRejection(slot, exercise, 'redundância conceitual com exercício já selecionado no dia');
+      continue;
+    }
+    if (
+      redundant &&
+      options.allowSameSlotCategoryDifferentConcept &&
+      state.selectedExercises?.some((selected) => selected.slug === exercise.slug)
+    ) {
+      logCandidateRejection(slot, exercise, 'exercício já selecionado no dia');
       continue;
     }
     if (!matchesMovementPattern(exercise, slot.requiredPatterns)) {
@@ -468,6 +622,15 @@ function collectCandidates(
       logCandidateRejection(slot, exercise, 'slot exige isolamento');
       continue;
     }
+    if (!matchesSlotCategory(exercise, slot.category)) {
+      logCandidateRejection(slot, exercise, `categoria ${slot.category ?? 'n/a'} incompatível`);
+      continue;
+    }
+    const conceptKey = conceptKeyForSlot(exercise, slot);
+    if (conceptKey && state.usedConceptKeys?.has(conceptKey)) {
+      logCandidateRejection(slot, exercise, `duplicata conceitual no dia: ${conceptKey}`);
+      continue;
+    }
     if (!options.ignoreMastery && constraints.iron_mastery >= 4) {
       if (TOO_BASIC_FOR_ADVANCED.has(exercise.slug)) {
         logCandidateRejection(slot, exercise, 'exercício básico demais para atleta avançado');
@@ -480,7 +643,7 @@ function collectCandidates(
       }
     }
     // Regra 4 hard filter: required equipment must be fully available.
-    if (!equipmentSubsetAllowed(exercise, constraints.available_equipment ?? constraints.equipment)) {
+    if (!equipmentSubsetAllowed(exercise, availableEquipment)) {
       logCandidateRejection(
         slot,
         exercise,
@@ -556,7 +719,7 @@ function collectCandidates(
   return candidates;
 }
 
-function pickBestCandidate(
+export function pickBestCandidate(
   candidates: CatalogExercise[],
   tracker: WeeklyVolumeTracker,
   constraints: SolverConstraints,
@@ -566,7 +729,7 @@ function pickBestCandidate(
 ): { exercise: CatalogExercise; score: number } | null {
   if (candidates.length === 0) return null;
 
-  if (slot?.slotId === 'overhead_press') {
+  if (slot?.slotId === 'overhead_press' || slot?.category === 'shoulder_overhead_press') {
     const overheadPress = candidates.find((candidate) => candidate.slug === 'overhead_press');
     if (overheadPress) {
       return {
@@ -576,7 +739,7 @@ function pickBestCandidate(
     }
   }
 
-  if (slot?.slotId === 'chest_compound_a') {
+  if (slot?.slotId === 'chest_compound_a' || slot?.category === 'chest_horizontal_press') {
     const benchPress = candidates.find((candidate) => candidate.slug === 'barbell_bench_press');
     if (benchPress) {
       return {
@@ -688,6 +851,8 @@ function pushSolverPick(
   score: number,
   state: {
     usedExerciseIds: Set<string>;
+    usedConceptKeys: Set<string>;
+    selectedExercises: RedundancyExercise[];
     sessionCnsAccum: number;
     shoulderSets: ShoulderVolumeLedger;
     dayHadAxialLoad: boolean;
@@ -700,6 +865,9 @@ function pushSolverPick(
 ): void {
   tracker.creditVolume(exercise, prescribedSets);
   state.usedExerciseIds.add(exercise.id);
+  const conceptKey = conceptKeyForSlot(exercise, slot);
+  if (conceptKey) state.usedConceptKeys.add(conceptKey);
+  state.selectedExercises.push(exerciseWithSlotCategory(exercise, slot));
   state.sessionCnsAccum += exercise.cns_fatigue_cost;
   state.sessionAxialLoad += exercise.axial_loading ?? (isAxialLoadExercise(exercise) ? 3 : 0);
   state.shoulderSets = applyShoulderLedger(state.shoulderSets, exercise, prescribedSets);
@@ -762,13 +930,17 @@ export function solveDaySlots(
   currentDayIndex?: number,
 ): { picks: readonly SolverResult[]; state: SolverState } {
   const usedExerciseIds = new Set(initialState.usedExerciseIds);
+  const usedConceptKeys = new Set<string>();
   let sessionCnsAccum = initialState.sessionCnsAccum;
   let sessionAxialLoad = initialState.sessionAxialLoad;
   let shoulderSets = { ...initialState.shoulderSets };
   const picks: SolverResult[] = [];
+  const selectedExercises: RedundancyExercise[] = [];
   let dayHadAxialLoad = false;
   const mutableState = {
     usedExerciseIds,
+    usedConceptKeys,
+    selectedExercises,
     sessionCnsAccum,
     sessionAxialLoad,
     shoulderSets,
@@ -776,9 +948,11 @@ export function solveDaySlots(
   };
 
   for (const slot of slots) {
-    const stateForSlot: SolverState = {
+    const stateForSlot: SolverStateWithSelection = {
       ...initialState,
       usedExerciseIds: mutableState.usedExerciseIds,
+      usedConceptKeys: mutableState.usedConceptKeys,
+      selectedExercises: mutableState.selectedExercises,
       sessionCnsAccum: mutableState.sessionCnsAccum,
       sessionAxialLoad: mutableState.sessionAxialLoad,
     };
@@ -802,9 +976,11 @@ export function solveDaySlots(
         ...slot,
         defaultSets: Math.min(3, Math.max(MINIMUM_VIABLE_WORKOUT_SETS, slot.defaultSets)),
       };
-      const stateForSlot: SolverState = {
+      const stateForSlot: SolverStateWithSelection = {
         ...initialState,
         usedExerciseIds: mutableState.usedExerciseIds,
+        usedConceptKeys: mutableState.usedConceptKeys,
+        selectedExercises: mutableState.selectedExercises,
         sessionCnsAccum: mutableState.sessionCnsAccum,
         sessionAxialLoad: mutableState.sessionAxialLoad,
         isRecoveryMode: false,
@@ -851,9 +1027,11 @@ export function solveDaySlots(
         ...slot,
         defaultSets: MINIMUM_VIABLE_WORKOUT_SETS,
       };
-      const stateForSlot: SolverState = {
+      const stateForSlot: SolverStateWithSelection = {
         ...initialState,
         usedExerciseIds: mutableState.usedExerciseIds,
+        usedConceptKeys: mutableState.usedConceptKeys,
+        selectedExercises: mutableState.selectedExercises,
         sessionCnsAccum: mutableState.sessionCnsAccum,
         sessionAxialLoad: mutableState.sessionAxialLoad,
       };
@@ -862,6 +1040,7 @@ export function solveDaySlots(
         ignoreMastery: true,
         ignoreMrv: true,
         ignoreRecoveryMode: true,
+        ignoreBodyweightBlacklist: true,
       });
       const selection = pickBestCandidate(candidates, tracker, constraints, stateForSlot, currentDayIndex, fallbackSlot);
       if (!selection) continue;
@@ -898,9 +1077,11 @@ export function solveDaySlots(
       continue;
     }
 
-    const stateForFinisher: SolverState = {
+    const stateForFinisher: SolverStateWithSelection = {
       ...initialState,
       usedExerciseIds: mutableState.usedExerciseIds,
+      usedConceptKeys: mutableState.usedConceptKeys,
+      selectedExercises: mutableState.selectedExercises,
       sessionCnsAccum: mutableState.sessionCnsAccum,
       sessionAxialLoad: mutableState.sessionAxialLoad,
     };

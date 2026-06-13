@@ -1,6 +1,10 @@
 import { resolveIronGoalType, type IronGoalType } from '@/lib/physics/rmCalculator';
 import { isDeloadMesocycleWeek } from '@/lib/gameplan/engine/clinicalLaws';
-import type { PerformanceLogEntry, WorkoutPillarLog } from '@/types/performance';
+import {
+  ironExercisesFromPerformanceLog,
+  type PerformanceLogEntry,
+  type WorkoutPillarLog,
+} from '@/types/performance';
 
 /** Map observed RIR (0–4) to session RPE scale (1–10). */
 export function rirToRpe(rir: number): number {
@@ -139,12 +143,13 @@ function acwrStatusFromRatio(
 }
 
 function ironSessionFromEntry(entry: PerformanceLogEntry): SessionLoad | null {
-  if (!entry.iron?.sets?.length) return null;
+  const exercises = ironExercisesFromPerformanceLog(entry);
+  const sets = exercises.flatMap((exercise) => exercise.sets);
+  if (!sets.length) return null;
 
   const ts = Date.parse(entry.timestamp);
   if (!Number.isFinite(ts)) return null;
 
-  const sets = entry.iron.sets;
   const rpeSamples = sets
     .map((set) => effectiveRpeFromSet(set))
     .filter((rpe): rpe is number => rpe != null);
@@ -324,10 +329,10 @@ export function formatExerciseProgressionHint(
   exerciseId: string,
   prescribedRir: number,
 ): string | null {
-  const entry = entries.find(
-    (row) => row.pillar === 'iron' && row.iron?.exercise_id === exerciseId,
-  );
-  const lastSet = entry?.iron?.sets[entry.iron.sets.length - 1];
+  const exerciseLog = entries
+    .flatMap((row) => ironExercisesFromPerformanceLog(row))
+    .find((iron) => iron.exercise_id === exerciseId);
+  const lastSet = exerciseLog?.sets[exerciseLog.sets.length - 1];
   if (!lastSet) return null;
 
   const reported = lastSet.reported_rir ?? lastSet.rir;

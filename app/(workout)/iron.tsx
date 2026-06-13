@@ -103,7 +103,6 @@ export default function IronModeScreen() {
   const { finishBlock } = useWorkoutNavigation();
   const equipment = useSommaStore((state) => state.user_environment.available_equipment);
   const userBiological = useSommaStore((state) => state.user_biological);
-  const appendIronSession = useSommaStore((state) => state.appendIronSession);
   const logIronSet = useSommaStore((state) => state.logIronSet);
 
   const localFallback = useMemo(() => resolveIronExercise(equipment), [equipment]);
@@ -340,6 +339,7 @@ export default function IronModeScreen() {
     logIronSet({
       block_id: resolvedBlockId,
       exercise_id: exercise.exercise_id,
+      exercise_slug: exercise.exercise_slug,
       exercise_name: exercise.name,
       set: entry,
       target_rir: exercise.target_rir,
@@ -389,14 +389,6 @@ export default function IronModeScreen() {
   ) => {
     const lastExercise = completedExercises[completedExercises.length - 1];
     const lastSet = lastExercise?.sets[lastExercise.sets.length - 1];
-
-    appendIronSession({
-      block_id: resolvedBlockId,
-      exercise_id: lastExercise?.exercise_id ?? exercise?.exercise_id ?? localFallback.id,
-      exercise_name: lastExercise?.exercise_name ?? exercise?.name ?? localFallback.name,
-      sets: lastExercise?.sets ?? logs,
-      completed_at: new Date().toISOString(),
-    });
 
     finishBlock(resolvedBlockId, {
       pillar: 'iron',

@@ -87,7 +87,11 @@ describe('DUP and Text-Only Elite cues', () => {
     const legsBSlugs = legsB?.picks.map((pick) => pick.exercise.slug) ?? [];
     expect(legsB?.picks[0]?.prescription.target_reps).toBeGreaterThanOrEqual(10);
     expect(legsB?.picks[0]?.prescription.target_reps).toBeLessThanOrEqual(12);
-    expect(legsBSlugs.some((slug) => slug === 'single_leg_leg_press' || slug === 'deficit_bulgarian_split_squat')).toBe(true);
+    expect(
+      legsBSlugs.some((slug) =>
+        /romanian_deadlift|deadlift|hip_thrust|leg_curl|hamstring/.test(slug),
+      ),
+    ).toBe(true);
   });
 
   it('B: injects squat tempo and technical failure cues for Legs A', () => {

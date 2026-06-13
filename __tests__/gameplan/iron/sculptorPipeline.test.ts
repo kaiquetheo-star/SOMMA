@@ -259,7 +259,7 @@ describe('SOMMA Iron Sculptor Pipeline', () => {
     });
 
     const legsA = gameplan.microcycle.find((day) => day.day_index === 3);
-    const legsB = gameplan.microcycle.find((day) => day.day_index === 7);
+    const legsB = gameplan.microcycle.find((day) => day.day_index === 6);
     expect(legsA).toBeDefined();
     expect(legsB).toBeDefined();
 
@@ -270,7 +270,7 @@ describe('SOMMA Iron Sculptor Pipeline', () => {
     expect(legsAExercises.some((row) => /5-8/.test(row.target_rep_range ?? '') || row.target_reps <= 8)).toBe(true);
     expect(legsAExercises.some((row) => row.cue_card?.failure_type === 'technical')).toBe(true);
 
-    // Legs B: estabilidade/stretch reduz custo de SNC e desloca a falha para contração local.
+    // Legs B: cadeia posterior/stretch reduz custo de SNC e desloca a falha para contração local.
     expect(legsBExercises.some((row) => row.target_reps >= 10 && row.target_reps <= 15)).toBe(true);
     expect(legsBExercises.some((row) => row.cue_card?.failure_type === 'concentric')).toBe(true);
 

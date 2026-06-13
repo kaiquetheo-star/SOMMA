@@ -177,6 +177,9 @@ export interface LibraryExerciseBase {
 
   movement_pattern: MovementPattern | null;
 
+  /** ABCDEF specialization slot used to prevent conceptual duplicates. */
+  slot_category?: string;
+
 }
 
 

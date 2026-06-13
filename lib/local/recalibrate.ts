@@ -45,6 +45,17 @@ function reportedRirFromRpe(rpe: number | null | undefined): number | null {
 }
 
 function performanceLogFromQueueItem(item: PerformanceQueueItem): PerformanceLogEntry | null {
+  if (item.type === 'session' && item.data) {
+    return {
+      id: item.data.sessionId,
+      type: 'session',
+      data: item.data,
+      pillar: 'iron',
+      block_id: item.data.blockId,
+      timestamp: item.data.completedAt,
+    };
+  }
+
   const { input } = item;
   if (input.pillar !== 'iron' || !input.exercise_id) return null;
 

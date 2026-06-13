@@ -245,41 +245,85 @@ function markDayCompletedIfReady(
   });
 }
 
-function upsertIronSetLog(
-  logs: PerformanceLogEntry[],
-  input: LogIronSetInput,
-): PerformanceLogEntry[] {
-  const logId = `iron-${input.block_id}-${input.exercise_id}`;
-  const existing = logs.find((entry) => entry.id === logId);
+function createSessionId(): string {
+  const cryptoApi = globalThis.crypto as Crypto | undefined;
+  if (typeof cryptoApi?.randomUUID === 'function') return cryptoApi.randomUUID();
+  return `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 
-  const ironSession: IronSessionLog = existing?.iron
-    ? {
-        ...existing.iron,
-        sets: [...existing.iron.sets.filter((set) => set.set_index !== input.set.set_index), input.set].sort(
-          (a, b) => a.set_index - b.set_index,
-        ),
-      }
-    : {
-        block_id: input.block_id,
-        exercise_id: input.exercise_id,
-        exercise_name: input.exercise_name,
-        sets: [input.set],
-        completed_at: input.set.logged_at,
-      };
-
-  const entry: PerformanceLogEntry = {
-    id: logId,
-    pillar: 'iron',
-    block_id: input.block_id,
-    iron: ironSession,
-    timestamp: input.set.logged_at,
+function createEmptyIronSession(blockId: string): IronSessionLog {
+  const now = new Date().toISOString();
+  return {
+    sessionId: createSessionId(),
+    blockId,
+    exercises: [],
+    completedAt: now,
   };
+}
 
-  if (existing) {
-    return logs.map((row) => (row.id === logId ? entry : row));
+function updateExerciseInSession(
+  exercises: IronSessionLog['exercises'],
+  input: LogIronSetInput,
+): IronSessionLog['exercises'] {
+  const set = {
+    setIndex: input.set.set_index,
+    weightKg: input.set.weight_kg,
+    reps: input.set.reps,
+    rir: input.set.reported_rir ?? input.set.rir ?? input.target_rir ?? 2,
+    restSecondsUsed: input.set.rest_seconds_used,
+    loggedAt: input.set.logged_at,
+    targetReps: input.set.target_reps,
+    targetRir: input.set.target_rir ?? input.target_rir ?? null,
+  };
+  const existing = exercises.find((exercise) => exercise.exerciseId === input.exercise_id);
+  const completedAt = input.set.logged_at;
+
+  if (!existing) {
+    return [
+      ...exercises,
+      {
+        exerciseId: input.exercise_id,
+        exerciseSlug: input.exercise_slug ?? input.exercise_id,
+        exerciseName: input.exercise_name,
+        sets: [set],
+        completedAt,
+      },
+    ];
   }
 
-  return [entry, ...logs];
+  return exercises.map((exercise) => {
+    if (exercise.exerciseId !== input.exercise_id) return exercise;
+    const sets = [...exercise.sets.filter((row) => row.setIndex !== set.setIndex), set].sort(
+      (a, b) => a.setIndex - b.setIndex,
+    );
+    return {
+      ...exercise,
+      exerciseSlug: input.exercise_slug ?? exercise.exerciseSlug,
+      exerciseName: input.exercise_name ?? exercise.exerciseName,
+      sets,
+      completedAt,
+    };
+  });
+}
+
+function createSessionLog(session: IronSessionLog, completedAt: string): PerformanceLogEntry {
+  const completedSession: IronSessionLog = {
+    ...session,
+    completedAt,
+    exercises: session.exercises.map((exercise) => ({
+      ...exercise,
+      completedAt: exercise.completedAt || completedAt,
+    })),
+  };
+
+  return {
+    id: completedSession.sessionId,
+    type: 'session',
+    data: completedSession,
+    pillar: 'iron',
+    block_id: completedSession.blockId,
+    timestamp: completedAt,
+  };
 }
 
 interface SommaState {
@@ -309,6 +353,7 @@ interface SommaState {
   getClinicalReviewTrigger: () => null;
   performance_logs: PerformanceLogEntry[];
   performanceQueue: PerformanceQueueItem[];
+  pendingSession: IronSessionLog | null;
   performance_syncing: boolean;
   lastWorkoutSummary: WorkoutSessionSummary | null;
   setUserEnvironment: (patch: Partial<UserEnvironment>) => void;
@@ -331,7 +376,6 @@ interface SommaState {
   completeBlock: (blockId: string) => void;
   logIronSet: (input: LogIronSetInput) => void;
   prepareWorkoutSummary: () => Promise<WorkoutSessionSummary | null>;
-  appendIronSession: (log: IronSessionLog) => void;
   completeWorkout: (input: WorkoutCompletionInput) => Promise<void>;
   flushPerformanceQueue: () => Promise<void>;
   completeFoundationScan: (payload: {
@@ -368,13 +412,6 @@ const initialFoundation: UserFoundation = {
   foundation_completed_at: null,
 };
 
-function findSessionForBlock(
-  logs: PerformanceLogEntry[],
-  blockId: string,
-): PerformanceLogEntry | null {
-  return logs.find((entry) => entry.block_id === blockId) ?? null;
-}
-
 export const useSommaStore = create<SommaState>()(
   persist(
     (set, get) => ({
@@ -393,6 +430,7 @@ export const useSommaStore = create<SommaState>()(
       damageControlActiveDates: [],
       performance_logs: [],
       performanceQueue: [],
+      pendingSession: null,
       performance_syncing: false,
       lastWorkoutSummary: null,
       gameplan_loading: false,
@@ -605,9 +643,19 @@ export const useSommaStore = create<SommaState>()(
         }),
 
       logIronSet: (input) => {
-        set((state) => ({
-          performance_logs: upsertIronSetLog(state.performance_logs, input),
-        }));
+        set((state) => {
+          const currentSession =
+            state.pendingSession?.blockId === input.block_id
+              ? state.pendingSession
+              : createEmptyIronSession(input.block_id);
+
+          return {
+            pendingSession: {
+              ...currentSession,
+              exercises: updateExerciseInSession(currentSession.exercises, input),
+            },
+          };
+        });
       },
 
       prepareWorkoutSummary: async () => {
@@ -629,20 +677,6 @@ export const useSommaStore = create<SommaState>()(
           return null;
         }
       },
-
-      appendIronSession: (log) =>
-        set((state) => ({
-          performance_logs: [
-            {
-              id: `iron-${log.block_id}-${Date.now()}`,
-              pillar: 'iron',
-              block_id: log.block_id,
-              iron: log,
-              timestamp: log.completed_at,
-            },
-            ...state.performance_logs,
-          ],
-        })),
 
       flushPerformanceQueue: async () => {
         const state = get();
@@ -699,19 +733,40 @@ export const useSommaStore = create<SommaState>()(
 
       completeWorkout: async (input) => {
         const state = get();
-        const session = findSessionForBlock(state.performance_logs, input.block_id);
+        const completedAt = new Date().toISOString();
+        const session = state.pendingSession?.blockId === input.block_id ? state.pendingSession : null;
+        if (input.pillar === 'iron' && !session) {
+          set((current) => ({
+            weeklyMicrocycle: markBlockCompletedInMicrocycle(
+              current.weeklyMicrocycle,
+              input.block_id,
+              completedAt,
+            ),
+          }));
+          return;
+        }
+        const sessionLog = session ? createSessionLog(session, completedAt) : null;
 
         const queueItem: PerformanceQueueItem = {
-          id: `queue-${input.block_id}-${Date.now()}`,
+          id: sessionLog?.id ?? `queue-${input.block_id}-${Date.now()}`,
+          type: sessionLog?.type,
+          data: sessionLog?.data,
           input,
-          session,
-          created_at: new Date().toISOString(),
+          session: sessionLog,
+          created_at: completedAt,
         };
         const pendingQueue = [...state.performanceQueue, queueItem];
         const processedQueueIds = new Set(pendingQueue.map((item) => item.id));
 
         set({
+          performance_logs: sessionLog
+            ? [
+                sessionLog,
+                ...state.performance_logs.filter((entry) => entry.id !== sessionLog.id),
+              ]
+            : state.performance_logs,
           performanceQueue: pendingQueue,
+          pendingSession: session ? null : state.pendingSession,
           performance_syncing: true,
         });
 
@@ -768,7 +823,6 @@ export const useSommaStore = create<SommaState>()(
         } catch (err) {
           console.warn('[SOMMA] Local recalibration failed:', err);
         } finally {
-          const completedAt = new Date().toISOString();
           set((current) => ({
             performance_syncing: false,
             weeklyMicrocycle: markBlockCompletedInMicrocycle(
@@ -834,6 +888,7 @@ export const useSommaStore = create<SommaState>()(
           damageControlActiveDates: [],
           performance_logs: [],
           performanceQueue: [],
+          pendingSession: null,
           performance_syncing: false,
           lastWorkoutSummary: null,
           gameplan_loading: false,
@@ -893,6 +948,7 @@ export const useSommaStore = create<SommaState>()(
         damageControlActiveDates: state.damageControlActiveDates,
         performance_logs: state.performance_logs,
         performanceQueue: state.performanceQueue,
+        pendingSession: state.pendingSession,
         lastWorkoutSummary: state.lastWorkoutSummary,
       }),
       onRehydrateStorage: () => (state, error) => {
@@ -926,6 +982,9 @@ export const useSommaStore = create<SommaState>()(
         }
         if (!state.performanceQueue) {
           state.performanceQueue = [];
+        }
+        if (!state.pendingSession) {
+          state.pendingSession = null;
         }
         if (!state.damageControlActiveDates) {
           state.damageControlActiveDates = [];

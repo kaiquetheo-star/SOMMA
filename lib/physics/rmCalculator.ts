@@ -1,6 +1,9 @@
 import type { BiologicalProfile, TrainingExperienceLevel } from '@/types/biological';
 import type { MovementPattern } from '@/types/catalog';
-import type { PerformanceLogEntry } from '@/types/performance';
+import {
+  ironExercisesFromPerformanceLog,
+  type PerformanceLogEntry,
+} from '@/types/performance';
 
 /** Iron prescription goal — maps from profiles.goal_iron */
 export type IronGoalType = 'hypertrophy' | 'strength' | 'default';
@@ -217,24 +220,27 @@ function performanceEntriesToSamples(entries: PerformanceLogEntry[]): Performanc
   const samples: PerformanceLogSample[] = [];
 
   for (const entry of entries) {
-    if (entry.pillar !== 'iron' || !entry.iron?.sets.length) continue;
+    if (entry.pillar !== 'iron') continue;
     if (Date.parse(entry.timestamp) < cutoff) continue;
 
-    samples.push({
-      exercise_id: entry.iron.exercise_id,
-      weight_used: entry.iron.sets[entry.iron.sets.length - 1]?.weight_kg ?? null,
-      reps_completed: entry.iron.sets[entry.iron.sets.length - 1]?.reps ?? null,
-      timestamp: entry.timestamp,
-      payload: {
-        iron: {
-          exercise_id: entry.iron.exercise_id,
-          sets: entry.iron.sets.map((set) => ({
-            weight_kg: set.weight_kg,
-            reps: set.reps,
-          })),
+    for (const iron of ironExercisesFromPerformanceLog(entry)) {
+      if (!iron.sets.length) continue;
+      samples.push({
+        exercise_id: iron.exercise_id,
+        weight_used: iron.sets[iron.sets.length - 1]?.weight_kg ?? null,
+        reps_completed: iron.sets[iron.sets.length - 1]?.reps ?? null,
+        timestamp: entry.timestamp,
+        payload: {
+          iron: {
+            exercise_id: iron.exercise_id,
+            sets: iron.sets.map((set) => ({
+              weight_kg: set.weight_kg,
+              reps: set.reps,
+            })),
+          },
         },
-      },
-    });
+      });
+    }
   }
 
   return samples;

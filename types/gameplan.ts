@@ -58,6 +58,8 @@ export interface IronExercisePrescription {
   stability_demand?: StabilityDemand;
   axial_loading?: AxialLoading;
   resistance_profile?: ResistanceProfile;
+  /** ABCDEF specialization slot surfaced for diagnostics and UI auditability. */
+  slot_category?: string;
   /** Audit trail for any solver/recovery volume reduction. */
   diagnostic_reason?: string;
 }

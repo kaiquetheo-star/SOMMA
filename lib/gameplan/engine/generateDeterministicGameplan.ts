@@ -185,14 +185,25 @@ function candidateScoreForFocus(
   return score;
 }
 
+function fallbackConceptKey(exercise: { slug?: string; display_name?: string; name?: string }): string | null {
+  const text = `${exercise.slug ?? ''} ${exercise.display_name ?? ''} ${exercise.name ?? ''}`.toLowerCase();
+  if (/pull[_\s-]?down/.test(text)) return 'vertical_pull:pulldown';
+  if (/leg[_\s-]?curl/.test(text)) return 'posterior_leg:leg_curl';
+  return null;
+}
+
 function buildMinimumViableIronExercises(
   catalog: Awaited<ReturnType<typeof fetchLibraryExercises>>,
   equipment: EquipmentTag[],
   blockedJointProfiles: readonly string[],
   focusLabel: string,
   excludedExerciseIds: ReadonlySet<string> = new Set(),
+  excludedConceptKeys: ReadonlySet<string> = new Set(),
 ): IronExercisePrescription[] {
-  return catalog
+  const usedConceptKeys = new Set(excludedConceptKeys);
+  const selected: Awaited<ReturnType<typeof fetchLibraryExercises>> = [];
+
+  for (const exercise of catalog
     .filter((exercise) =>
       !excludedExerciseIds.has(exercise.id) &&
       isMinimumViableCandidate(exercise, equipment, blockedJointProfiles),
@@ -201,9 +212,15 @@ function buildMinimumViableIronExercises(
       const scoreDelta = candidateScoreForFocus(b, focusLabel) - candidateScoreForFocus(a, focusLabel);
       if (scoreDelta !== 0) return scoreDelta;
       return a.slug.localeCompare(b.slug);
-    })
-    .slice(0, 2)
-    .map((exercise) => ({
+    })) {
+    const conceptKey = fallbackConceptKey(exercise);
+    if (conceptKey && usedConceptKeys.has(conceptKey)) continue;
+    if (conceptKey) usedConceptKeys.add(conceptKey);
+    selected.push(exercise);
+    if (selected.length >= 2) break;
+  }
+
+  return selected.map((exercise) => ({
       exercise_id: exercise.id,
       slug: exercise.slug,
       display_name: exercise.name,
@@ -253,12 +270,16 @@ function injectMinimumViableIronWorkouts(
             }))
           : existingExercises;
         const excluded = new Set(normalizedExisting.map((exercise) => exercise.exercise_id));
+        const excludedConcepts = new Set(
+          normalizedExisting.map(fallbackConceptKey).filter((key): key is string => key != null),
+        );
         const fillers = buildMinimumViableIronExercises(
           catalog,
           equipment,
           blockedJointProfiles,
           day.focus_label,
           excluded,
+          excludedConcepts,
         ).slice(0, Math.max(0, minimumExerciseCount - normalizedExisting.length));
 
         return {

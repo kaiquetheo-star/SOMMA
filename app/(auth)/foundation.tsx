@@ -16,6 +16,7 @@ import type { BiologicalProfile } from '@/types/biological';
 import {
   FIXED_GOAL_IRON,
   FIXED_NUTRITION_GOAL,
+  DEFAULT_PREFERRED_SPLIT,
   initialBiologicalProfile,
   isBiologicalProfileComplete,
 } from '@/types/biological';
@@ -70,6 +71,7 @@ export default function FoundationScanScreen() {
         goal_iron: FIXED_GOAL_IRON,
         nutrition_goal: FIXED_NUTRITION_GOAL,
         frequency_iron: biological.training_days_per_week ?? initialBiologicalProfile.frequency_iron,
+        preferred_split: biological.preferred_split ?? DEFAULT_PREFERRED_SPLIT,
       };
 
       completeFoundationScan({

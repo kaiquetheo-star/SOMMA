@@ -168,6 +168,7 @@ function toCatalogExercise(row: LibraryExercise): CatalogExercise | null {
     axial_loading: enriched.axial_loading,
     resistance_profile: enriched.resistance_profile,
     specific_cues: enriched.specific_cues,
+    slot_category: row.slot_category,
   };
 }
 

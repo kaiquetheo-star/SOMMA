@@ -1,8 +1,57 @@
 import type { LibraryExercise } from '@/types/catalog';
 
+type SlotCategory =
+  | 'chest_horizontal_press'
+  | 'chest_incline_press'
+  | 'chest_fly'
+  | 'triceps_overhead'
+  | 'triceps_pushdown'
+  | 'back_vertical_pull'
+  | 'back_horizontal_row'
+  | 'biceps_curl_long_head'
+  | 'biceps_curl_short_head'
+  | 'quad_compound'
+  | 'quad_isolation'
+  | 'adductor'
+  | 'calf_raise'
+  | 'shoulder_overhead_press'
+  | 'shoulder_lateral_raise'
+  | 'shoulder_posterior_fly'
+  | 'trap_shrug'
+  | 'biceps_curl'
+  | 'triceps_extension'
+  | 'forearm_isolation'
+  | 'core_anti_extension'
+  | 'hinge_compound'
+  | 'hamstring_curl'
+  | 'glute_isolation'
+  | 'calf_raise_seated';
+
+const SLOT_CATEGORY_BY_SLUG: Record<string, SlotCategory> = {
+  barbell_bench_press: 'chest_horizontal_press',
+  barbell_bench_press_nb: 'chest_horizontal_press',
+  dumbbell_bench_press: 'chest_horizontal_press',
+  machine_chest_press: 'chest_horizontal_press',
+  decline_barbell_bench: 'chest_horizontal_press',
+  barbell_incline_bench_press: 'chest_incline_press',
+  dumbbell_incline_press: 'chest_incline_press',
+  cable_lateral_raise: 'shoulder_lateral_raise',
+  cable_lateral_raises_single_arm: 'shoulder_lateral_raise',
+  high_cable_lateral_raise: 'shoulder_lateral_raise',
+  dumbbell_shoulder_press: 'shoulder_overhead_press',
+  face_pull: 'shoulder_posterior_fly',
+  dumbbell_bent_over_face_pull: 'shoulder_posterior_fly',
+  romanian_deadlift: 'hinge_compound',
+  barbell_romanian_deadlift: 'hinge_compound',
+  barbell_romanian_deadlift_rdl: 'hinge_compound',
+  dumbbell_romanian_deadlift: 'hinge_compound',
+  seated_leg_curl: 'hamstring_curl',
+  lever_seated_leg_curl: 'hamstring_curl',
+};
+
 // Auto-generated from supabase/migrations/.seed_batches/library_exercises_batch_*-3 seed files.
 // Do not edit by hand; regenerate from the SQL seeds when the catalog changes.
-export const FULL_BUNDLED_EXERCISES: LibraryExercise[] = [
+const RAW_FULL_BUNDLED_EXERCISES: LibraryExercise[] = [
   {
     "id": "d80fdee5-94f9-5f82-8ff4-d7e39046d56e",
     "slug": "1_arm_half_kneeling_lat_pulldown",
@@ -38304,3 +38353,87 @@ export const FULL_BUNDLED_EXERCISES: LibraryExercise[] = [
     "stretch_mediated_hypertrophy": false
   }
 ];
+
+function exerciseSearchText(exercise: Pick<LibraryExercise, 'slug' | 'name'>): string {
+  return `${exercise.slug} ${exercise.name}`.toLowerCase().replace(/[-\s]+/g, '_');
+}
+
+export function inferSlotCategory(exercise: LibraryExercise): SlotCategory {
+  const explicit = SLOT_CATEGORY_BY_SLUG[exercise.slug];
+  if (explicit) return explicit;
+
+  const text = exerciseSearchText(exercise);
+  const primary = exercise.primary_muscle?.toLowerCase().replace(/[-\s]+/g, '_') ?? '';
+  const pattern = exercise.movement_pattern;
+
+  if (primary === 'shoulders' || primary === 'delts' || primary === 'front_delts' || primary === 'side_delts' || primary === 'rear_delts') {
+    if (/rear|reverse|face_pull|face_pulls|posterior|delt_fly|pec_deck/.test(text) || primary === 'rear_delts') {
+      return 'shoulder_posterior_fly';
+    }
+    if (/lateral|side/.test(text) || primary === 'side_delts') return 'shoulder_lateral_raise';
+    if (/press|overhead|military|arnold|landmine/.test(text) || primary === 'front_delts') {
+      return 'shoulder_overhead_press';
+    }
+    return 'shoulder_lateral_raise';
+  }
+
+  if (primary === 'chest' || primary === 'upper_chest' || /chest|pec|bench|flye?/.test(text)) {
+    if (/incline|upper_chest/.test(text)) return 'chest_incline_press';
+    if (pattern === 'isolation' || /fly|flye|pec_deck|crossover/.test(text)) return 'chest_fly';
+    return 'chest_horizontal_press';
+  }
+
+  if (primary === 'triceps' || /tricep|triceps|pushdown|pressdown|skull|dip/.test(text)) {
+    if (/pushdown|pressdown/.test(text)) return 'triceps_pushdown';
+    if (/overhead|skull|lying|french|extension/.test(text)) return 'triceps_overhead';
+    return 'triceps_extension';
+  }
+
+  if (
+    primary === 'lats' ||
+    primary === 'back' ||
+    primary === 'mid_back' ||
+    /(^|_)lat(s?|issimus)(_|$)|pull_?down|pullup|pull_up|chin|row/.test(text)
+  ) {
+    if (/pull_?down|pullup|pull_up|chin/.test(text)) return 'back_vertical_pull';
+    return 'back_horizontal_row';
+  }
+
+  if (primary === 'biceps' || /bicep|curl/.test(text)) {
+    if (/incline|bayesian|drag/.test(text)) return 'biceps_curl_long_head';
+    if (/preacher|spider|concentration/.test(text)) return 'biceps_curl_short_head';
+    return 'biceps_curl';
+  }
+
+  if (primary === 'traps' || /trap|shrug/.test(text)) return 'trap_shrug';
+
+  if (primary === 'quads' || pattern === 'squat' || pattern === 'lunge' || /squat|lunge|leg_press|hack|pendulum|bulgarian|split/.test(text)) {
+    if (pattern === 'isolation' || /extension/.test(text)) return 'quad_isolation';
+    return 'quad_compound';
+  }
+
+  if (primary === 'adductors' || /adductor|inner_thigh/.test(text)) return 'adductor';
+
+  if (primary === 'hamstrings' || pattern === 'hinge' || /deadlift|rdl|romanian|hinge|leg_curl|hamstring.*curl/.test(text)) {
+    if (/leg_curl|hamstring.*curl|curl/.test(text) && pattern === 'isolation') return 'hamstring_curl';
+    return 'hinge_compound';
+  }
+
+  if (primary === 'glutes' || /glute|hip_thrust|kickback|pull_through|abduction/.test(text)) {
+    if (pattern === 'hinge' && /hip_thrust|bridge/.test(text)) return 'glute_isolation';
+    return pattern === 'hinge' ? 'hinge_compound' : 'glute_isolation';
+  }
+
+  if (primary === 'calves' || /calf|calves|raise/.test(text)) {
+    return /seated/.test(text) ? 'calf_raise_seated' : 'calf_raise';
+  }
+
+  if (primary === 'forearms' || /forearm|wrist|reverse_curl/.test(text)) return 'forearm_isolation';
+
+  return 'core_anti_extension';
+}
+
+export const FULL_BUNDLED_EXERCISES: LibraryExercise[] = RAW_FULL_BUNDLED_EXERCISES.map((exercise) => ({
+  ...exercise,
+  slot_category: inferSlotCategory(exercise),
+}));

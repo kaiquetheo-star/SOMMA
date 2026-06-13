@@ -185,6 +185,7 @@ export function mapToIronPrescription(
     stability_demand: exercise.stability_demand,
     axial_loading: exercise.axial_loading,
     resistance_profile: exercise.resistance_profile,
+    slot_category: exercise.slot_category,
   };
 }
 

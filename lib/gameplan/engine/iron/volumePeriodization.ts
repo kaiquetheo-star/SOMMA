@@ -24,7 +24,7 @@ function reduceVolumeForHighCnsFatigue(budget: VolumeBudget, cnsFatigueScore: nu
   return {
     ...budget,
     minSets: Math.max(1, Math.floor(budget.minSets * 0.8)),
-    maxSets: Math.max(1, Math.ceil(budget.maxSets * 0.8)),
+    maxSets: Math.max(1, Math.round(budget.maxSets * 0.8)),
   };
 }
 
