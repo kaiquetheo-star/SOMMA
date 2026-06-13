@@ -13,13 +13,44 @@
           "id": "block-d1-iron",
           "pillar": "iron",
           "title": "Iron: Chest & Triceps",
-          "subtitle": "Barbell Bench Press · Dumbbell Incline Fly · Dumbbell Decline Fly · Bent Over Cable Flye · Butterfly Narrow Grip · Cable Concentration Extension (On Knee)",
+          "subtitle": "Barbell Incline Bench Press · Barbell Bench Press · Dumbbell Decline Fly · Bent Over Cable Flye · Butterfly Narrow Grip · Cable Concentration Extension (On Knee) · Tricep Pushdown on Cable",
           "duration_minutes": 90,
           "order": 0,
           "status": "pending",
           "iron": {
             "routine_id": "iron_block-d1-iron",
             "exercises": [
+              {
+                "exercise_id": "77a019ec-694a-52ca-8442-9157c693d19c",
+                "slug": "barbell_incline_bench_press",
+                "display_name": "Barbell Incline Bench Press",
+                "target_sets": 4,
+                "target_reps": 12,
+                "target_rep_range": "8-12 @ 1 RIR",
+                "target_rir": 1,
+                "target_weight_kg": null,
+                "rest_seconds": 105,
+                "progression_note": "Calibrate first set @ prescribed RIR",
+                "execution_technique": "Standard",
+                "tempo": [
+                  3,
+                  0,
+                  1,
+                  1
+                ],
+                "cue_card": {
+                  "setup": "['Set up an incline bench at a 45-degree angle.', 'Lie down on the bench with your feet flat on the ground.', 'Grasp the barbell with an overhand grip, slightly wider than shoulder-width apart.', 'Unrack the barbell and lower it slowly towards your chest, keeping your elbows at a 45-degree angle.', 'Pause for a moment at the bottom, then push the barbell back up to the starting position.', 'Repeat for the desired number of repetitions.']",
+                  "vector": "['Set up an incline bench at a 45-degree angle.', 'Lie down on the bench with your feet flat on the ground.', 'Grasp the barbell with an overhand grip, slightly wider than shoulder-width apart.', 'Unrack the barbell and lower it slowly towards your chest, keeping your elbows at a 45-degree angle.', 'Pause for a moment at the bottom, then push the barbell back up to the starting position.', 'Repeat for the desired number of repetitions.']",
+                  "catch": "Lower under control and keep tension on the target tissue.",
+                  "anti_pattern": "Stop if joint pain exceeds normal muscle fatigue.",
+                  "failure_type": "technical"
+                },
+                "tactical_role": "primary_compound",
+                "stability_demand": "medium",
+                "axial_loading": 0,
+                "resistance_profile": "bell_shaped",
+                "slot_category": "chest_incline_press"
+              },
               {
                 "exercise_id": "91b0ab6e-aa43-5679-a434-3798a57846e2",
                 "slug": "barbell_bench_press",
@@ -52,37 +83,6 @@
                 "slot_category": "chest_horizontal_press"
               },
               {
-                "exercise_id": "487bf51a-4ffc-5a3d-ac9e-0c2620d99035",
-                "slug": "dumbbell_incline_fly",
-                "display_name": "Dumbbell Incline Fly",
-                "target_sets": 4,
-                "target_reps": 12,
-                "target_rep_range": "8-12 @ 1 RIR",
-                "target_rir": 1,
-                "target_weight_kg": null,
-                "rest_seconds": 105,
-                "progression_note": "Calibrate first set @ prescribed RIR",
-                "execution_technique": "Standard",
-                "tempo": [
-                  3,
-                  0,
-                  1,
-                  1
-                ],
-                "cue_card": {
-                  "setup": "This exercise involves lying on an incline bench and holding dumbbells in each hand.",
-                  "vector": "The arms are then extended out to the sides, parallel to the ground, and then brought back together in a hugging motion.",
-                  "catch": "Lower under control and keep tension on the target tissue.",
-                  "anti_pattern": "Stop if joint pain exceeds normal muscle fatigue.",
-                  "failure_type": "technical"
-                },
-                "tactical_role": "secondary_compound",
-                "stability_demand": "medium",
-                "axial_loading": 0,
-                "resistance_profile": "descending",
-                "slot_category": "chest_incline_press"
-              },
-              {
                 "exercise_id": "52b7d430-e79b-5f8c-b16e-47b78bb37d98",
                 "slug": "dumbbell_decline_fly",
                 "display_name": "Dumbbell Decline Fly",
@@ -111,7 +111,7 @@
                 "stability_demand": "medium",
                 "axial_loading": 0,
                 "resistance_profile": "descending",
-                "slot_category": "chest_fly"
+                "slot_category": "chest_decline_press"
               },
               {
                 "exercise_id": "836ec749-aed3-5260-9b18-b3faeed4c75d",
@@ -205,6 +205,37 @@
                 "axial_loading": 0,
                 "resistance_profile": "constant",
                 "slot_category": "triceps_overhead"
+              },
+              {
+                "exercise_id": "260bd553-97d8-57c4-9eec-9511aa8bd49b",
+                "slug": "tricep_pushdown_on_cable",
+                "display_name": "Tricep Pushdown on Cable",
+                "target_sets": 4,
+                "target_reps": 12,
+                "target_rep_range": "8-12 @ 2 RIR",
+                "target_rir": 2,
+                "target_weight_kg": null,
+                "rest_seconds": 105,
+                "progression_note": "Calibrate first set @ prescribed RIR",
+                "execution_technique": "Myo-Reps",
+                "tempo": [
+                  3,
+                  0,
+                  1,
+                  1
+                ],
+                "cue_card": {
+                  "setup": "The cable rope push-down is a popular exercise targeting the triceps muscles.",
+                  "vector": "It's easy to learn and perform, making it a favorite for everyone from beginners to advanced lifters.",
+                  "catch": "Lower under control and keep tension on the target tissue.",
+                  "anti_pattern": "Stop if joint pain exceeds normal muscle fatigue.",
+                  "failure_type": "technical"
+                },
+                "tactical_role": "isolation_metabolic",
+                "stability_demand": "low",
+                "axial_loading": 0,
+                "resistance_profile": "constant",
+                "slot_category": "triceps_pushdown"
               }
             ]
           }
@@ -265,13 +296,44 @@
           "id": "block-d2-iron",
           "pillar": "iron",
           "title": "Iron: Back (Width) & Biceps",
-          "subtitle": "Alternate Lateral Pulldown · Cable Seated High Row (V-Bar) · Alternating Biceps Curls with Dumbbell · Alternating Dumbbell Hammer Curl · Hammer Curls · Dumbbell One Arm Reverse Wrist Curl",
+          "subtitle": "Barbell Bent Over Row · Alternate Lateral Pulldown · T-bar Row · Alternating Biceps Curls with Dumbbell · Bayesian Curl · Cable Hammer Curl (With Rope)",
           "duration_minutes": 90,
           "order": 0,
           "status": "pending",
           "iron": {
             "routine_id": "iron_block-d2-iron",
             "exercises": [
+              {
+                "exercise_id": "0b1e872b-095b-5c3a-a067-4b1693701fac",
+                "slug": "barbell_bent_over_row",
+                "display_name": "Barbell Bent Over Row",
+                "target_sets": 4,
+                "target_reps": 15,
+                "target_rep_range": "10-15 @ 1 RIR",
+                "target_rir": 1,
+                "target_weight_kg": null,
+                "rest_seconds": 180,
+                "progression_note": "Calibrate first set @ prescribed RIR",
+                "execution_technique": "Standard",
+                "tempo": [
+                  3,
+                  1,
+                  1,
+                  1
+                ],
+                "cue_card": {
+                  "setup": "['Stand with your feet shoulder-width apart and knees slightly bent.', 'Bend forward at the hips while keeping your back straight and chest up.', 'Grasp the barbell with an overhand grip, hands slightly wider than shoulder-width apart.', 'Pull the barbell towards your lower chest by retracting your shoulder blades and squeezing your back muscles.', 'Pause for a moment at the top, then slowly lower the barbell back to the starting position.', 'Repeat for the desired number of repetitions.']",
+                  "vector": "['Stand with your feet shoulder-width apart and knees slightly bent.', 'Bend forward at the hips while keeping your back straight and chest up.', 'Grasp the barbell with an overhand grip, hands slightly wider than shoulder-width apart.', 'Pull the barbell towards your lower chest by retracting your shoulder blades and squeezing your back muscles.', 'Pause for a moment at the top, then slowly lower the barbell back to the starting position.', 'Repeat for the desired number of repetitions.']",
+                  "catch": "Lower under control and keep tension on the target tissue.",
+                  "anti_pattern": "Stop if joint pain exceeds normal muscle fatigue.",
+                  "failure_type": "technical"
+                },
+                "tactical_role": "secondary_compound",
+                "stability_demand": "high",
+                "axial_loading": 4,
+                "resistance_profile": "bell_shaped",
+                "slot_category": "back_horizontal_row"
+              },
               {
                 "exercise_id": "04a7d4f2-0a39-5f4e-ad47-472592c4d415",
                 "slug": "alternate_lateral_pulldown",
@@ -304,15 +366,15 @@
                 "slot_category": "back_vertical_pull"
               },
               {
-                "exercise_id": "be3b0b0e-8068-588d-97d3-77f13e8f1a18",
-                "slug": "cable_seated_high_row_v_bar",
-                "display_name": "Cable Seated High Row (V-Bar)",
+                "exercise_id": "35e89f9c-3656-5b26-bbd7-ecf6e62fd894",
+                "slug": "t_bar_row",
+                "display_name": "T-bar Row",
                 "target_sets": 4,
                 "target_reps": 15,
                 "target_rep_range": "10-15 @ 1 RIR",
                 "target_rir": 1,
                 "target_weight_kg": null,
-                "rest_seconds": 105,
+                "rest_seconds": 180,
                 "progression_note": "Calibrate first set @ prescribed RIR",
                 "execution_technique": "Standard",
                 "tempo": [
@@ -322,15 +384,15 @@
                   1
                 ],
                 "cue_card": {
-                  "setup": "['Sit on the cable machine with your feet flat on the floor and your knees slightly bent.', 'Grasp the v-bar attachment with an overhand grip, palms facing each other, and your hands shoulder-width apart.', 'Keep your back straight and lean slightly forward from the hips.', 'Pull the v-bar towards your torso by retracting your shoulder blades and squeezing your back muscles.', 'Pause for a moment at the peak of the contraction, then slowly release the tension and return to the starting position.', 'Repeat for the desired number of repetitions.']",
-                  "vector": "['Sit on the cable machine with your feet flat on the floor and your knees slightly bent.', 'Grasp the v-bar attachment with an overhand grip, palms facing each other, and your hands shoulder-width apart.', 'Keep your back straight and lean slightly forward from the hips.', 'Pull the v-bar towards your torso by retracting your shoulder blades and squeezing your back muscles.', 'Pause for a moment at the peak of the contraction, then slowly release the tension and return to the starting position.', 'Repeat for the desired number of repetitions.']",
+                  "setup": "bent over with triangle grip, slightly bent knees",
+                  "vector": "bent over with triangle grip, slightly bent knees",
                   "catch": "Lower under control and keep tension on the target tissue.",
                   "anti_pattern": "Stop if joint pain exceeds normal muscle fatigue.",
                   "failure_type": "technical"
                 },
                 "tactical_role": "secondary_compound",
                 "stability_demand": "low",
-                "axial_loading": 0,
+                "axial_loading": 1,
                 "resistance_profile": "constant",
                 "slot_category": "back_horizontal_row"
               },
@@ -363,12 +425,12 @@
                 "stability_demand": "medium",
                 "axial_loading": 0,
                 "resistance_profile": "bell_shaped",
-                "slot_category": "biceps_curl"
+                "slot_category": "biceps_curl_long_head"
               },
               {
-                "exercise_id": "3e26a93a-a678-5fcf-bd8b-c2938a514506",
-                "slug": "alternating_dumbbell_hammer_curl",
-                "display_name": "Alternating Dumbbell Hammer Curl",
+                "exercise_id": "a2ca8852-dc1d-5f27-8ce3-5efc01a3f85c",
+                "slug": "bayesian_curl",
+                "display_name": "Bayesian Curl",
                 "target_sets": 4,
                 "target_reps": 15,
                 "target_rep_range": "10-15 @ 2 RIR",
@@ -384,8 +446,8 @@
                   1
                 ],
                 "cue_card": {
-                  "setup": "Stand with your knees slightly bent and your back straight.",
-                  "vector": "Hold a dumbbell in each hand, using a neutral grip at your sides.",
+                  "setup": "Cable curl with stretched shoulder (backwards)",
+                  "vector": "Cable curl with stretched shoulder (backwards)",
                   "catch": "Lower under control and keep tension on the target tissue.",
                   "anti_pattern": "Stop if joint pain exceeds normal muscle fatigue.",
                   "failure_type": "technical"
@@ -394,12 +456,12 @@
                 "stability_demand": "medium",
                 "axial_loading": 0,
                 "resistance_profile": "bell_shaped",
-                "slot_category": "biceps_curl"
+                "slot_category": "biceps_curl_short_head"
               },
               {
-                "exercise_id": "31a42a0a-53a8-5a50-b9cb-fcb5dacd8fd1",
-                "slug": "hammer_curls",
-                "display_name": "Hammer Curls",
+                "exercise_id": "65b504d5-562b-5c47-bd3f-be0e3cedf573",
+                "slug": "cable_hammer_curl_with_rope",
+                "display_name": "Cable Hammer Curl (With Rope)",
                 "target_sets": 4,
                 "target_reps": 15,
                 "target_rep_range": "10-15 @ 2 RIR",
@@ -407,7 +469,7 @@
                 "target_weight_kg": null,
                 "rest_seconds": 105,
                 "progression_note": "Calibrate first set @ prescribed RIR",
-                "execution_technique": "Standard",
+                "execution_technique": "Myo-Reps",
                 "tempo": [
                   3,
                   1,
@@ -415,48 +477,17 @@
                   1
                 ],
                 "cue_card": {
-                  "setup": "- **Start:** Hold dumbbells at your sides with palms facing your torso.",
-                  "vector": "- **Curl:** Lift the weights toward your shoulders while maintaining the neutral grip (like holding a hammer).",
+                  "setup": "['Stand upright with your feet shoulder-width apart and a slight bend in your knees.', 'Hold the cable rope attachment with an underhand grip, palms facing each other, and your arms fully extended.', 'Keeping your upper arms stationary, exhale and curl the weights while contracting your biceps.', 'Continue to raise the cable rope attachment until your biceps are fully contracted and the rope is at shoulder level.', 'Hold the contracted position for a brief pause as you squeeze your biceps.', 'Inhale and slowly begin to lower the cable rope attachment back to the starting position.', 'Repeat for the desired number of repetitions.']",
+                  "vector": "['Stand upright with your feet shoulder-width apart and a slight bend in your knees.', 'Hold the cable rope attachment with an underhand grip, palms facing each other, and your arms fully extended.', 'Keeping your upper arms stationary, exhale and curl the weights while contracting your biceps.', 'Continue to raise the cable rope attachment until your biceps are fully contracted and the rope is at shoulder level.', 'Hold the contracted position for a brief pause as you squeeze your biceps.', 'Inhale and slowly begin to lower the cable rope attachment back to the starting position.', 'Repeat for the desired number of repetitions.']",
                   "catch": "Lower under control and keep tension on the target tissue.",
                   "anti_pattern": "Stop if joint pain exceeds normal muscle fatigue.",
                   "failure_type": "technical"
                 },
                 "tactical_role": "isolation_metabolic",
-                "stability_demand": "medium",
+                "stability_demand": "low",
                 "axial_loading": 0,
-                "resistance_profile": "bell_shaped",
-                "slot_category": "biceps_curl"
-              },
-              {
-                "exercise_id": "e7107d1c-0843-5831-be35-cfbd4c6709b4",
-                "slug": "dumbbell_one_arm_reverse_wrist_curl",
-                "display_name": "Dumbbell One Arm Reverse Wrist Curl",
-                "target_sets": 4,
-                "target_reps": 15,
-                "target_rep_range": "10-15 @ 2 RIR",
-                "target_rir": 2,
-                "target_weight_kg": null,
-                "rest_seconds": 105,
-                "progression_note": "Calibrate first set @ prescribed RIR",
-                "execution_technique": "Standard",
-                "tempo": [
-                  3,
-                  1,
-                  1,
-                  1
-                ],
-                "cue_card": {
-                  "setup": "['Sit on a bench or chair with your feet flat on the ground.', 'Hold a dumbbell in one hand with an overhand grip, palm facing down.', 'Rest your forearm on your thigh, with your wrist hanging off the edge.', 'Slowly lower the dumbbell towards the ground by flexing your wrist.', 'Pause for a moment at the bottom, then slowly curl your wrist back up towards your body.', 'Repeat for the desired number of repetitions, then switch to the other arm.']",
-                  "vector": "['Sit on a bench or chair with your feet flat on the ground.', 'Hold a dumbbell in one hand with an overhand grip, palm facing down.', 'Rest your forearm on your thigh, with your wrist hanging off the edge.', 'Slowly lower the dumbbell towards the ground by flexing your wrist.', 'Pause for a moment at the bottom, then slowly curl your wrist back up towards your body.', 'Repeat for the desired number of repetitions, then switch to the other arm.']",
-                  "catch": "Lower under control and keep tension on the target tissue.",
-                  "anti_pattern": "Stop if joint pain exceeds normal muscle fatigue.",
-                  "failure_type": "technical"
-                },
-                "tactical_role": "isolation_metabolic",
-                "stability_demand": "medium",
-                "axial_loading": 0,
-                "resistance_profile": "bell_shaped",
-                "slot_category": "biceps_curl"
+                "resistance_profile": "constant",
+                "slot_category": "biceps_hammer"
               }
             ]
           }
@@ -517,7 +548,7 @@
           "id": "block-d3-iron",
           "pillar": "iron",
           "title": "Iron: Legs (Quad Focus)",
-          "subtitle": "Dumbbell Single Leg Split Squat · Smith Single Leg Split Squat · Calf Press Using Leg Press Machine · Single Leg Extension · Leg Extension · Calf Raises, One Legged",
+          "subtitle": "Hack Squats · Smith Single Leg Split Squat · Calf Press Using Leg Press Machine · Single Leg Extension · Leg Extension · Calf Raises on Hackenschmitt Machine",
           "duration_minutes": 90,
           "order": 0,
           "status": "pending",
@@ -525,9 +556,9 @@
             "routine_id": "iron_block-d3-iron",
             "exercises": [
               {
-                "exercise_id": "c05e12ca-e046-56f8-b627-d92cfd6475b5",
-                "slug": "dumbbell_single_leg_split_squat",
-                "display_name": "Dumbbell Single Leg Split Squat",
+                "exercise_id": "dc69fed5-6474-5173-96a8-ab6f37f54af1",
+                "slug": "hack_squats",
+                "display_name": "Hack Squats",
                 "target_sets": 4,
                 "target_reps": 8,
                 "target_rep_range": "5-8 @ 1 RIR",
@@ -543,16 +574,16 @@
                   0
                 ],
                 "cue_card": {
-                  "setup": "['Stand with your feet shoulder-width apart, holding a dumbbell in each hand.', 'Take a step forward with one foot and position your feet so that your front foot is flat on the ground and your back foot is elevated on a bench or step.', 'Lower your body by bending your front knee and hip, keeping your back knee slightly bent and your back heel off the ground.', 'Continue lowering until your front thigh is parallel to the ground, then push through your front heel to return to the starting position.', 'Repeat for the desired number of repetitions, then switch legs and repeat.']",
-                  "vector": "['Stand with your feet shoulder-width apart, holding a dumbbell in each hand.', 'Take a step forward with one foot and position your feet so that your front foot is flat on the ground and your back foot is elevated on a bench or step.', 'Lower your body by bending your front knee and hip, keeping your back knee slightly bent and your back heel off the ground.', 'Continue lowering until your front thigh is parallel to the ground, then push through your front heel to return to the starting position.', 'Repeat for the desired number of repetitions, then switch legs and repeat.']",
+                  "setup": "Hack squats target the lower body and are performed on a hack squat machine or with a barbell.",
+                  "vector": "For the machine variation, position yourself on the platform with your shoulders under the pads and feet slightly forward.",
                   "catch": "Lower under control and keep tension on the target tissue.",
                   "anti_pattern": "Stop if joint pain exceeds normal muscle fatigue.",
                   "failure_type": "technical"
                 },
-                "tactical_role": "primary_compound",
-                "stability_demand": "medium",
-                "axial_loading": 0,
-                "resistance_profile": "bell_shaped",
+                "tactical_role": "secondary_compound",
+                "stability_demand": "low",
+                "axial_loading": 1,
+                "resistance_profile": "constant",
                 "slot_category": "quad_compound"
               },
               {
@@ -680,18 +711,17 @@
                 "slot_category": "quad_isolation"
               },
               {
-                "exercise_id": "efa553dd-3ff9-591f-968e-519af19599b3",
-                "slug": "calf_raises_one_legged",
-                "display_name": "Calf Raises, One Legged",
+                "exercise_id": "4f299c8b-033e-59e5-8121-2c7652e42d55",
+                "slug": "calf_raises_on_hackenschmitt_machine",
+                "display_name": "Calf Raises on Hackenschmitt Machine",
                 "target_sets": 4,
-                "diagnostic_reason": "volume_floor_fallback",
                 "target_reps": 8,
                 "target_rep_range": "5-8 @ 2 RIR",
                 "target_rir": 2,
                 "target_weight_kg": null,
                 "rest_seconds": 105,
                 "progression_note": "Calibrate first set @ prescribed RIR",
-                "execution_technique": "Standard",
+                "execution_technique": "Myo-Reps",
                 "tempo": [
                   3,
                   1,
@@ -699,16 +729,16 @@
                   0
                 ],
                 "cue_card": {
-                  "setup": "Set up with stable posture and controlled breathing.",
-                  "vector": "Move with controlled intent through the concentric phase.",
+                  "setup": "Place yourself on the machine with your back firmly against the backrest, the feet are on the platform for calf raises.",
+                  "vector": "Check that the feet are half free and that you can completely stretch the calf muscles down.",
                   "catch": "Lower under control and keep tension on the target tissue.",
                   "anti_pattern": "Stop if joint pain exceeds normal muscle fatigue.",
                   "failure_type": "technical"
                 },
                 "tactical_role": "isolation_metabolic",
-                "stability_demand": "medium",
+                "stability_demand": "low",
                 "axial_loading": 0,
-                "resistance_profile": "descending",
+                "resistance_profile": "constant",
                 "slot_category": "calf_raise"
               }
             ]
@@ -769,7 +799,7 @@
           "id": "block-d4-iron",
           "pillar": "iron",
           "title": "Iron: Shoulders & Traps",
-          "subtitle": "Barbell Seated Behind Head Military Press · 45° Lateral Raises · Bent-over Lateral Raises · Behind the Back Cable Lateral Raise · Cable Rear-delt Fly (Single Arm) · Butterfly Reverse · Cable Front Raise with a Small Bar",
+          "subtitle": "Barbell Seated Overhead Press · 45° Lateral Raises · Bent-over Lateral Raises · Behind the Back Cable Lateral Raise · Cable Rear-delt Fly (Single Arm) · Butterfly Reverse · Front Raises",
           "duration_minutes": 90,
           "order": 0,
           "status": "pending",
@@ -777,9 +807,9 @@
             "routine_id": "iron_block-d4-iron",
             "exercises": [
               {
-                "exercise_id": "603c8021-5e6f-5808-b33d-6ccc3dd51d64",
-                "slug": "barbell_seated_behind_head_military_press",
-                "display_name": "Barbell Seated Behind Head Military Press",
+                "exercise_id": "1818065a-7686-50d4-8d0e-5b1bbf6f732c",
+                "slug": "barbell_seated_overhead_press",
+                "display_name": "Barbell Seated Overhead Press",
                 "target_sets": 4,
                 "target_reps": 12,
                 "target_rep_range": "8-12 @ 1 RIR",
@@ -795,15 +825,15 @@
                   1
                 ],
                 "cue_card": {
-                  "setup": "['Sit on a bench with your back straight and feet flat on the ground.', 'Hold the barbell with an overhand grip, slightly wider than shoulder-width apart.', 'Lift the barbell off the rack and bring it down to shoulder level, behind your head.', 'Press the barbell upward until your arms are fully extended.', 'Lower the barbell back down to the starting position.', 'Repeat for the desired number of repetitions.']",
-                  "vector": "['Sit on a bench with your back straight and feet flat on the ground.', 'Hold the barbell with an overhand grip, slightly wider than shoulder-width apart.', 'Lift the barbell off the rack and bring it down to shoulder level, behind your head.', 'Press the barbell upward until your arms are fully extended.', 'Lower the barbell back down to the starting position.', 'Repeat for the desired number of repetitions.']",
+                  "setup": "['Sit on a bench with your back straight and feet flat on the ground.', 'Hold the barbell with an overhand grip, slightly wider than shoulder-width apart.', 'Lift the barbell off the rack and bring it to shoulder level, with your elbows bent and palms facing forward.', 'Press the barbell overhead by extending your arms fully.', 'Pause for a moment at the top, then slowly lower the barbell back to shoulder level.', 'Repeat for the desired number of repetitions.']",
+                  "vector": "['Sit on a bench with your back straight and feet flat on the ground.', 'Hold the barbell with an overhand grip, slightly wider than shoulder-width apart.', 'Lift the barbell off the rack and bring it to shoulder level, with your elbows bent and palms facing forward.', 'Press the barbell overhead by extending your arms fully.', 'Pause for a moment at the top, then slowly lower the barbell back to shoulder level.', 'Repeat for the desired number of repetitions.']",
                   "catch": "Lower under control and keep tension on the target tissue.",
                   "anti_pattern": "Stop if joint pain exceeds normal muscle fatigue.",
                   "failure_type": "technical"
                 },
                 "tactical_role": "secondary_compound",
                 "stability_demand": "medium",
-                "axial_loading": 2,
+                "axial_loading": 0,
                 "resistance_profile": "bell_shaped",
                 "slot_category": "shoulder_overhead_press"
               },
@@ -867,7 +897,7 @@
                 "stability_demand": "medium",
                 "axial_loading": 0,
                 "resistance_profile": "descending",
-                "slot_category": "shoulder_posterior_fly"
+                "slot_category": "shoulder_lateral_raise"
               },
               {
                 "exercise_id": "70e8b676-6272-540a-ae48-b263f4727700",
@@ -929,7 +959,7 @@
                 "stability_demand": "low",
                 "axial_loading": 0,
                 "resistance_profile": "constant",
-                "slot_category": "chest_fly"
+                "slot_category": "shoulder_posterior_fly"
               },
               {
                 "exercise_id": "316101e3-d84f-5e47-ac80-02913ccc5b51",
@@ -963,11 +993,10 @@
                 "slot_category": "shoulder_posterior_fly"
               },
               {
-                "exercise_id": "f03825df-7c67-59e7-a14e-f940c7dc24d3",
-                "slug": "cable_front_raise_with_a_small_bar",
-                "display_name": "Cable Front Raise with a Small Bar",
+                "exercise_id": "c14f3d85-4f4e-5fd3-829a-dd56d7478a45",
+                "slug": "front_raises",
+                "display_name": "Front Raises",
                 "target_sets": 4,
-                "diagnostic_reason": "volume_floor_fallback",
                 "target_reps": 12,
                 "target_rep_range": "8-12 @ 2 RIR",
                 "target_rir": 2,
@@ -982,17 +1011,17 @@
                   1
                 ],
                 "cue_card": {
-                  "setup": "The Cable Front Raise with a small bar isolates your anterior deltoids (front shoulders) by providing constant tension, requiring you to stand facing away from a low pulley, grab the bar with an overhand grip, and lift it in front of you to shoulder height with slightly bent arms, avoiding swinging and keeping your core tight for controlled movement up and down.",
-                  "vector": "Use a light-to-moderate weight, focusing on slow, controlled reps to feel the muscle work, not momentum.",
+                  "setup": "To execute the exercise, the lifter stands with their feet shoulder width apart and weights or resistance handles held by their side with a pronated (overhand) grip.",
+                  "vector": "The movement is to bring the arms up in front of the body to eye level and with only a slight bend in the elbow.",
                   "catch": "Lower under control and keep tension on the target tissue.",
                   "anti_pattern": "Stop if joint pain exceeds normal muscle fatigue.",
                   "failure_type": "technical"
                 },
                 "tactical_role": "isolation_metabolic",
-                "stability_demand": "low",
+                "stability_demand": "medium",
                 "axial_loading": 0,
-                "resistance_profile": "constant",
-                "slot_category": "shoulder_lateral_raise"
+                "resistance_profile": "descending",
+                "slot_category": "shoulder_anterior_raise"
               }
             ]
           }
@@ -1053,7 +1082,7 @@
           "id": "block-d5-iron",
           "pillar": "iron",
           "title": "Iron: Arms & Core",
-          "subtitle": "Bayesian Curl · Reverse Curl · Cable Tri Extension - External Rotation · Cable Tri Extension - Internal Rotation · Cable Tricep Kickback · Finger Curls · Abdominal Crunch",
+          "subtitle": "Alternating Dumbbell Hammer Curl · Reverse Curl · Cable Tri Extension - External Rotation · Cable Tri Extension - Internal Rotation · Dumbbell One Arm Reverse Wrist Curl · Abdominal Crunch · Cable Twist",
           "duration_minutes": 90,
           "order": 0,
           "status": "pending",
@@ -1061,9 +1090,9 @@
             "routine_id": "iron_block-d5-iron",
             "exercises": [
               {
-                "exercise_id": "a2ca8852-dc1d-5f27-8ce3-5efc01a3f85c",
-                "slug": "bayesian_curl",
-                "display_name": "Bayesian Curl",
+                "exercise_id": "3e26a93a-a678-5fcf-bd8b-c2938a514506",
+                "slug": "alternating_dumbbell_hammer_curl",
+                "display_name": "Alternating Dumbbell Hammer Curl",
                 "target_sets": 4,
                 "target_reps": 15,
                 "target_rep_range": "10-15 @ 2 RIR",
@@ -1079,8 +1108,8 @@
                   1
                 ],
                 "cue_card": {
-                  "setup": "Cable curl with stretched shoulder (backwards)",
-                  "vector": "Cable curl with stretched shoulder (backwards)",
+                  "setup": "Stand with your knees slightly bent and your back straight.",
+                  "vector": "Hold a dumbbell in each hand, using a neutral grip at your sides.",
                   "catch": "Lower under control and keep tension on the target tissue.",
                   "anti_pattern": "Stop if joint pain exceeds normal muscle fatigue.",
                   "failure_type": "technical"
@@ -1089,7 +1118,7 @@
                 "stability_demand": "medium",
                 "axial_loading": 0,
                 "resistance_profile": "bell_shaped",
-                "slot_category": "biceps_curl_long_head"
+                "slot_category": "biceps_curl"
               },
               {
                 "exercise_id": "81b13325-3888-5e31-a055-ca572edec6b3",
@@ -1151,7 +1180,7 @@
                 "stability_demand": "low",
                 "axial_loading": 0,
                 "resistance_profile": "constant",
-                "slot_category": "triceps_overhead"
+                "slot_category": "triceps_extension"
               },
               {
                 "exercise_id": "f0cce8b7-a04c-5898-b8f6-6592b2035830",
@@ -1182,43 +1211,12 @@
                 "stability_demand": "low",
                 "axial_loading": 0,
                 "resistance_profile": "constant",
-                "slot_category": "triceps_overhead"
-              },
-              {
-                "exercise_id": "ff6b71f2-917f-5f1b-aefe-d1f69c9fac05",
-                "slug": "cable_tricep_kickback",
-                "display_name": "Cable Tricep Kickback",
-                "target_sets": 4,
-                "target_reps": 15,
-                "target_rep_range": "10-15 @ 2 RIR",
-                "target_rir": 2,
-                "target_weight_kg": null,
-                "rest_seconds": 105,
-                "progression_note": "Calibrate first set @ prescribed RIR",
-                "execution_technique": "Myo-Reps",
-                "tempo": [
-                  3,
-                  1,
-                  1,
-                  1
-                ],
-                "cue_card": {
-                  "setup": "Grab onto the handle, and pull your elbow up and back slightly above your torso.",
-                  "vector": "Keep your upper arm to be parallel to the ground for the duration of the set",
-                  "catch": "Lower under control and keep tension on the target tissue.",
-                  "anti_pattern": "Stop if joint pain exceeds normal muscle fatigue.",
-                  "failure_type": "technical"
-                },
-                "tactical_role": "isolation_metabolic",
-                "stability_demand": "low",
-                "axial_loading": 0,
-                "resistance_profile": "constant",
                 "slot_category": "triceps_extension"
               },
               {
-                "exercise_id": "00a559a4-9ec7-5950-ad36-9c3656d10fc7",
-                "slug": "finger_curls",
-                "display_name": "Finger Curls",
+                "exercise_id": "e7107d1c-0843-5831-be35-cfbd4c6709b4",
+                "slug": "dumbbell_one_arm_reverse_wrist_curl",
+                "display_name": "Dumbbell One Arm Reverse Wrist Curl",
                 "target_sets": 4,
                 "target_reps": 15,
                 "target_rep_range": "10-15 @ 2 RIR",
@@ -1234,8 +1232,8 @@
                   1
                 ],
                 "cue_card": {
-                  "setup": "['Sit on a bench with your feet flat on the ground and hold a barbell with an underhand grip, palms facing up.', 'Rest your forearms on your thighs, allowing your wrists to hang off the edge.', 'Slowly curl your fingers towards your palms, squeezing the barbell tightly.', 'Hold the contraction for a moment, then slowly release your fingers back to the starting position.', 'Repeat for the desired number of repetitions.']",
-                  "vector": "['Sit on a bench with your feet flat on the ground and hold a barbell with an underhand grip, palms facing up.', 'Rest your forearms on your thighs, allowing your wrists to hang off the edge.', 'Slowly curl your fingers towards your palms, squeezing the barbell tightly.', 'Hold the contraction for a moment, then slowly release your fingers back to the starting position.', 'Repeat for the desired number of repetitions.']",
+                  "setup": "['Sit on a bench or chair with your feet flat on the ground.', 'Hold a dumbbell in one hand with an overhand grip, palm facing down.', 'Rest your forearm on your thigh, with your wrist hanging off the edge.', 'Slowly lower the dumbbell towards the ground by flexing your wrist.', 'Pause for a moment at the bottom, then slowly curl your wrist back up towards your body.', 'Repeat for the desired number of repetitions, then switch to the other arm.']",
+                  "vector": "['Sit on a bench or chair with your feet flat on the ground.', 'Hold a dumbbell in one hand with an overhand grip, palm facing down.', 'Rest your forearm on your thigh, with your wrist hanging off the edge.', 'Slowly lower the dumbbell towards the ground by flexing your wrist.', 'Pause for a moment at the bottom, then slowly curl your wrist back up towards your body.', 'Repeat for the desired number of repetitions, then switch to the other arm.']",
                   "catch": "Lower under control and keep tension on the target tissue.",
                   "anti_pattern": "Stop if joint pain exceeds normal muscle fatigue.",
                   "failure_type": "technical"
@@ -1244,14 +1242,13 @@
                 "stability_demand": "medium",
                 "axial_loading": 0,
                 "resistance_profile": "bell_shaped",
-                "slot_category": "biceps_curl"
+                "slot_category": "forearm_isolation"
               },
               {
                 "exercise_id": "4ae6fbed-18e9-52c3-933c-8b5e13664a88",
                 "slug": "3008_abdominal_crunch",
                 "display_name": "Abdominal Crunch",
                 "target_sets": 4,
-                "diagnostic_reason": "volume_floor_fallback",
                 "target_reps": 15,
                 "target_rep_range": "10-15 @ 2 RIR",
                 "target_rir": 2,
@@ -1277,6 +1274,37 @@
                 "axial_loading": 0,
                 "resistance_profile": "bell_shaped",
                 "slot_category": "core_anti_extension"
+              },
+              {
+                "exercise_id": "12448beb-6187-5bc2-a8d1-af133de9b1a7",
+                "slug": "cable_twist",
+                "display_name": "Cable Twist",
+                "target_sets": 4,
+                "target_reps": 15,
+                "target_rep_range": "10-15 @ 2 RIR",
+                "target_rir": 2,
+                "target_weight_kg": null,
+                "rest_seconds": 105,
+                "progression_note": "Calibrate first set @ prescribed RIR",
+                "execution_technique": "Myo-Reps",
+                "tempo": [
+                  3,
+                  1,
+                  1,
+                  1
+                ],
+                "cue_card": {
+                  "setup": "['Stand with your feet shoulder-width apart, facing the cable machine.', 'Hold the cable handle with both hands in front of your chest, keeping your arms slightly bent.', 'Engage your core and twist your torso to the right, pulling the cable across your body.', 'Pause for a moment at the end of the movement, feeling the contraction in your abs and obliques.', \"Slowly return to the starting position, resisting the cable's pull.\", 'Repeat the movement to the left side.', 'Continue alternating sides for the desired number of repetitions.']",
+                  "vector": "['Stand with your feet shoulder-width apart, facing the cable machine.', 'Hold the cable handle with both hands in front of your chest, keeping your arms slightly bent.', 'Engage your core and twist your torso to the right, pulling the cable across your body.', 'Pause for a moment at the end of the movement, feeling the contraction in your abs and obliques.', \"Slowly return to the starting position, resisting the cable's pull.\", 'Repeat the movement to the left side.', 'Continue alternating sides for the desired number of repetitions.']",
+                  "catch": "Lower under control and keep tension on the target tissue.",
+                  "anti_pattern": "Stop if joint pain exceeds normal muscle fatigue.",
+                  "failure_type": "technical"
+                },
+                "tactical_role": "isolation_metabolic",
+                "stability_demand": "low",
+                "axial_loading": 0,
+                "resistance_profile": "constant",
+                "slot_category": "core_rotation"
               }
             ]
           }
@@ -1337,7 +1365,7 @@
           "id": "block-d6-iron",
           "pillar": "iron",
           "title": "Iron: Legs (Posterior Focus)",
-          "subtitle": "Romanian Deadlift · Barbell Hip Thrust · Leg Curl · Dumbbell Frog Press · Calf Raises on Hackenschmitt Machine · Seated Dumbbell Calf Raise",
+          "subtitle": "Romanian Deadlift · Calf Raise Using Hack Squat Machine · Barbell Hip Thrust · Leg Curl · Dumbbell Frog Press · Seated Dumbbell Calf Raise",
           "duration_minutes": 90,
           "order": 0,
           "status": "pending",
@@ -1376,6 +1404,37 @@
                 "slot_category": "hinge_compound"
               },
               {
+                "exercise_id": "39ebc3be-04f5-5a26-8d1e-61f0345d55aa",
+                "slug": "calf_raise_using_hack_squat_machine",
+                "display_name": "Calf Raise Using Hack Squat Machine",
+                "target_sets": 4,
+                "target_reps": 12,
+                "target_rep_range": "10-12 @ 1 RIR",
+                "target_rir": 1,
+                "target_weight_kg": null,
+                "rest_seconds": 150,
+                "progression_note": "Calibrate first set @ prescribed RIR",
+                "execution_technique": "Standard",
+                "tempo": [
+                  2,
+                  1,
+                  1,
+                  1
+                ],
+                "cue_card": {
+                  "setup": "Ideally using a trapeze addon, Lift the weight up using your calves by getting on your toes.",
+                  "vector": "Ideally using a trapeze addon, Lift the weight up using your calves by getting on your toes.",
+                  "catch": "Lower under control and keep tension on the target tissue.",
+                  "anti_pattern": "Stop if joint pain exceeds normal muscle fatigue.",
+                  "failure_type": "technical"
+                },
+                "tactical_role": "secondary_compound",
+                "stability_demand": "low",
+                "axial_loading": 1,
+                "resistance_profile": "constant",
+                "slot_category": "calf_raise_seated"
+              },
+              {
                 "exercise_id": "778246eb-4324-589d-bd2e-fe243fb3aaeb",
                 "slug": "barbell_hip_thrust",
                 "display_name": "Barbell Hip Thrust",
@@ -1404,7 +1463,7 @@
                 "stability_demand": "medium",
                 "axial_loading": 1,
                 "resistance_profile": "bell_shaped",
-                "slot_category": "glute_isolation"
+                "slot_category": "hinge_compound"
               },
               {
                 "exercise_id": "96266361-222c-5250-bb33-af45164c5d06",
@@ -1469,42 +1528,10 @@
                 "slot_category": "glute_isolation"
               },
               {
-                "exercise_id": "4f299c8b-033e-59e5-8121-2c7652e42d55",
-                "slug": "calf_raises_on_hackenschmitt_machine",
-                "display_name": "Calf Raises on Hackenschmitt Machine",
-                "target_sets": 4,
-                "target_reps": 12,
-                "target_rep_range": "10-12 @ 2 RIR",
-                "target_rir": 2,
-                "target_weight_kg": null,
-                "rest_seconds": 105,
-                "progression_note": "Calibrate first set @ prescribed RIR",
-                "execution_technique": "Myo-Reps",
-                "tempo": [
-                  2,
-                  1,
-                  1,
-                  1
-                ],
-                "cue_card": {
-                  "setup": "Place yourself on the machine with your back firmly against the backrest, the feet are on the platform for calf raises.",
-                  "vector": "Check that the feet are half free and that you can completely stretch the calf muscles down.",
-                  "catch": "Lower under control and keep tension on the target tissue.",
-                  "anti_pattern": "Stop if joint pain exceeds normal muscle fatigue.",
-                  "failure_type": "technical"
-                },
-                "tactical_role": "isolation_metabolic",
-                "stability_demand": "low",
-                "axial_loading": 0,
-                "resistance_profile": "constant",
-                "slot_category": "calf_raise_seated"
-              },
-              {
                 "exercise_id": "2c268540-55eb-5a6a-b1bc-2dc6cf05dadf",
                 "slug": "seated_dumbbell_calf_raise",
                 "display_name": "Seated Dumbbell Calf Raise",
                 "target_sets": 4,
-                "diagnostic_reason": "volume_floor_fallback",
                 "target_reps": 12,
                 "target_rep_range": "10-12 @ 2 RIR",
                 "target_rir": 2,
@@ -1615,13 +1642,44 @@
       "id": "block-d2-iron",
       "pillar": "iron",
       "title": "Iron: Back (Width) & Biceps",
-      "subtitle": "Alternate Lateral Pulldown · Cable Seated High Row (V-Bar) · Alternating Biceps Curls with Dumbbell · Alternating Dumbbell Hammer Curl · Hammer Curls · Dumbbell One Arm Reverse Wrist Curl",
+      "subtitle": "Barbell Bent Over Row · Alternate Lateral Pulldown · T-bar Row · Alternating Biceps Curls with Dumbbell · Bayesian Curl · Cable Hammer Curl (With Rope)",
       "duration_minutes": 90,
       "order": 0,
       "status": "pending",
       "iron": {
         "routine_id": "iron_block-d2-iron",
         "exercises": [
+          {
+            "exercise_id": "0b1e872b-095b-5c3a-a067-4b1693701fac",
+            "slug": "barbell_bent_over_row",
+            "display_name": "Barbell Bent Over Row",
+            "target_sets": 4,
+            "target_reps": 15,
+            "target_rep_range": "10-15 @ 1 RIR",
+            "target_rir": 1,
+            "target_weight_kg": null,
+            "rest_seconds": 180,
+            "progression_note": "Calibrate first set @ prescribed RIR",
+            "execution_technique": "Standard",
+            "tempo": [
+              3,
+              1,
+              1,
+              1
+            ],
+            "cue_card": {
+              "setup": "['Stand with your feet shoulder-width apart and knees slightly bent.', 'Bend forward at the hips while keeping your back straight and chest up.', 'Grasp the barbell with an overhand grip, hands slightly wider than shoulder-width apart.', 'Pull the barbell towards your lower chest by retracting your shoulder blades and squeezing your back muscles.', 'Pause for a moment at the top, then slowly lower the barbell back to the starting position.', 'Repeat for the desired number of repetitions.']",
+              "vector": "['Stand with your feet shoulder-width apart and knees slightly bent.', 'Bend forward at the hips while keeping your back straight and chest up.', 'Grasp the barbell with an overhand grip, hands slightly wider than shoulder-width apart.', 'Pull the barbell towards your lower chest by retracting your shoulder blades and squeezing your back muscles.', 'Pause for a moment at the top, then slowly lower the barbell back to the starting position.', 'Repeat for the desired number of repetitions.']",
+              "catch": "Lower under control and keep tension on the target tissue.",
+              "anti_pattern": "Stop if joint pain exceeds normal muscle fatigue.",
+              "failure_type": "technical"
+            },
+            "tactical_role": "secondary_compound",
+            "stability_demand": "high",
+            "axial_loading": 4,
+            "resistance_profile": "bell_shaped",
+            "slot_category": "back_horizontal_row"
+          },
           {
             "exercise_id": "04a7d4f2-0a39-5f4e-ad47-472592c4d415",
             "slug": "alternate_lateral_pulldown",
@@ -1654,15 +1712,15 @@
             "slot_category": "back_vertical_pull"
           },
           {
-            "exercise_id": "be3b0b0e-8068-588d-97d3-77f13e8f1a18",
-            "slug": "cable_seated_high_row_v_bar",
-            "display_name": "Cable Seated High Row (V-Bar)",
+            "exercise_id": "35e89f9c-3656-5b26-bbd7-ecf6e62fd894",
+            "slug": "t_bar_row",
+            "display_name": "T-bar Row",
             "target_sets": 4,
             "target_reps": 15,
             "target_rep_range": "10-15 @ 1 RIR",
             "target_rir": 1,
             "target_weight_kg": null,
-            "rest_seconds": 105,
+            "rest_seconds": 180,
             "progression_note": "Calibrate first set @ prescribed RIR",
             "execution_technique": "Standard",
             "tempo": [
@@ -1672,15 +1730,15 @@
               1
             ],
             "cue_card": {
-              "setup": "['Sit on the cable machine with your feet flat on the floor and your knees slightly bent.', 'Grasp the v-bar attachment with an overhand grip, palms facing each other, and your hands shoulder-width apart.', 'Keep your back straight and lean slightly forward from the hips.', 'Pull the v-bar towards your torso by retracting your shoulder blades and squeezing your back muscles.', 'Pause for a moment at the peak of the contraction, then slowly release the tension and return to the starting position.', 'Repeat for the desired number of repetitions.']",
-              "vector": "['Sit on the cable machine with your feet flat on the floor and your knees slightly bent.', 'Grasp the v-bar attachment with an overhand grip, palms facing each other, and your hands shoulder-width apart.', 'Keep your back straight and lean slightly forward from the hips.', 'Pull the v-bar towards your torso by retracting your shoulder blades and squeezing your back muscles.', 'Pause for a moment at the peak of the contraction, then slowly release the tension and return to the starting position.', 'Repeat for the desired number of repetitions.']",
+              "setup": "bent over with triangle grip, slightly bent knees",
+              "vector": "bent over with triangle grip, slightly bent knees",
               "catch": "Lower under control and keep tension on the target tissue.",
               "anti_pattern": "Stop if joint pain exceeds normal muscle fatigue.",
               "failure_type": "technical"
             },
             "tactical_role": "secondary_compound",
             "stability_demand": "low",
-            "axial_loading": 0,
+            "axial_loading": 1,
             "resistance_profile": "constant",
             "slot_category": "back_horizontal_row"
           },
@@ -1713,12 +1771,12 @@
             "stability_demand": "medium",
             "axial_loading": 0,
             "resistance_profile": "bell_shaped",
-            "slot_category": "biceps_curl"
+            "slot_category": "biceps_curl_long_head"
           },
           {
-            "exercise_id": "3e26a93a-a678-5fcf-bd8b-c2938a514506",
-            "slug": "alternating_dumbbell_hammer_curl",
-            "display_name": "Alternating Dumbbell Hammer Curl",
+            "exercise_id": "a2ca8852-dc1d-5f27-8ce3-5efc01a3f85c",
+            "slug": "bayesian_curl",
+            "display_name": "Bayesian Curl",
             "target_sets": 4,
             "target_reps": 15,
             "target_rep_range": "10-15 @ 2 RIR",
@@ -1734,8 +1792,8 @@
               1
             ],
             "cue_card": {
-              "setup": "Stand with your knees slightly bent and your back straight.",
-              "vector": "Hold a dumbbell in each hand, using a neutral grip at your sides.",
+              "setup": "Cable curl with stretched shoulder (backwards)",
+              "vector": "Cable curl with stretched shoulder (backwards)",
               "catch": "Lower under control and keep tension on the target tissue.",
               "anti_pattern": "Stop if joint pain exceeds normal muscle fatigue.",
               "failure_type": "technical"
@@ -1744,12 +1802,12 @@
             "stability_demand": "medium",
             "axial_loading": 0,
             "resistance_profile": "bell_shaped",
-            "slot_category": "biceps_curl"
+            "slot_category": "biceps_curl_short_head"
           },
           {
-            "exercise_id": "31a42a0a-53a8-5a50-b9cb-fcb5dacd8fd1",
-            "slug": "hammer_curls",
-            "display_name": "Hammer Curls",
+            "exercise_id": "65b504d5-562b-5c47-bd3f-be0e3cedf573",
+            "slug": "cable_hammer_curl_with_rope",
+            "display_name": "Cable Hammer Curl (With Rope)",
             "target_sets": 4,
             "target_reps": 15,
             "target_rep_range": "10-15 @ 2 RIR",
@@ -1757,7 +1815,7 @@
             "target_weight_kg": null,
             "rest_seconds": 105,
             "progression_note": "Calibrate first set @ prescribed RIR",
-            "execution_technique": "Standard",
+            "execution_technique": "Myo-Reps",
             "tempo": [
               3,
               1,
@@ -1765,48 +1823,17 @@
               1
             ],
             "cue_card": {
-              "setup": "- **Start:** Hold dumbbells at your sides with palms facing your torso.",
-              "vector": "- **Curl:** Lift the weights toward your shoulders while maintaining the neutral grip (like holding a hammer).",
+              "setup": "['Stand upright with your feet shoulder-width apart and a slight bend in your knees.', 'Hold the cable rope attachment with an underhand grip, palms facing each other, and your arms fully extended.', 'Keeping your upper arms stationary, exhale and curl the weights while contracting your biceps.', 'Continue to raise the cable rope attachment until your biceps are fully contracted and the rope is at shoulder level.', 'Hold the contracted position for a brief pause as you squeeze your biceps.', 'Inhale and slowly begin to lower the cable rope attachment back to the starting position.', 'Repeat for the desired number of repetitions.']",
+              "vector": "['Stand upright with your feet shoulder-width apart and a slight bend in your knees.', 'Hold the cable rope attachment with an underhand grip, palms facing each other, and your arms fully extended.', 'Keeping your upper arms stationary, exhale and curl the weights while contracting your biceps.', 'Continue to raise the cable rope attachment until your biceps are fully contracted and the rope is at shoulder level.', 'Hold the contracted position for a brief pause as you squeeze your biceps.', 'Inhale and slowly begin to lower the cable rope attachment back to the starting position.', 'Repeat for the desired number of repetitions.']",
               "catch": "Lower under control and keep tension on the target tissue.",
               "anti_pattern": "Stop if joint pain exceeds normal muscle fatigue.",
               "failure_type": "technical"
             },
             "tactical_role": "isolation_metabolic",
-            "stability_demand": "medium",
+            "stability_demand": "low",
             "axial_loading": 0,
-            "resistance_profile": "bell_shaped",
-            "slot_category": "biceps_curl"
-          },
-          {
-            "exercise_id": "e7107d1c-0843-5831-be35-cfbd4c6709b4",
-            "slug": "dumbbell_one_arm_reverse_wrist_curl",
-            "display_name": "Dumbbell One Arm Reverse Wrist Curl",
-            "target_sets": 4,
-            "target_reps": 15,
-            "target_rep_range": "10-15 @ 2 RIR",
-            "target_rir": 2,
-            "target_weight_kg": null,
-            "rest_seconds": 105,
-            "progression_note": "Calibrate first set @ prescribed RIR",
-            "execution_technique": "Standard",
-            "tempo": [
-              3,
-              1,
-              1,
-              1
-            ],
-            "cue_card": {
-              "setup": "['Sit on a bench or chair with your feet flat on the ground.', 'Hold a dumbbell in one hand with an overhand grip, palm facing down.', 'Rest your forearm on your thigh, with your wrist hanging off the edge.', 'Slowly lower the dumbbell towards the ground by flexing your wrist.', 'Pause for a moment at the bottom, then slowly curl your wrist back up towards your body.', 'Repeat for the desired number of repetitions, then switch to the other arm.']",
-              "vector": "['Sit on a bench or chair with your feet flat on the ground.', 'Hold a dumbbell in one hand with an overhand grip, palm facing down.', 'Rest your forearm on your thigh, with your wrist hanging off the edge.', 'Slowly lower the dumbbell towards the ground by flexing your wrist.', 'Pause for a moment at the bottom, then slowly curl your wrist back up towards your body.', 'Repeat for the desired number of repetitions, then switch to the other arm.']",
-              "catch": "Lower under control and keep tension on the target tissue.",
-              "anti_pattern": "Stop if joint pain exceeds normal muscle fatigue.",
-              "failure_type": "technical"
-            },
-            "tactical_role": "isolation_metabolic",
-            "stability_demand": "medium",
-            "axial_loading": 0,
-            "resistance_profile": "bell_shaped",
-            "slot_category": "biceps_curl"
+            "resistance_profile": "constant",
+            "slot_category": "biceps_hammer"
           }
         ]
       }
@@ -1856,6 +1883,6 @@
       }
     }
   ],
-  "generated_at": "2026-06-13T17:00:04.541Z",
+  "generated_at": "2026-06-13T18:54:54.914Z",
   "clinical_review_trigger": null
 }

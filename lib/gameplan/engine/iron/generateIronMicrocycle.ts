@@ -10,6 +10,7 @@ import {
   collectCandidates,
   createInitialSolverState,
   DEFAULT_MAX_SESSION_CNS,
+  type DaySlotConfig,
   isAxialLoadExercise,
   pickBestCandidate,
   prescribedSetsForSlot,
@@ -83,6 +84,7 @@ const GUARANTEED_MIN_EXERCISES_PER_TRAINING_DAY = 4;
 function maxSessionCnsForMinutes(minutes: number): number {
   if (minutes <= 30) return 12;
   if (minutes <= 45) return DEFAULT_MAX_SESSION_CNS;
+  if (minutes >= 90) return 30;
   return 18;
 }
 
@@ -136,15 +138,18 @@ function picksFromSolver(
   logs21d: readonly EnginePerformanceRow[],
   goalIron: string | null,
   dailyFocus: DailyIronFocus,
+  slots: readonly SolverSlot[] = [],
 ): EnrichedIronPick[] {
   return solverPicks.flatMap((pick) => {
     const exercise = catalog.byId.get(pick.exerciseId);
     if (!exercise) return [];
+    const slotCategory = slotCategoryForPick(pick, slots);
+    const exerciseForSlot = slotCategory ? { ...exercise, slot_category: slotCategory } : exercise;
     return [
       {
         ...pick,
-        exercise,
-        prescription: mapToIronPrescription(pick, exercise, null, logs21d, goalIron, dailyFocus),
+        exercise: exerciseForSlot,
+        prescription: mapToIronPrescription(pick, exerciseForSlot, null, logs21d, goalIron, dailyFocus),
       },
     ];
   });
@@ -229,6 +234,7 @@ function pickFallbackExerciseViaSolver(
   selected: readonly RedundancyExercise[],
   allowSlotCategoryDuplicate = false,
   volumeFloorFallback = false,
+  daySlotConfig?: DaySlotConfig,
 ): { exercise: CatalogExercise; score: number } | null {
   const candidates = collectCandidates(
     slot.day,
@@ -243,6 +249,7 @@ function pickFallbackExerciseViaSolver(
       ignoreCnsBudget: volumeFloorFallback,
       ignoreMrv: volumeFloorFallback,
       ignoreRecoveryMode: volumeFloorFallback,
+      daySlotConfig,
     },
   ).filter((exercise) => {
     if (volumeFloorFallback && !tracker.canAddSets(exercise, 3).allowed) return false;
@@ -342,6 +349,7 @@ function validateIronDayBlockVolume(
         selected,
         allowSlotCategoryDuplicate,
         true,
+        { slots: template.slots },
       );
       if (!selection) continue;
 
@@ -415,6 +423,22 @@ function resolveSplitRotation(frequencyIron: number): readonly SplitDayKey[] {
   return PPL_ROTATION.slice(0, Math.min(frequencyIron, PPL_ROTATION.length));
 }
 
+function validateNoFallbacks(dayBlocks: readonly IronDayBlock[]): void {
+  for (const day of dayBlocks) {
+    const fallbackCount = day.picks.filter(
+      (pick) => pick.diagnostic_reason === 'volume_floor_fallback',
+    ).length;
+
+    if (fallbackCount > 0) {
+      console.warn(
+        `Dia ${day.dayIndex} tem ${fallbackCount} fallback(s). ` +
+          'O solver não está conseguindo preencher os slots naturalmente. ' +
+          'Revise slot_categories e anti-redundância.',
+      );
+    }
+  }
+}
+
 /**
  * Heuristic iron microcycle — ABCDEF by default when `frequency_iron === 6`;
  * PPL×2 remains available via `preferred_split`.
@@ -468,6 +492,7 @@ export function generateIronMicrocycle(input: GenerateIronMicrocycleInput): Iron
       solverState,
       tracker,
       input.ironDayIndices[ironSlot],
+      useAbcdefSplit ? ironSlot + 1 : undefined,
     );
     solverState = state;
 
@@ -489,7 +514,7 @@ export function generateIronMicrocycle(input: GenerateIronMicrocycleInput): Iron
       splitDay,
       focusLabel: template.focusLabel ?? PPL_FOCUS_LABELS[splitDay],
       ironSlotIndex: ironSlot,
-      picks: picksFromSolver(picks, catalog, input.logs21d, input.goalIron, dailyIronFocus),
+      picks: picksFromSolver(picks, catalog, input.logs21d, input.goalIron, dailyIronFocus, daySlots),
       coherenceValidated: false,
     });
 
@@ -524,9 +549,13 @@ export function generateIronMicrocycle(input: GenerateIronMicrocycleInput): Iron
     }
   }
 
-  return useAbcdefSplit
+  const finalBlocks = useAbcdefSplit
     ? validateIronDayBlockVolume(dayBlocks, catalog, input, constraints, tracker, solverState)
     : dayBlocks;
+
+  validateNoFallbacks(finalBlocks);
+
+  return finalBlocks;
 }
 
 export function ironDayBlockToPrescriptions(

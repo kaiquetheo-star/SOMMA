@@ -17,11 +17,13 @@ type SlotCategory =
   | 'shoulder_overhead_press'
   | 'shoulder_lateral_raise'
   | 'shoulder_posterior_fly'
+  | 'shoulder_anterior_raise'
   | 'trap_shrug'
   | 'biceps_curl'
   | 'triceps_extension'
   | 'forearm_isolation'
   | 'core_anti_extension'
+  | 'core_rotation'
   | 'hinge_compound'
   | 'hamstring_curl'
   | 'glute_isolation'
@@ -42,6 +44,30 @@ const SLOT_CATEGORY_OVERRIDES: Record<string, SlotCategory> = {
   bent_over_lateral_raises: 'shoulder_posterior_fly',
   butterfly_reverse: 'shoulder_posterior_fly',
   face_pull: 'shoulder_posterior_fly',
+  // Final corrections from backup 2026-06-13 18:23.
+  cable_rear_delt_fly_single_arm: 'shoulder_posterior_fly',
+  cable_rear_delt_fly: 'shoulder_posterior_fly',
+  cable_front_raise_with_a_small_bar: 'shoulder_anterior_raise',
+  cable_front_raise: 'shoulder_anterior_raise',
+  straight_bar_cable_front_raise: 'shoulder_anterior_raise',
+  plate_front_raise: 'shoulder_anterior_raise',
+  dumbbell_front_raise: 'shoulder_anterior_raise',
+  dumbbell_front_raise_v_2: 'shoulder_anterior_raise',
+  front_raises: 'shoulder_anterior_raise',
+  front_raises_with_plates: 'shoulder_anterior_raise',
+  finger_curls: 'forearm_isolation',
+  wrist_curls: 'forearm_isolation',
+  reverse_wrist_curl: 'forearm_isolation',
+  dumbbell_one_arm_reverse_wrist_curl: 'forearm_isolation',
+  barbell_wrist_curl: 'forearm_isolation',
+  calf_raises_one_legged: 'calf_raise',
+  '3008_abdominal_crunch': 'core_anti_extension',
+  seated_dumbbell_calf_raise: 'calf_raise_seated',
+  barbell_bent_over_row: 'back_horizontal_row',
+  t_bar_row: 'back_horizontal_row',
+  lever_t_bar_row: 'back_horizontal_row',
+  hack_squats: 'quad_compound',
+  leg_press: 'quad_compound',
 };
 
 const SLOT_CATEGORY_BY_SLUG: Record<string, SlotCategory> = {

@@ -35,7 +35,7 @@ const userBiological: UserBiological = {
   hormonal_transition: false,
   hormonal_protocol: {
     type: 'trt',
-    weekly_dose_mg: 200,
+    weekly_dose_mg: 300,
     recovery_multiplier: 1.5,
   },
 };

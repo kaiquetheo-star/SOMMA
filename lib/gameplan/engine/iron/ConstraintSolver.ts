@@ -15,6 +15,11 @@ import {
   type VolumeBudget,
   type VolumeExecutionTechnique,
 } from '@/lib/gameplan/engine/iron/volumePeriodization';
+import {
+  getMandatoryCompoundCandidates,
+  hasRequiredCompound,
+  MANDATORY_COMPOUND_GROUPS_BY_DAY,
+} from '@/lib/gameplan/engine/iron/mandatoryCompounds';
 import type { IronMovementPattern } from '@/lib/gameplan/engine/iron/taxonomy/movementPatterns';
 import type {
   CatalogExercise,
@@ -71,6 +76,9 @@ const BODYWEIGHT_BLACKLIST = new Set([
 
 export type RedundancyExercise = CatalogExercise & { slot_category?: string };
 export type SolverStateWithSelection = SolverState & { selectedExercises?: readonly RedundancyExercise[] };
+export type DaySlotConfig = {
+  slots: readonly ({ category?: string; count?: number } | SolverSlot)[];
+};
 
 function minimumViableDiagnosticReason(constraints: SolverConstraints): string {
   return constraints.blockedJointProfiles.length > 0
@@ -190,19 +198,42 @@ function exerciseWithSlotCategory(exercise: CatalogExercise, slot: SolverSlot): 
   return slot.category ? { ...exercise, slot_category: slot.category } : exercise;
 }
 
-export function isRedundant(candidate: RedundancyExercise, alreadySelected: readonly RedundancyExercise[]): boolean {
+function slotCategoryAllowsMultiple(category: string, daySlotConfig: DaySlotConfig): boolean {
+  let categoryInstances = 0;
+
+  for (const slot of daySlotConfig.slots) {
+    if (slot.category !== category) continue;
+    if ('count' in slot && typeof slot.count === 'number' && slot.count > 1) return true;
+    categoryInstances += 1;
+  }
+
+  return categoryInstances > 1;
+}
+
+export function isRedundant(
+  candidate: RedundancyExercise,
+  alreadySelected: readonly RedundancyExercise[],
+  daySlotConfig: DaySlotConfig = { slots: [] },
+): boolean {
   return alreadySelected.some((selected) => {
     if (candidate.slug === selected.slug) return true;
 
-    if (candidate.slot_category && candidate.slot_category === selected.slot_category) return true;
+    if (candidate.slot_category && candidate.slot_category === selected.slot_category) {
+      if (!slotCategoryAllowsMultiple(candidate.slot_category, daySlotConfig)) return true;
+    }
 
-    return (
-      candidate.slot_category != null &&
-      selected.slot_category != null &&
+    if (
       candidate.primary_muscle === selected.primary_muscle &&
       candidate.movement_pattern === selected.movement_pattern &&
-      candidate.slot_category === selected.slot_category
-    );
+      JSON.stringify(candidate.equipment_required) === JSON.stringify(selected.equipment_required)
+    ) {
+      if (candidate.slot_category && slotCategoryAllowsMultiple(candidate.slot_category, daySlotConfig)) {
+        return false;
+      }
+      return true;
+    }
+
+    return false;
   });
 }
 
@@ -276,7 +307,7 @@ export function matchesSlotCategory(exercise: CatalogExercise, category: string 
     case 'calf_raise':
       return exercise.primary_muscle === 'calves' && /calf|raise/.test(text);
     case 'calf_raise_seated':
-      return exercise.primary_muscle === 'calves' && /seated|calf|raise/.test(text);
+      return exercise.primary_muscle === 'calves' && /seated|hackenschmitt|hack_squat/.test(text);
     case 'shoulder_overhead_press':
       return exercise.movement_pattern === 'push' && /shoulder_press|overhead|military|arnold|landmine/.test(text);
     case 'shoulder_lateral_raise':
@@ -607,6 +638,7 @@ export function collectCandidates(
     ignoreRecoveryMode?: boolean;
     ignoreBodyweightBlacklist?: boolean;
     allowSameSlotCategoryDifferentConcept?: boolean;
+    daySlotConfig?: DaySlotConfig;
   } = {},
 ): CatalogExercise[] {
   const candidates: CatalogExercise[] = [];
@@ -629,17 +661,13 @@ export function collectCandidates(
       logCandidateRejection(slot, exercise, 'exercício já usado no microciclo');
       continue;
     }
-    const redundant = isRedundant(candidateForRedundancy, state.selectedExercises ?? []);
-    if (redundant && !options.allowSameSlotCategoryDifferentConcept) {
+    const redundant = isRedundant(
+      candidateForRedundancy,
+      state.selectedExercises ?? [],
+      options.daySlotConfig ?? { slots: [slot] },
+    );
+    if (redundant) {
       logCandidateRejection(slot, exercise, 'redundância conceitual com exercício já selecionado no dia');
-      continue;
-    }
-    if (
-      redundant &&
-      options.allowSameSlotCategoryDifferentConcept &&
-      state.selectedExercises?.some((selected) => selected.slug === exercise.slug)
-    ) {
-      logCandidateRejection(slot, exercise, 'exercício já selecionado no dia');
       continue;
     }
     if (!matchesMovementPattern(exercise, slot.requiredPatterns)) {
@@ -973,6 +1001,7 @@ export function solveDaySlots(
   initialState: SolverState,
   tracker: WeeklyVolumeTracker,
   currentDayIndex?: number,
+  mandatoryCompoundDayIndex?: number,
 ): { picks: readonly SolverResult[]; state: SolverState } {
   const usedExerciseIds = new Set(initialState.usedExerciseIds);
   const usedConceptKeys = new Set<string>();
@@ -991,8 +1020,70 @@ export function solveDaySlots(
     shoulderSets,
     dayHadAxialLoad,
   };
+  const daySlotConfig: DaySlotConfig = { slots };
+  const filledSlotIds = new Set(picks.map((pick) => pick.slotId));
+
+  if (mandatoryCompoundDayIndex != null) {
+    const selectedCatalogExercises = (): CatalogExercise[] =>
+      mutableState.selectedExercises.map((exercise) => exercise);
+    const mandatoryCandidates = getMandatoryCompoundCandidates(
+      catalog.exercises,
+      mandatoryCompoundDayIndex,
+      { available_equipment: constraints.available_equipment ?? constraints.equipment },
+    );
+
+    if (mandatoryCandidates.length > 0 && !hasRequiredCompound(selectedCatalogExercises(), mandatoryCompoundDayIndex)) {
+      const mandatoryGroups = MANDATORY_COMPOUND_GROUPS_BY_DAY[mandatoryCompoundDayIndex] ?? [];
+
+      for (const mandatoryGroup of mandatoryGroups) {
+        if (mandatoryGroup.some((slug) => selectedCatalogExercises().some((exercise) => exercise.slug === slug))) continue;
+        let mandatorySelected = false;
+        const groupCandidates = mandatoryCandidates.filter((candidate) => mandatoryGroup.includes(candidate.slug));
+
+        for (const mandatoryCandidate of groupCandidates) {
+          if (mandatorySelected) break;
+
+          for (const slot of slots) {
+            if (filledSlotIds.has(slot.slotId)) continue;
+            const bypassSameDayConcepts = mandatoryCompoundDayIndex === 1;
+            const stateForSlot: SolverStateWithSelection = {
+              ...initialState,
+              usedExerciseIds: mutableState.usedExerciseIds,
+              usedConceptKeys: bypassSameDayConcepts ? new Set<string>() : mutableState.usedConceptKeys,
+              selectedExercises: bypassSameDayConcepts ? [] : mutableState.selectedExercises,
+              sessionCnsAccum: mutableState.sessionCnsAccum,
+              sessionAxialLoad: mutableState.sessionAxialLoad,
+            };
+            const candidates = collectCandidates(day, catalog, slot, constraints, stateForSlot, tracker, currentDayIndex, {
+              daySlotConfig,
+            }).filter((exercise) => exercise.slug === mandatoryCandidate.slug);
+            const selection = pickBestCandidate(candidates, tracker, constraints, stateForSlot, currentDayIndex, slot);
+            if (!selection) continue;
+
+            const { prescribedSets, budget, phase } = prescribedSetsForSlot(slot, selection.exercise, constraints);
+            pushSolverPick(
+              picks,
+              selection.exercise,
+              slot,
+              prescribedSets,
+              selection.score,
+              mutableState,
+              tracker,
+              undefined,
+              budget,
+              phase,
+            );
+            filledSlotIds.add(slot.slotId);
+            mandatorySelected = true;
+            break;
+          }
+        }
+      }
+    }
+  }
 
   for (const slot of slots) {
+    if (filledSlotIds.has(slot.slotId)) continue;
     const stateForSlot: SolverStateWithSelection = {
       ...initialState,
       usedExerciseIds: mutableState.usedExerciseIds,
@@ -1003,6 +1094,7 @@ export function solveDaySlots(
     };
     const candidates = collectCandidates(day, catalog, slot, constraints, stateForSlot, tracker, currentDayIndex, {
       allowSameSlotCategoryDifferentConcept: isRepeatedSlotInstance(slot),
+      daySlotConfig,
     });
 
     const selection = pickBestCandidate(candidates, tracker, constraints, stateForSlot, currentDayIndex, slot);
@@ -1011,6 +1103,7 @@ export function solveDaySlots(
     const { exercise, score } = selection;
     const { prescribedSets, budget, phase } = prescribedSetsForSlot(slot, exercise, constraints);
     pushSolverPick(picks, exercise, slot, prescribedSets, score, mutableState, tracker, undefined, budget, phase);
+    filledSlotIds.add(slot.slotId);
   }
 
   if (picks.length > 0 && picks.length < MINIMUM_FULL_WORKOUT_EXERCISE_COUNT) {
@@ -1045,6 +1138,7 @@ export function solveDaySlots(
           ignoreMrv: true,
           ignoreRecoveryMode: true,
           allowSameSlotCategoryDifferentConcept: isRepeatedSlotInstance(deloadSlot),
+          daySlotConfig,
         },
       );
       const selection = pickBestCandidate(candidates, tracker, constraints, stateForSlot, currentDayIndex, deloadSlot);
@@ -1090,6 +1184,7 @@ export function solveDaySlots(
         ignoreRecoveryMode: true,
         ignoreBodyweightBlacklist: true,
         allowSameSlotCategoryDifferentConcept: isRepeatedSlotInstance(fallbackSlot),
+        daySlotConfig,
       });
       const selection = pickBestCandidate(candidates, tracker, constraints, stateForSlot, currentDayIndex, fallbackSlot);
       if (!selection) continue;

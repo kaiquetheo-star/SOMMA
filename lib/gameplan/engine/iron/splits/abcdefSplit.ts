@@ -131,8 +131,8 @@ const ABCDEF_TRAINING_DAYS: readonly AbcdefTrainingDay[] = [
     min_exercises: 7,
     max_exercises: 9,
     slots: [
-      { category: 'biceps_curl', count: 3, priority: 1 },
-      { category: 'triceps_extension', count: 3, priority: 1 },
+      { category: 'biceps_curl', count: 2, priority: 1 },
+      { category: 'triceps_extension', count: 2, priority: 1 },
       { category: 'forearm_isolation', count: 1, priority: 2 },
       { category: 'core_anti_extension', count: 1, priority: 2 },
       { category: 'core_rotation', count: 1, priority: 3 },
