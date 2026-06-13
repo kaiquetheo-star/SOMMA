@@ -10,6 +10,7 @@ import {
   FIXED_NUTRITION_GOAL,
   type MesocyclePhase,
   type BiologicalProfile,
+  type HormonalProtocol,
   type PreferredSplit,
 } from '@/types/biological';
 
@@ -62,10 +63,51 @@ const PREFERRED_SPLIT_OPTIONS: Array<{
   },
 ];
 
+type HormonalProtocolOptionId = 'natural' | 'trt_low' | 'trt_high' | 'enhanced';
+
+const HORMONAL_PROTOCOL_OPTIONS: Array<{
+  id: HormonalProtocolOptionId;
+  label: string;
+  subtitle: string;
+  protocol: HormonalProtocol;
+}> = [
+  {
+    id: 'natural',
+    label: 'Natural',
+    subtitle: 'Baseline recovery and standard volume tolerance.',
+    protocol: { type: 'natural', recovery_multiplier: 1.0 },
+  },
+  {
+    id: 'trt_low',
+    label: 'TRT (100-200mg/week)',
+    subtitle: 'Therapeutic TRT range; recovery multiplier 1.5x.',
+    protocol: { type: 'trt', weekly_dose_mg: 200, recovery_multiplier: 1.5 },
+  },
+  {
+    id: 'trt_high',
+    label: 'TRT (200-300mg/week)',
+    subtitle: 'Aggressive TRT range; recovery multiplier 2.0x.',
+    protocol: { type: 'trt', weekly_dose_mg: 300, recovery_multiplier: 2.0 },
+  },
+  {
+    id: 'enhanced',
+    label: 'Enhanced Cycle',
+    subtitle: 'Full enhanced cycle; recovery multiplier 2.5x.',
+    protocol: { type: 'enhanced_cycle', recovery_multiplier: 2.5 },
+  },
+];
+
+function resolveHormonalProtocolOptionId(protocol: HormonalProtocol | undefined): HormonalProtocolOptionId {
+  if (!protocol || protocol.type === 'natural') return 'natural';
+  if (protocol.type === 'enhanced_cycle') return 'enhanced';
+  return protocol.weekly_dose_mg != null && protocol.weekly_dose_mg > 200 ? 'trt_high' : 'trt_low';
+}
+
 export function BiologicalPassportForm({ value, onChange }: BiologicalPassportFormProps) {
   const age = ageFromDateOfBirth(value.date_of_birth);
   const selectedMesocyclePhase = value.mesocycle_phase ?? 'maintenance';
   const selectedPreferredSplit = value.preferred_split ?? 'abcdef';
+  const selectedHormonalProtocol = resolveHormonalProtocolOptionId(value.hormonal_protocol);
 
   return (
     <View className="gap-6">
@@ -125,6 +167,28 @@ export function BiologicalPassportForm({ value, onChange }: BiologicalPassportFo
           onChange({ training_days_per_week, frequency_iron: training_days_per_week })
         }
       />
+
+      <View className="gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-5">
+        <View>
+          <Text className="font-body text-[10px] uppercase tracking-[0.35em] text-matte-gold/70">
+            Hormonal Protocol
+          </Text>
+          <Text className="mt-2 font-body text-xs leading-5 text-[#6B7568]">
+            Tunes recovery and volume ceilings for the Iron periodization engine.
+          </Text>
+        </View>
+
+        {HORMONAL_PROTOCOL_OPTIONS.map((option) => (
+          <SelectionTile
+            key={option.id}
+            label={option.label}
+            subtitle={option.subtitle}
+            selected={selectedHormonalProtocol === option.id}
+            onPress={() => onChange({ hormonal_protocol: option.protocol })}
+            accessibilityLabel={`Select ${option.label} hormonal protocol`}
+          />
+        ))}
+      </View>
 
       <View className="gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-5">
         <View>

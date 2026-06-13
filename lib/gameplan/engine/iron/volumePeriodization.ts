@@ -1,5 +1,6 @@
 import type { CatalogExercise } from '@/lib/gameplan/engine/iron/types';
-import type { MesocyclePhase } from '@/types/biological';
+import { getVolumeBudgetForHormonalProfile } from '@/lib/gameplan/engine/iron/hormonalProfile';
+import type { MesocyclePhase, UserBiological } from '@/types/biological';
 
 export type VolumeExecutionTechnique = 'Standard' | 'Myo-Reps' | 'Drop-Set' | 'Rest-Pause';
 
@@ -43,13 +44,48 @@ export function resolveEffectiveMesocyclePhase(
 
 export function calculateVolumeBudget(
   exercise: CatalogExercise,
-  mesocyclePhase: MesocyclePhase,
+  biological: UserBiological,
   isCompound: boolean,
   cnsFatigueScore: number,
 ): VolumeBudget {
+  const mesocyclePhase = biological.mesocycle_phase ?? 'maintenance';
+  const hormonalBudget = getVolumeBudgetForHormonalProfile(biological, mesocyclePhase);
+  const usesEnhancedRecovery = biological.hormonal_protocol != null && biological.hormonal_protocol.type !== 'natural';
   let budget: VolumeBudget;
 
-  if (mesocyclePhase === 'bulking') {
+  if (mesocyclePhase === 'bulking' && usesEnhancedRecovery) {
+    budget = isCompound
+      ? {
+          minSets: 4,
+          maxSets: Math.min(6, Math.max(4, hormonalBudget.targetSetsPerSession)),
+          targetRepRange: '6-10',
+          targetRIR: 1,
+          executionTechnique: 'Standard',
+        }
+      : {
+          minSets: 4,
+          maxSets: Math.min(8, Math.max(4, hormonalBudget.targetSetsPerSession)),
+          targetRepRange: '10-15',
+          targetRIR: 2,
+          executionTechnique: 'Myo-Reps',
+        };
+  } else if (mesocyclePhase === 'cutting' && usesEnhancedRecovery) {
+    budget = isCompound
+      ? {
+          minSets: 4,
+          maxSets: Math.min(5, Math.max(4, hormonalBudget.targetSetsPerSession)),
+          targetRepRange: '8-12',
+          targetRIR: 2,
+          executionTechnique: 'Standard',
+        }
+      : {
+          minSets: 5,
+          maxSets: Math.min(8, Math.max(5, hormonalBudget.targetSetsPerSession)),
+          targetRepRange: '12-20',
+          targetRIR: 2,
+          executionTechnique: 'Myo-Reps',
+        };
+  } else if (mesocyclePhase === 'bulking') {
     budget = isCompound
       ? {
           minSets: 4,

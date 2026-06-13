@@ -17,6 +17,7 @@ import {
   solveDaySlots,
 } from '@/lib/gameplan/engine/iron/ConstraintSolver';
 import { mapToIronPrescription } from '@/lib/gameplan/engine/iron/loadPrescriptionMapper';
+import { getVolumeBudgetForHormonalProfile } from '@/lib/gameplan/engine/iron/hormonalProfile';
 import { PPL_DAY_SLOTS, PPL_ROTATION, resolvePplDayTemplate } from '@/lib/gameplan/engine/iron/splits/pplSplit';
 import { resolveAbcdefDayTemplate } from '@/lib/gameplan/engine/iron/splits/abcdefSplit';
 import { getDailyIronFocus, type DailyIronFocus } from '@/lib/gameplan/engine/iron/dupLogic';
@@ -125,6 +126,7 @@ function buildConstraints(
     cns_fatigue_score: input.biological.cns_fatigue_score,
     mesocycle_phase: input.biological.mesocycle_phase,
     mesocycle_week: input.biological.mesocycle_week,
+    biological: input.biological,
   };
 }
 
@@ -226,6 +228,7 @@ function pickFallbackExerciseViaSolver(
   currentDayIndex: number,
   selected: readonly RedundancyExercise[],
   allowSlotCategoryDuplicate = false,
+  volumeFloorFallback = false,
 ): { exercise: CatalogExercise; score: number } | null {
   const candidates = collectCandidates(
     slot.day,
@@ -235,8 +238,14 @@ function pickFallbackExerciseViaSolver(
     state,
     tracker,
     currentDayIndex,
-    { allowSameSlotCategoryDifferentConcept: allowSlotCategoryDuplicate },
+    {
+      allowSameSlotCategoryDifferentConcept: allowSlotCategoryDuplicate,
+      ignoreCnsBudget: volumeFloorFallback,
+      ignoreMrv: volumeFloorFallback,
+      ignoreRecoveryMode: volumeFloorFallback,
+    },
   ).filter((exercise) => {
+    if (volumeFloorFallback && !tracker.canAddSets(exercise, 3).allowed) return false;
     if (!allowSlotCategoryDuplicate) return true;
     const candidate = exerciseWithSlotCategory(exercise, slot);
     const candidateFamily = fallbackConceptFamily(exercise, slot);
@@ -263,11 +272,16 @@ function validateIronDayBlockVolume(
 
   const validatedBlocks = dayBlocks.map((block) => {
     const template = resolveAbcdefDayTemplate(block.ironSlotIndex);
-    const minimumExerciseCount = Math.max(
-      GUARANTEED_MIN_EXERCISES_PER_TRAINING_DAY,
-      template.minExercises,
-      template.slots.length,
+    const hormonalBudget = getVolumeBudgetForHormonalProfile(
+      input.biological,
+      input.biological.mesocycle_phase ?? 'maintenance',
     );
+    const maximumExerciseCount = Math.min(template.maxExercises, hormonalBudget.maxExercisesPerDay);
+    const requestedMinimumExerciseCount = Math.max(
+      GUARANTEED_MIN_EXERCISES_PER_TRAINING_DAY,
+      Math.max(template.minExercises, hormonalBudget.minExercisesPerDay),
+    );
+    const minimumExerciseCount = Math.min(maximumExerciseCount, requestedMinimumExerciseCount);
     if (block.picks.length >= minimumExerciseCount) return block;
 
     const selected: RedundancyExercise[] = block.picks.map((pick) => {
@@ -327,6 +341,7 @@ function validateIronDayBlockVolume(
         block.dayIndex,
         selected,
         allowSlotCategoryDuplicate,
+        true,
       );
       if (!selection) continue;
 
@@ -335,7 +350,7 @@ function validateIronDayBlockVolume(
       const { prescribedSets, budget } = prescribedSetsForSlot(slot, exercise, constraints);
       const fallbackSets = isMinimumViableVolumeFloor
         ? Math.min(2, prescribedSets)
-        : Math.min(3, Math.max(2, prescribedSets));
+        : Math.max(2, prescribedSets);
       const solverResult: SolverResult = {
         slotId: `${slot.slotId}_volume_floor_fallback`,
         exerciseId: exercise.id,

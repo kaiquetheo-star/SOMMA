@@ -19,6 +19,9 @@ export function maxIronExercisesForMinutes(minutes: number): IronTimeBudgetLimit
   if (minutes <= 45) {
     return { cap: 4, compoundsOnly: false };
   }
+  if (minutes >= UNLIMITED_IRON_MINUTES) {
+    return { cap: 9, compoundsOnly: false };
+  }
   return { cap: 6, compoundsOnly: false };
 }
 

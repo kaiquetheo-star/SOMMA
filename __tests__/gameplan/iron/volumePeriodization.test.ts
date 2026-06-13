@@ -6,6 +6,7 @@ import {
   resolveEffectiveMesocyclePhase,
 } from '@/lib/gameplan/engine/iron/volumePeriodization';
 import type { CatalogExercise } from '@/lib/gameplan/engine/iron/types';
+import { initialBiologicalProfile, type MesocyclePhase, type UserBiological } from '@/types/biological';
 
 function catalogExercise(partial: Partial<CatalogExercise>): CatalogExercise {
   return {
@@ -42,6 +43,17 @@ function catalogExercise(partial: Partial<CatalogExercise>): CatalogExercise {
   };
 }
 
+function biological(
+  mesocyclePhase: MesocyclePhase,
+  overrides: Partial<UserBiological> = {},
+): UserBiological {
+  return {
+    ...initialBiologicalProfile,
+    mesocycle_phase: mesocyclePhase,
+    ...overrides,
+  };
+}
+
 describe('calculateVolumeBudget', () => {
   it('allows 5-7 sets for a cutting isolation movement', () => {
     const cableFly = catalogExercise({
@@ -51,7 +63,7 @@ describe('calculateVolumeBudget', () => {
       tactical_role: 'isolation_metabolic',
     });
 
-    const budget = calculateVolumeBudget(cableFly, 'cutting', isCompoundExercise(cableFly), 0);
+    const budget = calculateVolumeBudget(cableFly, biological('cutting'), isCompoundExercise(cableFly), 0);
 
     expect(budget).toMatchObject({
       minSets: 5,
@@ -71,7 +83,7 @@ describe('calculateVolumeBudget', () => {
       cns_fatigue_cost: 4,
     });
 
-    const budget = calculateVolumeBudget(benchPress, 'bulking', isCompoundExercise(benchPress), 0);
+    const budget = calculateVolumeBudget(benchPress, biological('bulking'), isCompoundExercise(benchPress), 0);
 
     expect(budget).toMatchObject({
       minSets: 4,
@@ -89,7 +101,7 @@ describe('calculateVolumeBudget', () => {
       movement_pattern: 'isolation',
     });
 
-    const budget = calculateVolumeBudget(legExtension, 'deload', isCompoundExercise(legExtension), 0);
+    const budget = calculateVolumeBudget(legExtension, biological('deload'), isCompoundExercise(legExtension), 0);
 
     expect(budget).toMatchObject({
       minSets: 2,
@@ -108,7 +120,7 @@ describe('calculateVolumeBudget', () => {
       tactical_role: 'isolation_metabolic',
     });
 
-    const budget = calculateVolumeBudget(lateralRaise, 'maintenance', isCompoundExercise(lateralRaise), 0);
+    const budget = calculateVolumeBudget(lateralRaise, biological('maintenance'), isCompoundExercise(lateralRaise), 0);
 
     expect(budget.minSets).toBe(3);
     expect(budget.maxSets).toBe(4);
@@ -127,9 +139,68 @@ describe('calculateVolumeBudget', () => {
       movement_pattern: 'isolation',
     });
 
-    const budget = calculateVolumeBudget(cableFly, 'cutting', isCompoundExercise(cableFly), 80);
+    const budget = calculateVolumeBudget(cableFly, biological('cutting'), isCompoundExercise(cableFly), 80);
 
     expect(budget.minSets).toBe(4);
     expect(budget.maxSets).toBe(6);
+  });
+
+  it('allows higher bulking compound volume for TRT/enhanced profiles', () => {
+    const benchPress = catalogExercise({
+      slug: 'barbell_bench_press',
+      name: 'Barbell Bench Press',
+      movement_pattern: 'push',
+      tactical_role: 'primary_compound',
+    });
+
+    const budget = calculateVolumeBudget(
+      benchPress,
+      biological('bulking', {
+        hormonal_protocol: {
+          type: 'trt',
+          weekly_dose_mg: 200,
+          recovery_multiplier: 1.5,
+        },
+      }),
+      isCompoundExercise(benchPress),
+      0,
+    );
+
+    expect(budget).toMatchObject({
+      minSets: 4,
+      maxSets: 6,
+      targetRepRange: '6-10',
+      targetRIR: 1,
+      executionTechnique: 'Standard',
+    });
+  });
+
+  it('keeps cutting isolation volume high for non-natural profiles', () => {
+    const cableFly = catalogExercise({
+      slug: 'cable_fly',
+      name: 'Cable Fly',
+      movement_pattern: 'isolation',
+    });
+
+    const budget = calculateVolumeBudget(
+      cableFly,
+      biological('cutting', {
+        hormonal_protocol: {
+          type: 'enhanced_cycle',
+          weekly_dose_mg: 500,
+          recovery_multiplier: 2.5,
+        },
+      }),
+      isCompoundExercise(cableFly),
+      0,
+    );
+
+    expect(budget).toMatchObject({
+      minSets: 5,
+      maxSets: 8,
+      targetRepRange: '12-20',
+      targetRIR: 2,
+      executionTechnique: 'Myo-Reps',
+    });
   });
 });

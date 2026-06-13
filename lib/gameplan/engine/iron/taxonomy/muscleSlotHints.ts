@@ -26,7 +26,12 @@ export function matchesMuscleSlotHint(exercise: CatalogExercise, hint: string | 
   }
 
   if (hint === 'front_delts') {
-    return exercise.primary_muscle === 'front_delts' || exercise.primary_muscle === 'shoulders';
+    return (
+      exercise.primary_muscle === 'front_delts' ||
+      exercise.primary_muscle === 'shoulders' ||
+      exercise.primary_muscle === 'delts' ||
+      /front|anterior/i.test(exercise.slug)
+    );
   }
 
   if (hint === 'upper_chest') {

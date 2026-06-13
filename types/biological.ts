@@ -14,6 +14,14 @@ export type MesocycleGoal = 'strength' | 'hypertrophy' | 'metabolic_conditioning
 
 export type PreferredSplit = 'abcdef' | 'ppl_x2';
 
+export type HormonalProtocol = {
+  type: 'natural' | 'trt' | 'enhanced_cycle';
+  /** Weekly exogenous androgen dose in mg, when known. */
+  weekly_dose_mg?: number;
+  /** Recovery and volume tolerance multiplier used by periodization. */
+  recovery_multiplier: 1.0 | 1.5 | 2.0 | 2.5;
+};
+
 /** Biological Passport — maps to anthropometric, Iron and nutrition steering fields */
 export interface BiologicalProfile {
   date_of_birth: string | null;
@@ -53,6 +61,8 @@ export interface BiologicalProfile {
   current_body_fat_estimate: number | null;
   /** Regra 2/3: hormonal transition phase increases recovery and hydration caution. */
   hormonal_transition?: boolean | null;
+  /** Explicit hormonal protocol for recovery-aware Iron periodization. */
+  hormonal_protocol?: HormonalProtocol;
 }
 
 export type UserBiological = BiologicalProfile;
@@ -103,6 +113,7 @@ export const initialBiologicalProfile: BiologicalProfile = {
   clinical_exit_interview: null,
   current_body_fat_estimate: null,
   hormonal_transition: false,
+  hormonal_protocol: undefined,
 };
 
 export function withFixedBiologicalProfile(
@@ -135,6 +146,7 @@ export function withFixedBiologicalProfile(
     current_body_fat_estimate:
       profile?.current_body_fat_estimate ?? initialBiologicalProfile.current_body_fat_estimate,
     hormonal_transition: profile?.hormonal_transition ?? initialBiologicalProfile.hormonal_transition,
+    hormonal_protocol: profile?.hormonal_protocol ?? initialBiologicalProfile.hormonal_protocol,
   };
 }
 

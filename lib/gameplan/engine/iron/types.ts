@@ -13,7 +13,7 @@ import type {
 import type { EnginePerformanceRow } from '@/lib/gameplan/engine/performanceLogs';
 import type { EquipmentTag } from '@/store/useSommaStore';
 import type { DailyIronFocus } from '@/lib/gameplan/engine/iron/dupLogic';
-import type { MesocyclePhase } from '@/types/biological';
+import type { MesocyclePhase, UserBiological } from '@/types/biological';
 
 export type SplitDayKey = 'push' | 'pull' | 'legs';
 
@@ -119,6 +119,8 @@ export interface SolverConstraints {
   mesocycle_phase?: MesocyclePhase | null;
   /** Current mesocycle week. Weeks 4/6 force deload budgets. */
   mesocycle_week?: number | null;
+  /** Full biological passport for recovery-aware periodization. */
+  biological?: UserBiological;
 }
 
 export interface SolverState {

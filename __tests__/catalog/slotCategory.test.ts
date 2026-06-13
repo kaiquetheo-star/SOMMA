@@ -114,7 +114,7 @@ describe('Slot Category Overrides', () => {
         'stiff_leg_deadlift',
         'stiff_legged_deadlifts',
         'dumbbell_stiff_leg_deadlift',
-      ].includes(exercise.slug),
+      ].includes(exercise.slug ?? ''),
     );
 
     expect(hasRdlOrStiff).toBe(true);

@@ -31,6 +31,7 @@ import type {
   WeeklyVolumeSnapshot,
 } from '@/lib/gameplan/engine/iron/types';
 import { computeRestSecondsFromCns } from '@/types/catalog';
+import { initialBiologicalProfile } from '@/types/biological';
 import type { EquipmentTag } from '@/store/useSommaStore';
 
 /** Head-coach session CNS budget defaults when passport omits a cap. */
@@ -242,8 +243,12 @@ export function matchesSlotCategory(exercise: CatalogExercise, category: string 
       return exercise.movement_pattern === 'push' && /bench|chest_press|push_up|dip/.test(text) && !/incline|shoulder|overhead|military|landmine/.test(text);
     case 'chest_incline_press':
       return exercise.movement_pattern === 'push' && /incline|upper_chest/.test(text);
+    case 'chest_decline_press':
+      return exercise.movement_pattern === 'push' && /decline|dip/.test(text);
     case 'chest_fly':
       return exercise.movement_pattern === 'isolation' && /fly|pec_deck|crossover/.test(text);
+    case 'triceps_compound':
+      return (exercise.movement_pattern === 'push' || exercise.movement_pattern === 'isolation') && /dip|close_grip|closegrip|diamond|bench/.test(text);
     case 'triceps_overhead':
       return exercise.primary_muscle === 'triceps' && /overhead|skull|lying|french|extension/.test(text) && !/pushdown|pressdown/.test(text);
     case 'triceps_pushdown':
@@ -258,6 +263,8 @@ export function matchesSlotCategory(exercise: CatalogExercise, category: string 
       return exercise.primary_muscle === 'biceps' && /incline|bayesian|drag|curl/.test(text);
     case 'biceps_curl_short_head':
       return exercise.primary_muscle === 'biceps' && /preacher|spider|concentration|curl/.test(text);
+    case 'biceps_hammer':
+      return exercise.primary_muscle === 'biceps' && /hammer/.test(text);
     case 'biceps_curl':
       return exercise.primary_muscle === 'biceps' && /curl/.test(text);
     case 'quad_compound':
@@ -276,12 +283,16 @@ export function matchesSlotCategory(exercise: CatalogExercise, category: string 
       return /lateral|side/.test(text) && /raise/.test(text);
     case 'shoulder_posterior_fly':
       return /rear|reverse|face_pull|pec_deck|delt_fly|posterior/.test(text);
+    case 'shoulder_anterior_raise':
+      return /front|anterior/.test(text) && /raise/.test(text);
     case 'trap_shrug':
       return exercise.primary_muscle === 'traps' || /shrug|trap/.test(text);
     case 'forearm_isolation':
       return exercise.primary_muscle === 'forearms' || /forearm|wrist|reverse_curl/.test(text);
     case 'core_anti_extension':
       return exercise.primary_muscle === 'core' && /crunch|ab|plank|rollout|stabilization|hanging_knee/.test(text);
+    case 'core_rotation':
+      return exercise.primary_muscle === 'core' && /rotation|twist|russian|woodchop|pallof/.test(text);
     case 'hinge_compound':
       return exercise.movement_pattern === 'hinge' && /deadlift|rdl|romanian|hinge|hip_thrust|good_morning/.test(text);
     case 'hamstring_curl':
@@ -346,6 +357,10 @@ function isHiitLegConflictExercise(day: SplitDayKey, exercise: CatalogExercise, 
       exercise.movement_pattern === 'hinge' ||
       exercise.movement_pattern === 'lunge')
   );
+}
+
+function isRepeatedSlotInstance(slot: SolverSlot): boolean {
+  return /_[2-9]\d*$/.test(slot.slotId);
 }
 
 function isConsecutiveAfterPreviousTrainingDay(state: SolverState, currentDayIndex: number | undefined): boolean {
@@ -530,14 +545,22 @@ function solverTechniqueFromBudget(technique: VolumeExecutionTechnique | undefin
 
 function volumeBudgetForExercise(
   exercise: CatalogExercise,
-  constraints: Pick<SolverConstraints, 'mesocycle_phase' | 'mesocycle_week' | 'cns_fatigue_score'>,
+  constraints: Pick<SolverConstraints, 'mesocycle_phase' | 'mesocycle_week' | 'cns_fatigue_score' | 'biological'>,
 ): { budget: VolumeBudget; phase: ReturnType<typeof resolveEffectiveMesocyclePhase> } {
   const phase = resolveEffectiveMesocyclePhase(constraints.mesocycle_phase, constraints.mesocycle_week);
+  const biological = {
+    ...initialBiologicalProfile,
+    ...constraints.biological,
+    mesocycle_phase: phase,
+    mesocycle_week: constraints.mesocycle_week ?? constraints.biological?.mesocycle_week ?? initialBiologicalProfile.mesocycle_week,
+    cns_fatigue_score: constraints.cns_fatigue_score ?? constraints.biological?.cns_fatigue_score ?? initialBiologicalProfile.cns_fatigue_score,
+  };
+
   return {
     phase,
     budget: calculateVolumeBudget(
       exercise,
-      phase,
+      biological,
       isCompoundExercise(exercise),
       constraints.cns_fatigue_score ?? 0,
     ),
@@ -547,7 +570,7 @@ function volumeBudgetForExercise(
 export function prescribedSetsForSlot(
   slot: SolverSlot,
   exercise: CatalogExercise,
-  constraints: Pick<SolverConstraints, 'mesocycle_phase' | 'mesocycle_week' | 'cns_fatigue_score'>,
+  constraints: Pick<SolverConstraints, 'mesocycle_phase' | 'mesocycle_week' | 'cns_fatigue_score' | 'biological'>,
 ): { prescribedSets: number; budget: VolumeBudget; phase: ReturnType<typeof resolveEffectiveMesocyclePhase> } {
   const requestedSets = Math.max(0, slot.defaultSets);
   const { budget, phase } = volumeBudgetForExercise(exercise, constraints);
@@ -839,7 +862,7 @@ function maybeIncreaseExistingLowCnsIsolation(
   picks: SolverResult[],
   catalog: ExerciseCatalog,
   tracker: WeeklyVolumeTracker,
-  constraints: Pick<SolverConstraints, 'mesocycle_phase' | 'mesocycle_week' | 'cns_fatigue_score'>,
+  constraints: Pick<SolverConstraints, 'mesocycle_phase' | 'mesocycle_week' | 'cns_fatigue_score' | 'biological'>,
 ): boolean {
   let selectedExercise: CatalogExercise | null = null;
   const candidate = picks.find((pick) => {
@@ -978,7 +1001,9 @@ export function solveDaySlots(
       sessionCnsAccum: mutableState.sessionCnsAccum,
       sessionAxialLoad: mutableState.sessionAxialLoad,
     };
-    const candidates = collectCandidates(day, catalog, slot, constraints, stateForSlot, tracker, currentDayIndex);
+    const candidates = collectCandidates(day, catalog, slot, constraints, stateForSlot, tracker, currentDayIndex, {
+      allowSameSlotCategoryDifferentConcept: isRepeatedSlotInstance(slot),
+    });
 
     const selection = pickBestCandidate(candidates, tracker, constraints, stateForSlot, currentDayIndex, slot);
     if (!selection) continue;
@@ -1019,6 +1044,7 @@ export function solveDaySlots(
           ignoreCnsBudget: true,
           ignoreMrv: true,
           ignoreRecoveryMode: true,
+          allowSameSlotCategoryDifferentConcept: isRepeatedSlotInstance(deloadSlot),
         },
       );
       const selection = pickBestCandidate(candidates, tracker, constraints, stateForSlot, currentDayIndex, deloadSlot);
@@ -1063,6 +1089,7 @@ export function solveDaySlots(
         ignoreMrv: true,
         ignoreRecoveryMode: true,
         ignoreBodyweightBlacklist: true,
+        allowSameSlotCategoryDifferentConcept: isRepeatedSlotInstance(fallbackSlot),
       });
       const selection = pickBestCandidate(candidates, tracker, constraints, stateForSlot, currentDayIndex, fallbackSlot);
       if (!selection) continue;

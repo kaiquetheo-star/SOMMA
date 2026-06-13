@@ -6,6 +6,7 @@ import {
   isCompoundExercise,
   resolveEffectiveMesocyclePhase,
 } from '@/lib/gameplan/engine/iron/volumePeriodization';
+import { initialBiologicalProfile } from '@/types/biological';
 
 const MAX_FINISHER_OR_ISOLATION_SETS = 4;
 const MAX_REASONABLE_SETS_PER_EXERCISE = 8;
@@ -61,7 +62,7 @@ function sanitizeTargetSets(exercise: {
 export interface MicrocycleIronVolumeSanitizeContext {
   biological?: Pick<
     BiologicalProfile,
-    'mesocycle_phase' | 'mesocycle_week' | 'cns_fatigue_score'
+    'mesocycle_phase' | 'mesocycle_week' | 'cns_fatigue_score' | 'hormonal_protocol'
   > | null;
   catalog?: Pick<ExerciseCatalog, 'byId' | 'bySlug'> | ReadonlyMap<string, CatalogExercise> | null;
 }
@@ -103,9 +104,14 @@ function sanitizeTargetSetsWithBudget(
         context.biological.mesocycle_phase,
         context.biological.mesocycle_week,
       );
+  const biological = {
+    ...initialBiologicalProfile,
+    ...context.biological,
+    mesocycle_phase: mesocyclePhase,
+  };
   const budget = calculateVolumeBudget(
     catalogExercise,
-    mesocyclePhase,
+    biological,
     isCompoundExercise(catalogExercise),
     context.biological.cns_fatigue_score ?? 0,
   );

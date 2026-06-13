@@ -26,9 +26,18 @@ const userBiological: UserBiological = {
   iron_mastery: null,
   frequency_iron: 6,
   cns_fatigue_score: 0,
+  mesocycle_phase: 'bulking',
+  mesocycle_week: 1,
+  mesocycle_goal: 'hypertrophy',
+  preferred_split: 'abcdef',
   clinical_exit_interview: null,
   current_body_fat_estimate: 18,
   hormonal_transition: false,
+  hormonal_protocol: {
+    type: 'trt',
+    weekly_dose_mg: 200,
+    recovery_multiplier: 1.5,
+  },
 };
 
 const userEnvironment = {
