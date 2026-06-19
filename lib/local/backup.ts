@@ -1,30 +1,34 @@
 import * as DocumentPicker from 'expo-document-picker';
 
+import type {
+    BiometricCheckpoint,
+    ReadinessScan,
+} from '@/lib/gameplan/engine/adaptiveStateMachine';
 import { isProtocolDateStale } from '@/lib/gameplan/generateStubGameplan';
 import {
-  isDegenerateMicrocycle,
-  sanitizeMicrocycleIronVolume,
+    isDegenerateMicrocycle,
+    sanitizeMicrocycleIronVolume,
 } from '@/lib/gameplan/microcycleValidation';
 import { getTodayDayIndex } from '@/lib/gameplan/microcycleWeek';
 import type {
-  EquipmentTag,
-  FocusPreference,
-  UserEnvironment,
-  UserFoundation,
-  UserStats,
+    EquipmentTag,
+    FocusPreference,
+    UserEnvironment,
+    UserFoundation,
+    UserStats,
 } from '@/store/useSommaStore';
 import {
-  DEFAULT_TRAINING_DAYS_PER_WEEK,
-  initialBiologicalProfile,
-  normalizeBodyFatFields,
-  withFixedBiologicalProfile,
-  type BiologicalProfile,
+    DEFAULT_TRAINING_DAYS_PER_WEEK,
+    initialBiologicalProfile,
+    normalizeBodyFatFields,
+    withFixedBiologicalProfile,
+    type BiologicalProfile,
 } from '@/types/biological';
 import type { MicrocycleDay } from '@/types/gameplan';
 import type {
-  PerformanceLogEntry,
-  PerformanceQueueItem,
-  WorkoutSessionSummary,
+    PerformanceLogEntry,
+    PerformanceQueueItem,
+    WorkoutSessionSummary,
 } from '@/types/performance';
 
 export const SOMMA_BACKUP_VERSION = 1;
@@ -43,6 +47,9 @@ export interface SommaPersistedSnapshot {
   selectedDayIndex: number;
   readinessScanDate: string | null;
   subjectiveReadiness: number | null;
+  readinessScan: ReadinessScan | null;
+  biometricCheckpoints: BiometricCheckpoint[];
+  adaptationLogs: unknown[];
   performance_logs: PerformanceLogEntry[];
   performanceQueue: PerformanceQueueItem[];
   lastWorkoutSummary: WorkoutSessionSummary | null;
@@ -67,6 +74,9 @@ export function snapshotFromStoreState(state: {
   selectedDayIndex: number;
   readinessScanDate: string | null;
   subjectiveReadiness: number | null;
+  readinessScan: ReadinessScan | null;
+  biometricCheckpoints: BiometricCheckpoint[];
+  adaptationLogs: unknown[];
   performance_logs: PerformanceLogEntry[];
   performanceQueue: PerformanceQueueItem[];
   lastWorkoutSummary: WorkoutSessionSummary | null;
@@ -83,6 +93,9 @@ export function snapshotFromStoreState(state: {
     selectedDayIndex: state.selectedDayIndex,
     readinessScanDate: state.readinessScanDate,
     subjectiveReadiness: state.subjectiveReadiness,
+    readinessScan: state.readinessScan,
+    biometricCheckpoints: state.biometricCheckpoints,
+    adaptationLogs: state.adaptationLogs,
     performance_logs: state.performance_logs,
     performanceQueue: state.performanceQueue,
     lastWorkoutSummary: state.lastWorkoutSummary,
@@ -184,10 +197,24 @@ export function normalizePersistedSnapshot(raw: unknown): SommaPersistedSnapshot
 
   let readinessScanDate = asStringOrNull(payload.readinessScanDate);
   let subjectiveReadiness = asNumberOrNull(payload.subjectiveReadiness);
+  let readinessScan: ReadinessScan | null = null;
+  if (isRecord(payload.readinessScan)) {
+    readinessScan = {
+      sleep_quality: asNumberOrNull(payload.readinessScan.sleep_quality) ?? 3,
+      muscle_soreness: asNumberOrNull(payload.readinessScan.muscle_soreness) ?? 3,
+      energy_level: asNumberOrNull(payload.readinessScan.energy_level) ?? 3,
+      stress_level: asNumberOrNull(payload.readinessScan.stress_level) ?? 3,
+      mobility_feeling: asNumberOrNull(payload.readinessScan.mobility_feeling) ?? 3,
+      timestamp: asStringOrNull(payload.readinessScan.timestamp) ?? new Date().toISOString(),
+    };
+  }
+  const biometricCheckpoints = asArray<BiometricCheckpoint>(payload.biometricCheckpoints);
+  const adaptationLogs = asArray<unknown>(payload.adaptationLogs);
   const today = new Date().toISOString().slice(0, 10);
   if (readinessScanDate && readinessScanDate !== today) {
     readinessScanDate = null;
     subjectiveReadiness = null;
+    readinessScan = null;
   }
 
   const expectedTraining =
@@ -244,6 +271,9 @@ export function normalizePersistedSnapshot(raw: unknown): SommaPersistedSnapshot
     selectedDayIndex,
     readinessScanDate,
     subjectiveReadiness,
+    readinessScan,
+    biometricCheckpoints,
+    adaptationLogs,
     performance_logs: asArray<PerformanceLogEntry>(payload.performance_logs),
     performanceQueue: asArray<PerformanceQueueItem>(payload.performanceQueue),
     lastWorkoutSummary: (payload.lastWorkoutSummary as WorkoutSessionSummary | null) ?? null,

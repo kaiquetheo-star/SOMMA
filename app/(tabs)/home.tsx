@@ -1,24 +1,27 @@
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { WeeklyStrip } from '@/components/WeeklyStrip';
-import { GameplanBlockCard } from '@/components/sanctuary/GameplanBlockCard';
+import { ReadinessScanModal } from '@/components/clinical/ReadinessScanModal';
+import { WeeklyBiometricCheckin } from '@/components/clinical/WeeklyBiometricCheckin';
 import { LoadingFallback } from '@/components/routing/LoadingFallback';
+import { GameplanBlockCard } from '@/components/sanctuary/GameplanBlockCard';
 import { useStoreHydrated } from '@/hooks/useStoreHydrated';
 import { useWorkoutNavigation } from '@/hooks/useWorkoutNavigation';
 import { prefetchLibraryCatalogs } from '@/lib/catalog/library';
-import { isProtocolDateStale } from '@/lib/gameplan/generateStubGameplan';
+import { computeReadinessScore } from '@/lib/gameplan/engine/adaptiveStateMachine';
 import { getDailyIronFocus } from '@/lib/gameplan/engine/iron/dupLogic';
+import { isProtocolDateStale } from '@/lib/gameplan/generateStubGameplan';
 import {
-  getMicrocycleDay,
-  getTodayDayIndex,
-  MICROCYCLE_DAY_LABELS,
+    getMicrocycleDay,
+    getTodayDayIndex,
+    MICROCYCLE_DAY_LABELS,
 } from '@/lib/gameplan/microcycleWeek';
 import {
-  hasCompletedFoundationScan,
-  useSommaStore,
+    hasCompletedFoundationScan,
+    useSommaStore,
 } from '@/store/useSommaStore';
 import type { GameplanBlock, IronExercisePrescription, MicrocycleDay } from '@/types/gameplan';
 
@@ -114,6 +117,12 @@ export default function DailyCommandScreen() {
   const ensureDailyGameplan = useSommaStore((state) => state.ensureDailyGameplan);
   const fetchDailyGameplanAsync = useSommaStore((state) => state.fetchDailyGameplanAsync);
   const regenerateDailyGameplan = useSommaStore((state) => state.regenerateDailyGameplan);
+  const readinessScan = useSommaStore((state) => state.readinessScan);
+  const showReadinessModal = useSommaStore((state) => state.showReadinessModal);
+  const setShowReadinessModal = useSommaStore((state) => state.setShowReadinessModal);
+  const submitReadinessScan = useSommaStore((state) => state.submitReadinessScan);
+  const biometricCheckpoints = useSommaStore((state) => state.biometricCheckpoints);
+  const submitBiometricCheckpoint = useSommaStore((state) => state.submitBiometricCheckpoint);
   const { openBlock } = useWorkoutNavigation();
 
   const todayDayIndex = getTodayDayIndex(weekStartDate);
@@ -230,6 +239,44 @@ export default function DailyCommandScreen() {
               Fueling · {nutritionLine}
             </Text>
           ) : null}
+        </View>
+
+        <View className="mb-6 space-y-5">
+          <View className="rounded-3xl border border-white/10 bg-white/[0.035] p-5">
+            <View className="flex-row items-center justify-between gap-4">
+              <View>
+                <Text className="font-body text-[10px] uppercase tracking-[0.3em] text-[#6B7568]">
+                  Readiness & Biometrics
+                </Text>
+                <Text className="mt-2 font-display text-lg text-[#E8E4DC]">
+                  Check-in diário e semanal
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => setShowReadinessModal(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Abrir modal de readiness"
+                className="rounded-2xl bg-[#BFA06A] px-4 py-3"
+              >
+                <Text className="font-body-bold text-xs uppercase tracking-[0.24em] text-[#0F1512]">
+                  Registrar Readiness
+                </Text>
+              </Pressable>
+            </View>
+            <Text className="mt-4 font-body text-sm leading-6 text-[#8A9488]">
+              {readinessScan
+                ? `Último scan: ${new Date(readinessScan.timestamp).toLocaleDateString('pt-BR')} — Nota ${computeReadinessScore(readinessScan).toFixed(1)}`
+                : 'Nenhum scan diário registrado para hoje.'}
+            </Text>
+          </View>
+
+          <WeeklyBiometricCheckin
+            checkpoints={biometricCheckpoints}
+            onAddCheckpoint={(checkpoint) => {
+              submitBiometricCheckpoint(checkpoint);
+              void fetchDailyGameplanAsync();
+            }}
+          />
         </View>
 
         {performanceSyncing ? (
@@ -403,6 +450,17 @@ export default function DailyCommandScreen() {
           </Pressable>
         </View>
       ) : null}
+
+      <ReadinessScanModal
+        visible={showReadinessModal}
+        existingScan={readinessScan}
+        onClose={() => setShowReadinessModal(false)}
+        onSubmit={(scan) => {
+          submitReadinessScan(scan);
+          setShowReadinessModal(false);
+          void fetchDailyGameplanAsync();
+        }}
+      />
     </SafeAreaView>
   );
 }

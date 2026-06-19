@@ -3,52 +3,58 @@ import { persist } from 'zustand/middleware';
 
 import { sommaPersistStorage } from '@/lib/storage/persistStorage';
 
+import { fetchLibraryExercises } from '@/lib/catalog/library';
+import {
+    computeReadinessScore,
+    type AdaptationLogEntry,
+    type BiometricCheckpoint,
+    type ReadinessScan,
+} from '@/lib/gameplan/engine/adaptiveStateMachine';
+import { applyReadinessAutoregulationToMicrocycle } from '@/lib/gameplan/engine/clinicalLaws';
 import { fetchDailyGameplan } from '@/lib/gameplan/fetchDailyGameplan';
 import { isGameplanFetchError } from '@/lib/gameplan/gameplanErrors';
 import { isProtocolDateStale } from '@/lib/gameplan/generateStubGameplan';
-import { normalizePersistedSnapshot, type SommaPersistedSnapshot } from '@/lib/local/backup';
 import {
-  mergePerformanceLogsWithQueue,
-  recalibrateFromPerformanceQueue,
-} from '@/lib/local/recalibrate';
-import {
-  isDegenerateMicrocycle,
-  sanitizeMicrocycleIronVolume,
+    isDegenerateMicrocycle,
+    sanitizeMicrocycleIronVolume,
 } from '@/lib/gameplan/microcycleValidation';
 import { getMicrocycleDay, getTodayDayIndex } from '@/lib/gameplan/microcycleWeek';
-import { applyReadinessAutoregulationToMicrocycle } from '@/lib/gameplan/engine/clinicalLaws';
-import type { ClinicalExitInterview } from '@/types/clinical';
-import { fetchLibraryExercises } from '@/lib/catalog/library';
-import { buildWorkoutSessionSummary } from '@/lib/workout/buildSessionSummary';
+import { normalizePersistedSnapshot, type SommaPersistedSnapshot } from '@/lib/local/backup';
 import {
-  applyDamageControl,
-  injectMetabolicFlushBlock,
-  restoreDamageControlTarget,
+    mergePerformanceLogsWithQueue,
+    recalibrateFromPerformanceQueue,
+} from '@/lib/local/recalibrate';
+import {
+    applyDamageControl,
+    injectMetabolicFlushBlock,
+    restoreDamageControlTarget,
 } from '@/lib/physics/damageControl';
+import { buildWorkoutSessionSummary } from '@/lib/workout/buildSessionSummary';
 import type { BiologicalProfile } from '@/types/biological';
 import {
-  DEFAULT_TRAINING_DAYS_PER_WEEK,
-  initialBiologicalProfile,
-  isBiologicalProfileComplete,
-  normalizeBodyFatFields,
-  withFixedBiologicalProfile,
+    DEFAULT_TRAINING_DAYS_PER_WEEK,
+    initialBiologicalProfile,
+    isBiologicalProfileComplete,
+    normalizeBodyFatFields,
+    withFixedBiologicalProfile,
 } from '@/types/biological';
+import type { ClinicalExitInterview } from '@/types/clinical';
 import type {
-  DailyGameplan,
-  GameplanBlock,
-  GameplanBlockStatus,
-  MicrocycleDay,
+    DailyGameplan,
+    GameplanBlock,
+    GameplanBlockStatus,
+    MicrocycleDay,
 } from '@/types/gameplan';
 import type {
-  IronSessionLog,
-  PerformanceLogEntry,
-  PerformanceQueueItem,
-  LogIronSetInput,
-  WorkoutCompletionInput,
-  WorkoutSessionSummary,
+    IronSessionLog,
+    LogIronSetInput,
+    PerformanceLogEntry,
+    PerformanceQueueItem,
+    WorkoutCompletionInput,
+    WorkoutSessionSummary,
 } from '@/types/performance';
 
-export type { WorkoutCompletionInput, PerformanceQueueItem, LogIronSetInput } from '@/types/performance';
+export type { LogIronSetInput, PerformanceQueueItem, WorkoutCompletionInput } from '@/types/performance';
 
 /** Equipment tags aligned with SRS REQ-1.3 / `user_environment` schema */
 export type EquipmentTag =
@@ -95,6 +101,7 @@ function applyGameplanToState(gameplan: DailyGameplan, source: SommaState['gamep
     protocolGeneratedAt: gameplan.generated_at,
     selectedDayIndex: getTodayDayIndex(gameplan.week_start_date),
     gameplan_source: source,
+    adaptationLogs: gameplan.adaptation_logs ?? [],
   };
 }
 
@@ -344,11 +351,18 @@ interface SommaState {
   /** Daily readiness scan (Clinical Law II) — calendar date when last completed */
   readinessScanDate: string | null;
   subjectiveReadiness: number | null;
+  readinessScan: ReadinessScan | null;
+  biometricCheckpoints: BiometricCheckpoint[];
+  showReadinessModal: boolean;
+  adaptationLogs: AdaptationLogEntry[];
   damageControlActiveDates: string[];
   setSelectedDayIndex: (dayIndex: number) => void;
   toggleDamageControlDate: (date: string) => void;
   needsDailyReadinessScan: () => boolean;
   applySubjectiveReadiness: (score: number) => void;
+  submitReadinessScan: (scan: ReadinessScan) => void;
+  submitBiometricCheckpoint: (checkpoint: BiometricCheckpoint) => void;
+  setShowReadinessModal: (show: boolean) => void;
   submitClinicalExitInterview: (interview: ClinicalExitInterview) => Promise<void>;
   getClinicalReviewTrigger: () => null;
   performance_logs: PerformanceLogEntry[];
@@ -427,6 +441,10 @@ export const useSommaStore = create<SommaState>()(
       selectedDayIndex: getTodayDayIndex(),
       readinessScanDate: null,
       subjectiveReadiness: null,
+      readinessScan: null,
+      biometricCheckpoints: [],
+      showReadinessModal: false,
+      adaptationLogs: [],
       damageControlActiveDates: [],
       performance_logs: [],
       performanceQueue: [],
@@ -512,6 +530,26 @@ export const useSommaStore = create<SommaState>()(
         });
       },
 
+      submitReadinessScan: (scan) => {
+        const today = new Date().toISOString().slice(0, 10);
+        set((state) => ({
+          readinessScan: scan,
+          subjectiveReadiness: computeReadinessScore(scan),
+          readinessScanDate: today,
+          showReadinessModal: false,
+        }));
+      },
+
+      submitBiometricCheckpoint: (checkpoint) => {
+        set((state) => ({
+          biometricCheckpoints: [...state.biometricCheckpoints, checkpoint].sort((a, b) =>
+            a.date.localeCompare(b.date),
+          ),
+        }));
+      },
+
+      setShowReadinessModal: (show) => set({ showReadinessModal: show }),
+
       getClinicalReviewTrigger: () => null,
 
       submitClinicalExitInterview: async (interview) => {
@@ -574,6 +612,8 @@ export const useSommaStore = create<SommaState>()(
             biological: state.user_biological,
             userStats: state.user_stats,
             performanceLogs,
+            readinessScan: state.readinessScan ?? undefined,
+            biometricCheckpoints: state.biometricCheckpoints,
           });
 
           set({
@@ -885,6 +925,10 @@ export const useSommaStore = create<SommaState>()(
           selectedDayIndex: getTodayDayIndex(),
           readinessScanDate: null,
           subjectiveReadiness: null,
+          readinessScan: null,
+          biometricCheckpoints: [],
+          showReadinessModal: false,
+          adaptationLogs: [],
           damageControlActiveDates: [],
           performance_logs: [],
           performanceQueue: [],
@@ -914,6 +958,9 @@ export const useSommaStore = create<SommaState>()(
           performance_syncing: boolean;
           gameplan_loading: boolean;
           gameplan_error: string | null;
+          readinessScan?: ReadinessScan | null;
+          biometricCheckpoints?: BiometricCheckpoint[];
+          adaptationLogs?: AdaptationLogEntry[];
         } = {
           ...snapshot,
           _hasHydrated: true,
@@ -945,6 +992,10 @@ export const useSommaStore = create<SommaState>()(
         selectedDayIndex: state.selectedDayIndex,
         readinessScanDate: state.readinessScanDate,
         subjectiveReadiness: state.subjectiveReadiness,
+        readinessScan: state.readinessScan,
+        biometricCheckpoints: state.biometricCheckpoints,
+        showReadinessModal: state.showReadinessModal,
+        adaptationLogs: state.adaptationLogs,
         damageControlActiveDates: state.damageControlActiveDates,
         performance_logs: state.performance_logs,
         performanceQueue: state.performanceQueue,
@@ -988,6 +1039,15 @@ export const useSommaStore = create<SommaState>()(
         }
         if (!state.damageControlActiveDates) {
           state.damageControlActiveDates = [];
+        }
+        if (!state.readinessScan) {
+          state.readinessScan = null;
+        }
+        if (!state.biometricCheckpoints) {
+          state.biometricCheckpoints = [];
+        }
+        if (!state.adaptationLogs) {
+          state.adaptationLogs = [];
         }
 
         if (!state.weeklyMicrocycle) {

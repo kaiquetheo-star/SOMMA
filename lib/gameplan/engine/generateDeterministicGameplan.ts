@@ -1,58 +1,64 @@
 // CLINICAL ENGINE: DETERMINISTIC ONLY. NO RANDOMNESS ALLOWED. IF INPUTS ARE CONSTANT, OUTPUT MUST BE CONSTANT.
+import { fetchLibraryExercises } from '@/lib/catalog/library';
 import {
-  dateForDayIndex,
-  getDayIndexForDate,
-  getWeekStartMonday,
-} from '@/lib/gameplan/microcycleWeek';
+    adaptGameplan,
+    type AdaptiveStateMachineInput,
+    type BiometricCheckpoint,
+    type ReadinessScan,
+} from '@/lib/gameplan/engine/adaptiveStateMachine';
 import {
-  deriveActiveTrainingDays,
-  equipmentMatches,
-  focusLabelForIronSlot,
-  resolvePillarFrequencies,
-  spreadPillarDayIndices,
-} from '@/lib/gameplan/engine/periodization';
-import type { PillarTimeBudget } from '@/lib/gameplan/engine/prescription';
-import {
-  buildIronGameplanBlock,
-  generateIronMicrocycle,
-  type IronDayBlock,
-} from '@/lib/gameplan/engine/iron/generateIronMicrocycle';
-import {
-  applyIronRoutineAutoregulation,
-  buildIronBlock,
-  detectIronAutoregulation,
-} from '@/lib/gameplan/engine/legacy/ironPrescriptionLegacy';
-import {
-  filterIronLogsLastDays,
-  flattenPerformanceLogs,
-} from '@/lib/gameplan/engine/performanceLogs';
-import {
-  computeTrainingLoadSnapshot,
-  telemetrySuggestsPoorRecovery,
-  yesterdayEffectiveRpe,
-} from '@/lib/physics/loadTelemetry';
-import { computeNutritionSnapshot } from '@/lib/physics/metabolicTelemetry';
-import { injectRecoveryProtocols } from '@/lib/gameplan/engine/iron/recoveryInjector';
-import {
-  applyNeuroMechanicalOrderingToMicrocycle,
+    applyNeuroMechanicalOrderingToMicrocycle,
 } from '@/lib/gameplan/engine/clinicalLaws';
 import { MESOCYCLE_DAYS, WEEKLY_VOLUME_DAYS } from '@/lib/gameplan/engine/constants';
 import { buildGenerationContext } from '@/lib/gameplan/engine/generation';
-import { pruneIronBlocksInMicrocycle } from '@/lib/gameplan/engine/volumePruning';
-import { fetchLibraryExercises } from '@/lib/catalog/library';
 import { buildExerciseCatalog } from '@/lib/gameplan/engine/iron/catalog/ExerciseCatalog';
-import { sanitizeMicrocycleIronVolume } from '@/lib/gameplan/microcycleValidation';
+import {
+    buildIronGameplanBlock,
+    generateIronMicrocycle,
+    type IronDayBlock,
+} from '@/lib/gameplan/engine/iron/generateIronMicrocycle';
 import { applyIntensityStrategies } from '@/lib/gameplan/engine/iron/IntensityStrategyEngine';
+import { injectRecoveryProtocols } from '@/lib/gameplan/engine/iron/recoveryInjector';
+import {
+    applyIronRoutineAutoregulation,
+    buildIronBlock,
+    detectIronAutoregulation,
+} from '@/lib/gameplan/engine/legacy/ironPrescriptionLegacy';
 import { generateLongevityAddon } from '@/lib/gameplan/engine/longevityMapper';
+import {
+    filterIronLogsLastDays,
+    flattenPerformanceLogs,
+} from '@/lib/gameplan/engine/performanceLogs';
+import {
+    deriveActiveTrainingDays,
+    equipmentMatches,
+    focusLabelForIronSlot,
+    resolvePillarFrequencies,
+    spreadPillarDayIndices,
+} from '@/lib/gameplan/engine/periodization';
+import type { PillarTimeBudget } from '@/lib/gameplan/engine/prescription';
+import { pruneIronBlocksInMicrocycle } from '@/lib/gameplan/engine/volumePruning';
+import { sanitizeMicrocycleIronVolume } from '@/lib/gameplan/microcycleValidation';
+import {
+    dateForDayIndex,
+    getDayIndexForDate,
+    getWeekStartMonday,
+} from '@/lib/gameplan/microcycleWeek';
+import {
+    computeTrainingLoadSnapshot,
+    telemetrySuggestsPoorRecovery,
+    yesterdayEffectiveRpe,
+} from '@/lib/physics/loadTelemetry';
+import { computeNutritionSnapshot } from '@/lib/physics/metabolicTelemetry';
+import type { EquipmentTag, FocusPreference, UserStats } from '@/store/useSommaStore';
 import type { BiologicalProfile } from '@/types/biological';
 import type {
-  DailyGameplan,
-  GameplanBlock,
-  IronExercisePrescription,
-  MicrocycleDay,
+    DailyGameplan,
+    GameplanBlock,
+    IronExercisePrescription,
+    MicrocycleDay,
 } from '@/types/gameplan';
 import type { PerformanceLogEntry } from '@/types/performance';
-import type { EquipmentTag, FocusPreference, UserStats } from '@/store/useSommaStore';
 
 export interface GenerateDeterministicGameplanInput {
   focus: FocusPreference;
@@ -60,6 +66,8 @@ export interface GenerateDeterministicGameplanInput {
   biological: BiologicalProfile;
   userStats: UserStats;
   performanceLogs: PerformanceLogEntry[];
+  readinessScan?: ReadinessScan;
+  biometricCheckpoints?: BiometricCheckpoint[];
   /** Optional override for today's date (tests) */
   protocolDate?: string;
 }
@@ -549,6 +557,16 @@ export async function generateDeterministicGameplan(
     catalog,
   );
 
+  const adaptationInput: AdaptiveStateMachineInput = {
+    biological: input.biological,
+    logs7d: ironLogs7d,
+    logs21d: ironLogs3w,
+    readinessScan: input.readinessScan,
+    biometricCheckpoints: input.biometricCheckpoints,
+  };
+  const adaptationResult = await adaptGameplan(orderedMicrocycle, adaptationInput);
+  orderedMicrocycle = adaptationResult.microcycle;
+
   orderedMicrocycle = sanitizeMicrocycleIronVolume(orderedMicrocycle, {
     biological: input.biological,
     catalog: buildExerciseCatalog(catalog),
@@ -566,6 +584,7 @@ export async function generateDeterministicGameplan(
     microcycle: orderedMicrocycle,
     blocks,
     generated_at: new Date().toISOString(),
+    adaptation_logs: adaptationResult.adaptationLogs,
     clinical_review_trigger: null,
   };
 }

@@ -1,15 +1,15 @@
 // CLINICAL ENGINE: DETERMINISTIC ONLY. NO RANDOMNESS ALLOWED. IF INPUTS ARE CONSTANT, OUTPUT MUST BE CONSTANT.
 import { fetchLibraryExercises } from '@/lib/catalog/library';
+import type { BiometricCheckpoint, ReadinessScan } from '@/lib/gameplan/engine/adaptiveStateMachine';
 import { applyNeuroMechanicalOrderingToMicrocycle } from '@/lib/gameplan/engine/clinicalLaws';
 import { generateDeterministicGameplan } from '@/lib/gameplan/engine/generateDeterministicGameplan';
-import { getMicrocycleDay, getTodayDayIndex, getWeekStartMonday } from '@/lib/gameplan/microcycleWeek';
-import { GameplanFetchError } from '@/lib/gameplan/gameplanErrors';
 import { assessMicrocycleHealth } from '@/lib/gameplan/microcycleValidation';
-import { deriveTrainingDaysFromFrequencies, isBiologicalProfileComplete } from '@/types/biological';
+import { getMicrocycleDay, getTodayDayIndex, getWeekStartMonday } from '@/lib/gameplan/microcycleWeek';
+import type { EquipmentTag, FocusPreference, UserStats } from '@/store/useSommaStore';
 import type { BiologicalProfile } from '@/types/biological';
+import { deriveTrainingDaysFromFrequencies, isBiologicalProfileComplete } from '@/types/biological';
 import type { DailyGameplan, MicrocycleDay } from '@/types/gameplan';
 import type { PerformanceLogEntry } from '@/types/performance';
-import type { FocusPreference, EquipmentTag, UserStats } from '@/store/useSommaStore';
 
 export type GameplanSource = 'ai' | 'deterministic' | 'fallback' | 'stub' | 'local';
 
@@ -41,6 +41,8 @@ export interface FetchDailyGameplanInput {
   biological: BiologicalProfile;
   userStats: UserStats;
   performanceLogs: PerformanceLogEntry[];
+  readinessScan?: ReadinessScan;
+  biometricCheckpoints?: BiometricCheckpoint[];
 }
 
 export interface FetchDailyGameplanResult {
@@ -84,6 +86,8 @@ export async function fetchDailyGameplan({
   biological,
   userStats,
   performanceLogs,
+  readinessScan,
+  biometricCheckpoints,
 }: FetchDailyGameplanInput): Promise<FetchDailyGameplanResult> {
   const trainingDaysPerWeek = deriveTrainingDaysFromFrequencies(biological);
 
@@ -100,6 +104,8 @@ export async function fetchDailyGameplan({
       biological,
       userStats,
       performanceLogs,
+      readinessScan,
+      biometricCheckpoints,
     });
     const gameplan = await finalizeGameplanOrdering(generated);
 

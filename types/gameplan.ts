@@ -1,12 +1,21 @@
-import type { ClinicalReviewTrigger } from '@/types/clinical';
 import type {
-  AxialLoading,
-  ExerciseCueCard,
-  ExerciseTempo,
-  ResistanceProfile,
-  StabilityDemand,
-  TacticalExerciseRole,
+    AxialLoading,
+    ExerciseCueCard,
+    ExerciseTempo,
+    ResistanceProfile,
+    StabilityDemand,
+    TacticalExerciseRole,
 } from '@/types/catalog';
+import type { ClinicalReviewTrigger } from '@/types/clinical';
+
+export interface AdaptationLogEntry {
+  timestamp: string;
+  rule_triggered: string;
+  action_taken: string;
+  exercises_rotated?: string[];
+  new_exercises?: string[];
+  details?: Record<string, string | number | boolean>;
+}
 
 export type WorkoutPillar = 'iron' | 'nutrition' | 'spirit' | 'longevity';
 
@@ -142,6 +151,7 @@ export interface DailyGameplan {
   training_days_per_week?: number;
   /** Full 7-day plan from the AI clinic */
   microcycle: MicrocycleDay[];
+  adaptation_logs?: AdaptationLogEntry[];
   /** Optional UI trigger — e.g. End-of-Month Clinical Exit Interview */
   clinical_review_trigger?: ClinicalReviewTrigger | null;
   /** Today's ritual blocks (derived from microcycle or legacy single-day payload) */
