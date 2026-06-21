@@ -1,6 +1,6 @@
 // CLINICAL ENGINE: DETERMINISTIC ONLY. NO RANDOMNESS ALLOWED. IF INPUTS ARE CONSTANT, OUTPUT MUST BE CONSTANT.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
-import { corsHeaders } from '../_shared/cors.ts';
+import { buildCorsHeaders, corsHeaders } from '../_shared/cors.ts';
 import {
   applyDeloadToIronExercise,
   capIronExercisesForDeload,
@@ -3570,17 +3570,46 @@ function buildFallbackProtocol(
 // Handler
 // ---------------------------------------------------------------------------
 
+function isValidFocusPreference(value: unknown): value is FocusPreference {
+  if (typeof value !== 'object' || value === null) return false;
+  const obj = value as Record<string, unknown>;
+  return (
+    typeof obj.iron === 'number' &&
+    typeof obj.combat === 'number' &&
+    typeof obj.flow === 'number' &&
+    typeof obj.spirit === 'number'
+  );
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
+}
+
 export async function handleHeadCoachRequest(req: Request): Promise<Response> {
+  const cors = buildCorsHeaders(req.headers.get('origin'));
+
+  function corsJsonResponse(body: unknown, status = 200) {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { ...cors, 'Content-Type': 'application/json' },
+    });
+  }
+
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers: cors });
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error('[generate_daily_protocol] Missing SUPABASE_URL or SUPABASE_ANON_KEY env vars');
+      return corsJsonResponse({ error: 'SERVER_MISCONFIGURED', message: 'Server configuration error' }, 500);
+    }
+
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      return jsonResponse({ error: 'Missing authorization' }, 401);
+      return corsJsonResponse({ error: 'Missing authorization' }, 401);
     }
 
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -3593,18 +3622,33 @@ export async function handleHeadCoachRequest(req: Request): Promise<Response> {
     } = await supabase.auth.getUser();
 
     if (userError || !user) {
-      return jsonResponse({ error: 'Unauthorized' }, 401);
+      return corsJsonResponse({ error: 'Unauthorized' }, 401);
     }
 
-    console.log('[generate_daily_protocol] Handler start', { user_id: user.id });
+    console.log('[generate_daily_protocol] Handler start');
 
-    const body = (await req.json()) as Record<string, unknown>;
-    const focus_preference = body.focus_preference as FocusPreference;
+    let body: Record<string, unknown>;
+    try {
+      body = (await req.json()) as Record<string, unknown>;
+    } catch {
+      return corsJsonResponse({ error: 'INVALID_REQUEST', message: 'Request body must be valid JSON' }, 400);
+    }
+
+    const rawFocus = body.focus_preference;
+    if (rawFocus != null && !isValidFocusPreference(rawFocus)) {
+      return corsJsonResponse({ error: 'INVALID_REQUEST', message: 'focus_preference must have numeric iron, combat, flow, spirit fields' }, 400);
+    }
+    const focus_preference = rawFocus as FocusPreference;
+
+    const rawEquipment = body.available_equipment;
+    if (rawEquipment != null && !isStringArray(rawEquipment)) {
+      return corsJsonResponse({ error: 'INVALID_REQUEST', message: 'available_equipment must be an array of strings' }, 400);
+    }
 
     const catalogAssets = await fetchMandatoryCatalogAssets(
       supabase,
       user.id,
-      body.available_equipment as string[] | undefined,
+      rawEquipment as string[] | undefined,
     );
 
     const available_equipment = catalogAssets.available_equipment;
@@ -3614,12 +3658,10 @@ export async function handleHeadCoachRequest(req: Request): Promise<Response> {
     const allowedSpiritTempoIds = catalogAssets.spirit_tempo_ids;
     const availableAssetsTag = buildAvailableAssetsTag(catalogAssets);
     console.log('[generate_daily_protocol] <AVAILABLE_ASSETS> injected', {
-      tag_char_length: availableAssetsTag.length,
       exercises: exerciseCatalog.length,
       combat: comboCatalog.length,
       flow: flowCatalog.filter((row) => row.pillar === 'flow').length,
       spirit: flowCatalog.filter((row) => row.pillar === 'spirit').length,
-      equipment: available_equipment,
     });
 
     if (catalogAssets.fetch_errors.length > 0) {
@@ -3905,12 +3947,10 @@ export async function handleHeadCoachRequest(req: Request): Promise<Response> {
 
     if (upsertError) {
       console.error('[generate_daily_protocol] daily_protocols upsert failed:', upsertError.message);
-      return jsonResponse(
+      return corsJsonResponse(
         {
           error: 'DB_UPSERT_FAILED',
-          message: upsertError.message,
-          hint: upsertError.hint ?? undefined,
-          code: upsertError.code ?? undefined,
+          message: 'Failed to save protocol. Please try again.',
         },
         500,
       );
@@ -3929,13 +3969,13 @@ export async function handleHeadCoachRequest(req: Request): Promise<Response> {
       source,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
+    const internalMessage = error instanceof Error ? error.message : 'Unknown error';
     const weekStartDate = getWeekStartMonday(new Date().toISOString().slice(0, 10));
-    console.error('[generate_daily_protocol] Unhandled generation error:', message);
-    return jsonResponse(
+    console.error('[generate_daily_protocol] Unhandled generation error:', internalMessage);
+    return corsJsonResponse(
       {
         error: 'GENERATION_FAILED',
-        message,
+        message: 'Internal server error',
         week_start_date: weekStartDate,
       },
       500,
