@@ -1,11 +1,35 @@
 import type { LibraryExercise } from '@/types/catalog';
-import { applyFivePhaseClinicalMatrix, classifyClinicalPhase } from '@/lib/gameplan/engine/clinicalMatrix';
+import { applyFivePhaseClinicalMatrix, classifyClinicalPhase } from '@/lib/shared/exerciseClassification';
 import type {
   GameplanBlock,
   IronExercisePrescription,
   MicrocycleDay,
 } from '@/types/gameplan';
 import type { PerformanceQueueItem } from '@/types/performance';
+import {
+  BIOMECH_SLUG_CHEST_OPENER,
+  BIOMECH_SLUG_MALASANA,
+  CNS_DELTA_IRON_SET,
+  CNS_FATIGUE_MAX,
+  DELOAD_IRON_EXERCISE_CAP,
+  DELOAD_LOAD_FACTOR,
+  DELOAD_MESOCYCLE_WEEK,
+  READINESS_AUTOREG_THRESHOLD,
+  READINESS_LOAD_FACTOR,
+} from '@/lib/shared/clinicalConstants';
+
+export {
+  CNS_DELTA_IRON_SET,
+  CNS_FATIGUE_MAX,
+  CNS_FATIGUE_AUTOREG_THRESHOLD,
+  DELOAD_MESOCYCLE_WEEK,
+  DELOAD_IRON_EXERCISE_CAP,
+  DELOAD_LOAD_FACTOR,
+  READINESS_AUTOREG_THRESHOLD,
+  READINESS_LOAD_FACTOR,
+  BIOMECH_SLUG_MALASANA,
+  BIOMECH_SLUG_CHEST_OPENER,
+} from '@/lib/shared/clinicalConstants';
 
 const TITLE_CASE_SMALL_WORDS = new Set([
   'a',
@@ -25,24 +49,6 @@ const TITLE_CASE_SMALL_WORDS = new Set([
 
 /** Neuro-Mechanical Recruitment — Iron exercise buckets (1 = first) — alias of ClinicalPhase */
 export type IronRecruitmentRank = 1 | 2 | 3 | 4 | 5;
-
-/** Clinical Law III — CNS fatigue deltas (sync.ts) */
-export const CNS_DELTA_IRON_SET = 2;
-export const CNS_FATIGUE_MAX = 100;
-/** Rolling profile score at/above this → poor_recovery autoreg (Clinical Law III) */
-export const CNS_FATIGUE_AUTOREG_THRESHOLD = 70;
-
-/** Clinical Law III — Mesocycle deload */
-export const DELOAD_MESOCYCLE_WEEK = 4;
-export const DELOAD_IRON_EXERCISE_CAP = 4;
-export const DELOAD_LOAD_FACTOR = 0.6;
-
-/** Clinical Law II — Subjective readiness autoreg */
-export const READINESS_AUTOREG_THRESHOLD = 4;
-export const READINESS_LOAD_FACTOR = 0.85;
-
-export const BIOMECH_SLUG_MALASANA = 'squat_malasana';
-export const BIOMECH_SLUG_CHEST_OPENER = 'sphinx';
 
 /** Strip numeric catalog prefixes and normalize title case for UI */
 export function beautifyCatalogName(raw: string): string {

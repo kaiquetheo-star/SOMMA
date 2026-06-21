@@ -1,4 +1,5 @@
 // CLINICAL ENGINE: DETERMINISTIC ONLY. NO RANDOMNESS ALLOWED. IF INPUTS ARE CONSTANT, OUTPUT MUST BE CONSTANT.
+// Canonical source: lib/shared/blueprintMatcher.ts — keep in sync.
 import {
   normalizeCatalogSlug,
   PRECISION_BLUEPRINT,

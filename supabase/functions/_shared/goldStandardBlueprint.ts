@@ -1,4 +1,5 @@
 // CLINICAL ENGINE: DETERMINISTIC ONLY. NO RANDOMNESS ALLOWED. IF INPUTS ARE CONSTANT, OUTPUT MUST BE CONSTANT.
+// Canonical source: lib/gameplan/engine/goldStandardBlueprint.ts + lib/shared/slugUtils.ts — keep in sync.
 
 export type IronDayBlueprintKey = 'push' | 'pull' | 'legs' | 'upper' | 'lower' | 'full';
 

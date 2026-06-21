@@ -16,11 +16,11 @@ import {
   applyDeloadToIronExercise,
   beautifyCatalogName,
   capIronExercisesForDeload,
-  CNS_FATIGUE_AUTOREG_THRESHOLD,
   isDeloadMesocycleWeek,
   resolveBiomechanicalPrerequisiteSlugs,
   sortIronExercises,
 } from '@/lib/gameplan/engine/clinicalLaws';
+import { CNS_FATIGUE_AUTOREG_THRESHOLD } from '@/lib/shared/clinicalConstants';
 import {
   applyHypertrophyVolumeGuardrail,
   archetypeExerciseCountDelta,

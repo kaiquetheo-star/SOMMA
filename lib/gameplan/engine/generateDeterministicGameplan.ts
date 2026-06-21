@@ -59,6 +59,7 @@ import type {
     MicrocycleDay,
 } from '@/types/gameplan';
 import type { PerformanceLogEntry } from '@/types/performance';
+import { todayDateKey } from '@/lib/shared/dateUtils';
 
 export interface GenerateDeterministicGameplanInput {
   focus: FocusPreference;
@@ -81,10 +82,6 @@ function resolveMesocycleWeek(biological: BiologicalProfile): number | null {
   return typeof mesocycleWeek === 'number' && Number.isFinite(mesocycleWeek)
     ? mesocycleWeek
     : null;
-}
-
-function todayDateKey(): string {
-  return new Date().toISOString().slice(0, 10);
 }
 
 function resolveBaseRoutineIds(

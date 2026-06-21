@@ -17,7 +17,7 @@ import { maxIronExercisesForMinutes } from '@/lib/gameplan/engine/volumePruning'
 import {
   BIOMECH_SLUG_CHEST_OPENER,
   BIOMECH_SLUG_MALASANA,
-} from '@/lib/gameplan/engine/clinicalLaws';
+} from '@/lib/shared/clinicalConstants';
 
 export interface PillarFrequency {
   frequency_iron: number;

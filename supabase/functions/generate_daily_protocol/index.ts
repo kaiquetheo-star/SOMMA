@@ -17,6 +17,10 @@ import {
   resolvePrescriptionTargetWeight,
   targetWeightFromE1RM,
 } from '../_shared/rmCalculator.ts';
+import {
+  getWeekStartMonday,
+  getDayIndexForDate,
+} from '../_shared/weekUtils.ts';
 
 const PERFORMANCE_LOGS_QUERY_LIMIT = 80;
 
@@ -674,23 +678,6 @@ function expandRoutineIdsForTime(
     if (selected.length >= targetCount) break;
   }
   return selected.slice(0, targetCount);
-}
-
-function getWeekStartMonday(dateKey: string): string {
-  const date = new Date(`${dateKey}T12:00:00`);
-  if (Number.isNaN(date.getTime())) return dateKey;
-  const day = date.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  date.setDate(date.getDate() + diff);
-  return date.toISOString().slice(0, 10);
-}
-
-function getDayIndexForDate(dateKey: string, weekStartDate: string): number {
-  const date = new Date(`${dateKey}T12:00:00`);
-  const start = new Date(`${weekStartDate}T12:00:00`);
-  if (Number.isNaN(date.getTime()) || Number.isNaN(start.getTime())) return 1;
-  const diffDays = Math.round((date.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
-  return Math.min(7, Math.max(1, diffDays + 1));
 }
 
 function spreadTrainingDayIndices(trainingDaysPerWeek: number): number[] {

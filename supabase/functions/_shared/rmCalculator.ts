@@ -1,4 +1,4 @@
-/** Shared 1RM physics — imported by Edge Functions (Deno). Mirrors lib/physics/rmCalculator.ts */
+/** Shared 1RM physics — imported by Edge Functions (Deno). Canonical source: lib/shared/rmCore.ts — keep in sync. */
 
 export type IronGoalType = 'hypertrophy' | 'strength' | 'default';
 

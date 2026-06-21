@@ -1,5 +1,7 @@
 // CLINICAL ENGINE: DETERMINISTIC ONLY. NO RANDOMNESS ALLOWED. IF INPUTS ARE CONSTANT, OUTPUT MUST BE CONSTANT.
 
+import { normalizeSlug } from '@/lib/shared/slugUtils';
+
 /** Split key inferred from Head Coach focus_label */
 export type IronDayBlueprintKey = 'push' | 'pull' | 'legs' | 'upper' | 'lower' | 'full';
 export interface PrecisionBlueprintSlot {
@@ -60,7 +62,7 @@ export const PRECISION_BLUEPRINT: Record<IronDayBlueprintKey, readonly Precision
 };
 
 export function normalizeCatalogSlug(slug: string): string {
-  return slug.toLowerCase().replace(/-/g, '_');
+  return normalizeSlug(slug);
 }
 
 export function slugMatchesGold(candidate: string, gold: string): boolean {

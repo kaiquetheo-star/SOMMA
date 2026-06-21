@@ -10,6 +10,7 @@ import type { BiologicalProfile } from '@/types/biological';
 import { deriveTrainingDaysFromFrequencies, isBiologicalProfileComplete } from '@/types/biological';
 import type { DailyGameplan, MicrocycleDay } from '@/types/gameplan';
 import type { PerformanceLogEntry } from '@/types/performance';
+import { todayDateKey } from '@/lib/shared/dateUtils';
 
 export type GameplanSource = 'ai' | 'deterministic' | 'fallback' | 'stub' | 'local';
 
@@ -56,7 +57,7 @@ export interface FetchDailyGameplanResult {
  * This prevents the UI from freezing and gives the user a functional (if empty) state.
  */
 function buildSafeFallbackGameplan(trainingDaysPerWeek: number): DailyGameplan {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayDateKey();
   const weekStart = getWeekStartMonday(today);
   const microcycle: MicrocycleDay[] = Array.from({ length: 7 }, (_, i) => ({
     day_index: i + 1,

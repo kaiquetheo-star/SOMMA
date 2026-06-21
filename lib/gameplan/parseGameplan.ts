@@ -3,6 +3,7 @@ import {
   getDayIndexForDate,
   getWeekStartMonday,
 } from '@/lib/gameplan/microcycleWeek';
+import { todayDateKey } from '@/lib/shared/dateUtils';
 import {
   isDegenerateMicrocycle,
   sanitizeMicrocycleIronVolume,
@@ -234,7 +235,7 @@ export function parseDailyGameplanPayload(payload: unknown): DailyGameplan | nul
     return null;
   }
   const date =
-    typeof record.date === 'string' ? record.date : new Date().toISOString().slice(0, 10);
+    typeof record.date === 'string' ? record.date : todayDateKey();
   const generated_at =
     typeof record.generated_at === 'string' ? record.generated_at : new Date().toISOString();
 

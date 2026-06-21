@@ -8,10 +8,7 @@ import type {
   WorkoutSessionSummary,
 } from '@/types/performance';
 import { ironExercisesFromPerformanceLog } from '@/types/performance';
-
-function todayDateKey(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+import { todayDateKey } from '@/lib/shared/dateUtils';
 
 function isTodayTimestamp(timestamp: string): boolean {
   return timestamp.slice(0, 10) === todayDateKey();

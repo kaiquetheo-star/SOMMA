@@ -8,10 +8,7 @@ import {
 import type { DailyGameplan, GameplanBlock, MicrocycleDay } from '@/types/gameplan';
 import type { EquipmentTag, FocusPreference } from '@/store/useSommaStore';
 import { DEFAULT_TRAINING_DAYS_PER_WEEK } from '@/types/biological';
-
-function todayDateKey(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+import { todayDateKey } from '@/lib/shared/dateUtils';
 
 function ironSubtitle(equipment: EquipmentTag[]): string {
   if (equipment.includes('barbell') || equipment.includes('full_gym')) {

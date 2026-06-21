@@ -1,6 +1,6 @@
 /**
  * Zero-Cost Clinical Engine — shared deterministic laws for Edge Head Coach.
- * Mirrors lib/gameplan/engine/clinicalLaws.ts + clinicalMatrix.ts (keep in sync).
+ * Canonical sources: lib/shared/clinicalConstants.ts, lib/shared/exerciseClassification.ts — keep in sync.
  */
 
 // CLINICAL ENGINE: DETERMINISTIC ONLY. NO RANDOMNESS ALLOWED. IF INPUTS ARE CONSTANT, OUTPUT MUST BE CONSTANT.
