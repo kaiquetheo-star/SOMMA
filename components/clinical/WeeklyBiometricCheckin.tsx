@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, Text, TextInput, View, type TextStyle } from 'react-native';
 
 import type { BiometricCheckpoint } from '@/lib/gameplan/engine/adaptiveStateMachine';
 import { isWeightStable } from '@/lib/gameplan/engine/adaptiveStateMachine';
@@ -72,7 +72,7 @@ export function WeeklyBiometricCheckin({ checkpoints, onAddCheckpoint }: WeeklyB
             placeholder="Ex: 78.5"
             placeholderTextColor="#4E5B52"
             className="mt-3 rounded-2xl border border-white/10 bg-[#0F1512] px-4 py-3 font-display text-xl text-[#E8E4DC]"
-            style={Platform.OS === 'web' ? { outlineStyle: 'none' } : undefined}
+            style={Platform.OS === 'web' ? ({ outlineStyle: 'none' } as unknown as TextStyle) : undefined}
             {...webTextInputProps()}
           />
         </View>
@@ -87,7 +87,7 @@ export function WeeklyBiometricCheckin({ checkpoints, onAddCheckpoint }: WeeklyB
             placeholder="Opcional"
             placeholderTextColor="#4E5B52"
             className="mt-3 rounded-2xl border border-white/10 bg-[#0F1512] px-4 py-3 font-display text-xl text-[#E8E4DC]"
-            style={Platform.OS === 'web' ? { outlineStyle: 'none' } : undefined}
+            style={Platform.OS === 'web' ? ({ outlineStyle: 'none' } as unknown as TextStyle) : undefined}
             {...webTextInputProps()}
           />
         </View>

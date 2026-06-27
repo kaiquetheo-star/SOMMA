@@ -1,9 +1,5 @@
-import {
-  MEV,
-  MRV_HARD,
-  MRV_SOFT,
-  type WeeklyVolumeTracker,
-} from '@/lib/gameplan/engine/iron/WeeklyVolumeTracker';
+import type { WeeklyVolumeTracker } from '@/lib/gameplan/engine/iron/WeeklyVolumeTracker';
+import { ABCDE_ARMS_CALENDAR_DAY } from '@/lib/gameplan/engine/iron/dupLogic';
 import { supportsAdvancedMetabolicTechnique } from '@/lib/catalog/tacticalEnrichment';
 import { classifyShoulderRegion } from '@/lib/gameplan/engine/iron/taxonomy/shoulderRegions';
 import { matchesMuscleSlotHint } from '@/lib/gameplan/engine/iron/taxonomy/muscleSlotHints';
@@ -18,7 +14,7 @@ import {
 import {
   getMandatoryCompoundCandidates,
   hasRequiredCompound,
-  MANDATORY_COMPOUND_GROUPS_BY_DAY,
+  mandatoryCompoundGroupsForDay,
 } from '@/lib/gameplan/engine/iron/mandatoryCompounds';
 import type { IronMovementPattern } from '@/lib/gameplan/engine/iron/taxonomy/movementPatterns';
 import type {
@@ -36,7 +32,7 @@ import type {
   WeeklyVolumeSnapshot,
 } from '@/lib/gameplan/engine/iron/types';
 import { computeRestSecondsFromCns } from '@/types/catalog';
-import { initialBiologicalProfile } from '@/types/biological';
+import { initialBiologicalProfile, normalizePreferredSplit } from '@/types/biological';
 import type { EquipmentTag } from '@/store/useSommaStore';
 
 /** Head-coach session CNS budget defaults when passport omits a cap. */
@@ -79,6 +75,53 @@ export type SolverStateWithSelection = SolverState & { selectedExercises?: reado
 export type DaySlotConfig = {
   slots: readonly ({ category?: string; count?: number } | SolverSlot)[];
 };
+
+const SCORE_ARM_DAY_ISOLATION_BONUS = 900;
+
+const ARM_ISOLATION_SLOT_CATEGORIES = new Set([
+  'biceps_curl',
+  'biceps_curl_long_head',
+  'biceps_curl_short_head',
+  'biceps_hammer',
+  'triceps_overhead',
+  'triceps_pushdown',
+  'triceps_extension',
+  'forearm_isolation',
+]);
+
+function isArmPrimaryMuscle(muscle: string): boolean {
+  return muscle === 'biceps' || muscle === 'triceps' || muscle === 'forearms' || muscle === 'brachialis';
+}
+
+function isAbcdeArmsCalendarDay(
+  constraints: Pick<SolverConstraints, 'calendarDayIndex' | 'biological'> | undefined,
+): boolean {
+  if (!constraints) return false;
+  const split = normalizePreferredSplit(constraints.biological?.preferred_split);
+  return (split === 'abcde' || split === 'abcdef') && constraints.calendarDayIndex === ABCDE_ARMS_CALENDAR_DAY;
+}
+
+function isArmsDedicatedIsolationSlot(
+  slot: SolverSlot,
+  constraints: Pick<SolverConstraints, 'calendarDayIndex' | 'biological'>,
+): boolean {
+  return isAbcdeArmsCalendarDay(constraints) && slot.category != null && ARM_ISOLATION_SLOT_CATEGORIES.has(slot.category);
+}
+
+export function isArmsDedicatedSolverSlot(
+  slot: SolverSlot,
+  constraints: Pick<SolverConstraints, 'calendarDayIndex' | 'biological'>,
+): boolean {
+  return isArmsDedicatedIsolationSlot(slot, constraints);
+}
+
+function isLowCnsArmIsolation(exercise: CatalogExercise): boolean {
+  return (
+    exercise.movement_pattern === 'isolation' &&
+    isArmPrimaryMuscle(exercise.primary_muscle) &&
+    exercise.cns_fatigue_cost <= 3
+  );
+}
 
 function minimumViableDiagnosticReason(constraints: SolverConstraints): string {
   return constraints.blockedJointProfiles.length > 0
@@ -174,6 +217,7 @@ function cloneWeeklySnapshot(tracker: WeeklyVolumeTracker): WeeklyVolumeSnapshot
     mev: tracker.snapshot.mev,
     mrvSoft: tracker.snapshot.mrvSoft,
     mrvHard: tracker.snapshot.mrvHard,
+    maxSetsSession: tracker.snapshot.maxSetsSession,
   };
 }
 
@@ -422,9 +466,20 @@ function synergistOverlapLoad(
   return overlap;
 }
 
-function dupFocusBonus(exercise: CatalogExercise, constraints?: Pick<SolverConstraints, 'dailyIronFocus'>): number {
+function dupFocusBonus(
+  exercise: CatalogExercise,
+  constraints?: Pick<SolverConstraints, 'dailyIronFocus' | 'calendarDayIndex' | 'biological'>,
+): number {
   const focus = constraints?.dailyIronFocus?.focus;
   if (!focus) return 0;
+
+  if (
+    focus === 'metabolic_hypertrophy' &&
+    isAbcdeArmsCalendarDay(constraints) &&
+    isLowCnsArmIsolation(exercise)
+  ) {
+    return SCORE_DUP_MATCH_BONUS;
+  }
 
   // Regra 5.1: Legs A favors high-threshold compounds for pure mechanical tension.
   if (focus === 'pure_mechanical_tension') {
@@ -514,23 +569,35 @@ function tacticalOrderRank(exercise: CatalogExercise): number {
 export function scoreExerciseCandidate(
   exercise: CatalogExercise,
   tracker: WeeklyVolumeTracker,
-  constraints?: Pick<SolverConstraints, 'iron_mastery' | 'dailyIronFocus' | 'cns_fatigue_score'>,
+  constraints?: Pick<
+    SolverConstraints,
+    'iron_mastery' | 'dailyIronFocus' | 'cns_fatigue_score' | 'calendarDayIndex' | 'biological'
+  >,
   state?: Pick<SolverState, 'usedExerciseIds' | 'previousDayHadAxialLoad' | 'previousDayIndex' | 'isRecoveryMode'>,
   currentDayIndex?: number,
 ): number {
   let score = exercise.selection_score * SCORE_X_FRAME_WEIGHT;
 
   const primaryVolume = tracker.completedSetsForMuscle(exercise.primary_muscle);
-  if (primaryVolume < MEV) {
+  const { mev, mrvSoft, mrvHard } = tracker.snapshot;
+  if (primaryVolume < mev) {
     score += SCORE_RULE_1_MEV_BOOST;
-  } else if (primaryVolume > MRV_SOFT && primaryVolume <= MRV_HARD) {
+    if (isAbcdeArmsCalendarDay(constraints) && isArmPrimaryMuscle(exercise.primary_muscle)) {
+      score += SCORE_ARM_DAY_ISOLATION_BONUS;
+    }
+  } else if (primaryVolume > mrvSoft && primaryVolume <= mrvHard) {
     score -= SCORE_MRV_SOFT_PENALTY;
   }
 
   const overlap = synergistOverlapLoad(exercise, tracker);
-  score -= SCORE_SYNERGIST_OVERLAP_PENALTY * overlap;
+  const armDayIsolation = isAbcdeArmsCalendarDay(constraints) && isLowCnsArmIsolation(exercise);
+  if (!(armDayIsolation && primaryVolume < mev)) {
+    score -= SCORE_SYNERGIST_OVERLAP_PENALTY * overlap;
+  }
 
-  score -= SCORE_CNS_PENALTY * exercise.cns_fatigue_cost;
+  score -= armDayIsolation
+    ? SCORE_CNS_PENALTY * Math.min(exercise.cns_fatigue_cost, 1)
+    : SCORE_CNS_PENALTY * exercise.cns_fatigue_cost;
   score += dupFocusBonus(exercise, constraints);
 
   if (isHighFatigueContext(tracker, state, constraints)) {
@@ -637,6 +704,8 @@ export function collectCandidates(
     ignoreMrv?: boolean;
     ignoreRecoveryMode?: boolean;
     ignoreBodyweightBlacklist?: boolean;
+    ignoreJointStress?: boolean;
+    armsDedicatedRelaxation?: boolean;
     allowSameSlotCategoryDifferentConcept?: boolean;
     daySlotConfig?: DaySlotConfig;
   } = {},
@@ -711,7 +780,13 @@ export function collectCandidates(
       );
       continue;
     }
-    if (!jointProfileAllowed(exercise, constraints.blockedJointProfiles)) {
+    const relaxJointForArms =
+      options.armsDedicatedRelaxation && isLowCnsArmIsolation(exercise);
+    if (
+      !options.ignoreJointStress &&
+      !relaxJointForArms &&
+      !jointProfileAllowed(exercise, constraints.blockedJointProfiles)
+    ) {
       logCandidateRejection(slot, exercise, `perfil articular bloqueado: ${exercise.joint_stress_profile}`);
       continue;
     }
@@ -748,8 +823,11 @@ export function collectCandidates(
     }
 
     // Regra 2.2/2.3: recovery mode blocks spinal stress, while scoring strongly favors stable machines/cables.
+    const relaxArmRecovery =
+      options.armsDedicatedRelaxation && isLowCnsArmIsolation(exercise);
     if (
       !options.ignoreRecoveryMode &&
+      !relaxArmRecovery &&
       isHighFatigueContext(tracker, state, constraints) &&
       ((exercise.axial_loading ?? 0) >= 3 || isLumbarShearExercise(exercise))
     ) {
@@ -764,7 +842,10 @@ export function collectCandidates(
       continue;
     }
 
-    if (!options.ignoreCnsBudget && state.sessionCnsAccum + exercise.cns_fatigue_cost > constraints.maxSessionCns) {
+    const skipCnsBudget =
+      options.ignoreCnsBudget ||
+      (options.armsDedicatedRelaxation && isLowCnsArmIsolation(exercise));
+    if (!skipCnsBudget && state.sessionCnsAccum + exercise.cns_fatigue_cost > constraints.maxSessionCns) {
       logCandidateRejection(
         slot,
         exercise,
@@ -1030,10 +1111,14 @@ export function solveDaySlots(
       catalog.exercises,
       mandatoryCompoundDayIndex,
       { available_equipment: constraints.available_equipment ?? constraints.equipment },
+      constraints.biological?.preferred_split,
     );
 
-    if (mandatoryCandidates.length > 0 && !hasRequiredCompound(selectedCatalogExercises(), mandatoryCompoundDayIndex)) {
-      const mandatoryGroups = MANDATORY_COMPOUND_GROUPS_BY_DAY[mandatoryCompoundDayIndex] ?? [];
+    if (mandatoryCandidates.length > 0 && !hasRequiredCompound(selectedCatalogExercises(), mandatoryCompoundDayIndex, constraints.biological?.preferred_split)) {
+      const mandatoryGroups = mandatoryCompoundGroupsForDay(
+        mandatoryCompoundDayIndex,
+        constraints.biological?.preferred_split,
+      );
 
       for (const mandatoryGroup of mandatoryGroups) {
         if (mandatoryGroup.some((slug) => selectedCatalogExercises().some((exercise) => exercise.slug === slug))) continue;
@@ -1092,17 +1177,59 @@ export function solveDaySlots(
       sessionCnsAccum: mutableState.sessionCnsAccum,
       sessionAxialLoad: mutableState.sessionAxialLoad,
     };
-    const candidates = collectCandidates(day, catalog, slot, constraints, stateForSlot, tracker, currentDayIndex, {
+    const slotCollectOptions = {
       allowSameSlotCategoryDifferentConcept: isRepeatedSlotInstance(slot),
       daySlotConfig,
-    });
+    };
+    const armsRelaxation = isArmsDedicatedIsolationSlot(slot, constraints);
 
-    const selection = pickBestCandidate(candidates, tracker, constraints, stateForSlot, currentDayIndex, slot);
+    let candidates = collectCandidates(day, catalog, slot, constraints, stateForSlot, tracker, currentDayIndex, slotCollectOptions);
+    let selection = pickBestCandidate(candidates, tracker, constraints, stateForSlot, currentDayIndex, slot);
+    let slotDiagnosticReason: string | undefined;
+
+    if (!selection) {
+      candidates = collectCandidates(day, catalog, slot, constraints, stateForSlot, tracker, currentDayIndex, {
+        ...slotCollectOptions,
+        ignoreCnsBudget: true,
+        ignoreMrv: true,
+        ignoreRecoveryMode: true,
+        armsDedicatedRelaxation: armsRelaxation,
+      });
+      selection = pickBestCandidate(candidates, tracker, constraints, stateForSlot, currentDayIndex, slot);
+    }
+
+    if (!selection) {
+      const exhaustedCandidates = collectCandidates(day, catalog, slot, constraints, stateForSlot, tracker, currentDayIndex, {
+        ...slotCollectOptions,
+        ignoreCnsBudget: true,
+        ignoreMastery: true,
+        ignoreMrv: true,
+        ignoreRecoveryMode: true,
+        ignoreBodyweightBlacklist: true,
+        ignoreJointStress: true,
+        armsDedicatedRelaxation: true,
+      });
+      if (exhaustedCandidates.length === 0) continue;
+      selection = pickBestCandidate(exhaustedCandidates, tracker, constraints, stateForSlot, currentDayIndex, slot);
+      slotDiagnosticReason = minimumViableDiagnosticReason(constraints);
+    }
+
     if (!selection) continue;
 
     const { exercise, score } = selection;
     const { prescribedSets, budget, phase } = prescribedSetsForSlot(slot, exercise, constraints);
-    pushSolverPick(picks, exercise, slot, prescribedSets, score, mutableState, tracker, undefined, budget, phase);
+    pushSolverPick(
+      picks,
+      exercise,
+      slot,
+      prescribedSets,
+      score,
+      mutableState,
+      tracker,
+      slotDiagnosticReason,
+      budget,
+      phase,
+    );
     filledSlotIds.add(slot.slotId);
   }
 

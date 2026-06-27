@@ -12,7 +12,7 @@ export type MesocyclePhase = 'bulking' | 'cutting' | 'maintenance' | 'deload';
 
 export type MesocycleGoal = 'strength' | 'hypertrophy' | 'metabolic_conditioning';
 
-export type PreferredSplit = 'abcdef' | 'ppl_x2';
+export type PreferredSplit = 'abcde' | 'abcdef' | 'ppl_x2';
 
 export type HormonalProtocol = {
   type: 'natural' | 'trt' | 'enhanced_cycle';
@@ -53,7 +53,7 @@ export interface BiologicalProfile {
   mesocycle_week?: number | null;
   /** Primary adaptation target for the current mesocycle. */
   mesocycle_goal?: MesocycleGoal | null;
-  /** Weekly Iron split template. ABCDEF is the X-Frame default; PPL x2 is legacy. */
+  /** Weekly Iron split template. ABCDE is the X-Frame default; PPL x2 hits each muscle 2×/week. */
   preferred_split?: PreferredSplit | null;
   /** Month 1 exit interview — calibrates Month 2 target loads */
   clinical_exit_interview: ClinicalExitInterview | null;
@@ -73,8 +73,8 @@ export const FIXED_DATE_OF_BIRTH = '1994-05-14';
 export const FIXED_HEIGHT_CM = 159;
 export const FIXED_GOAL_IRON = 'Hypertrophy';
 export const FIXED_NUTRITION_GOAL = 'Hypertrophy support';
-export const DEFAULT_FREQUENCY_IRON = 6;
-export const DEFAULT_PREFERRED_SPLIT: PreferredSplit = 'abcdef';
+export const DEFAULT_FREQUENCY_IRON = 5;
+export const DEFAULT_PREFERRED_SPLIT: PreferredSplit = 'abcde';
 
 export const TIME_BUDGET_PRESETS = [
   { id: '45', label: '45m', iron: 45 },
@@ -89,7 +89,7 @@ export const DEFAULT_AVAILABLE_TIME_IRON = 90;
 
 export const TRAINING_DAYS_MIN = 1;
 export const TRAINING_DAYS_MAX = 7;
-export const DEFAULT_TRAINING_DAYS_PER_WEEK = 6;
+export const DEFAULT_TRAINING_DAYS_PER_WEEK = 5;
 
 export const initialBiologicalProfile: BiologicalProfile = {
   date_of_birth: FIXED_DATE_OF_BIRTH,
@@ -116,6 +116,45 @@ export const initialBiologicalProfile: BiologicalProfile = {
   hormonal_protocol: undefined,
 };
 
+export function normalizePreferredSplit(
+  split: PreferredSplit | string | null | undefined,
+): PreferredSplit {
+  if (split === 'ppl_x2') return 'ppl_x2';
+  if (split === 'abcde') return 'abcde';
+  if (split === 'abcdef') return 'abcde';
+  return 'abcde';
+}
+
+/** Graceful migration: legacy ABCDEF (6×) → ABCDE (5×) on next protocol generation. */
+export function normalizeIronProfileForGeneration(profile: BiologicalProfile): BiologicalProfile {
+  const preferred_split = normalizePreferredSplit(profile.preferred_split);
+  const migratedFromAbcdef = profile.preferred_split === 'abcdef';
+
+  let frequency_iron = profile.frequency_iron;
+  if (preferred_split === 'abcde') {
+    if (profile.preferred_split === 'abcdef' || frequency_iron == null || frequency_iron === 6) {
+      frequency_iron = DEFAULT_FREQUENCY_IRON;
+    }
+  } else if (preferred_split === 'ppl_x2') {
+    if (frequency_iron == null) frequency_iron = 6;
+  }
+
+  const resolvedFrequency = clampPillarFrequency(frequency_iron, DEFAULT_FREQUENCY_IRON);
+  const training_days_per_week =
+    migratedFromAbcdef
+      ? resolvedFrequency
+      : clampTrainingDaysPerWeek(
+          profile.training_days_per_week ?? deriveTrainingDaysFromFrequencies({ frequency_iron: resolvedFrequency }),
+        );
+
+  return {
+    ...profile,
+    preferred_split,
+    frequency_iron: resolvedFrequency,
+    training_days_per_week,
+  };
+}
+
 export function withFixedBiologicalProfile(
   profile: Partial<BiologicalProfile> | null | undefined,
 ): BiologicalProfile {
@@ -140,7 +179,7 @@ export function withFixedBiologicalProfile(
     mesocycle_phase: profile?.mesocycle_phase ?? initialBiologicalProfile.mesocycle_phase,
     mesocycle_week: profile?.mesocycle_week ?? initialBiologicalProfile.mesocycle_week,
     mesocycle_goal: profile?.mesocycle_goal ?? initialBiologicalProfile.mesocycle_goal,
-    preferred_split: profile?.preferred_split ?? DEFAULT_PREFERRED_SPLIT,
+    preferred_split: normalizePreferredSplit(profile?.preferred_split ?? DEFAULT_PREFERRED_SPLIT),
     clinical_exit_interview:
       profile?.clinical_exit_interview ?? initialBiologicalProfile.clinical_exit_interview,
     current_body_fat_estimate:

@@ -336,6 +336,8 @@ function createSessionLog(session: IronSessionLog, completedAt: string): Perform
 interface SommaState {
   /** False until persist rehydration completes — never written to storage */
   _hasHydrated: boolean;
+  /** True while SecureStore/AsyncStorage rehydration is in flight — never persisted */
+  isHydrating: boolean;
   user_environment: UserEnvironment;
   user_stats: UserStats;
   user_foundation: UserFoundation;
@@ -430,6 +432,7 @@ export const useSommaStore = create<SommaState>()(
   persist(
     (set, get) => ({
       _hasHydrated: false,
+      isHydrating: true,
       user_environment: initialEnvironment,
       user_stats: initialStats,
       user_foundation: initialFoundation,
@@ -774,7 +777,14 @@ export const useSommaStore = create<SommaState>()(
       completeWorkout: async (input) => {
         const state = get();
         const completedAt = new Date().toISOString();
-        const session = state.pendingSession?.blockId === input.block_id ? state.pendingSession : null;
+        const session =
+          state.pendingSession?.blockId === input.block_id
+            ? state.pendingSession
+            : input.pillar === 'iron' &&
+                state.pendingSession != null &&
+                state.pendingSession.exercises.length > 0
+              ? state.pendingSession
+              : null;
         if (input.pillar === 'iron' && !session) {
           set((current) => ({
             weeklyMicrocycle: markBlockCompletedInMicrocycle(
@@ -914,6 +924,7 @@ export const useSommaStore = create<SommaState>()(
       resetStore: async () => {
         set({
           _hasHydrated: true,
+          isHydrating: false,
           user_environment: { ...initialEnvironment },
           user_stats: { ...initialStats },
           user_foundation: { ...initialFoundation },
@@ -955,6 +966,7 @@ export const useSommaStore = create<SommaState>()(
 
         const patch: SommaPersistedSnapshot & {
           _hasHydrated: boolean;
+          isHydrating: boolean;
           performance_syncing: boolean;
           gameplan_loading: boolean;
           gameplan_error: string | null;
@@ -963,7 +975,9 @@ export const useSommaStore = create<SommaState>()(
           adaptationLogs?: AdaptationLogEntry[];
         } = {
           ...snapshot,
+          adaptationLogs: snapshot.adaptationLogs as AdaptationLogEntry[],
           _hasHydrated: true,
+          isHydrating: false,
           performance_syncing: false,
           gameplan_loading: false,
           gameplan_error: null,
@@ -1007,7 +1021,7 @@ export const useSommaStore = create<SommaState>()(
           console.warn('[SOMMA] Persist rehydrate error:', error);
         }
         if (!state) {
-          useSommaStore.setState({ _hasHydrated: true });
+          useSommaStore.setState({ _hasHydrated: true, isHydrating: false });
           return;
         }
         if (!state.user_biological) {
@@ -1095,7 +1109,7 @@ export const useSommaStore = create<SommaState>()(
           state.gameplan_source = null;
         }
 
-        useSommaStore.setState({ _hasHydrated: true });
+        useSommaStore.setState({ _hasHydrated: true, isHydrating: false });
       },
     },
   ),

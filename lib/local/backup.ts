@@ -34,6 +34,12 @@ import type {
 export const SOMMA_BACKUP_VERSION = 1;
 export const SOMMA_STORAGE_KEY = 'somma-offline-store';
 
+function clampReadinessDimension(value: number | null, fallback: 1 | 2 | 3 | 4 | 5): 1 | 2 | 3 | 4 | 5 {
+  if (value == null || !Number.isFinite(value)) return fallback;
+  const rounded = Math.min(5, Math.max(1, Math.round(value)));
+  return rounded as 1 | 2 | 3 | 4 | 5;
+}
+
 /** Fields mirrored from `useSommaStore` persist `partialize`. */
 export interface SommaPersistedSnapshot {
   user_environment: UserEnvironment;
@@ -200,11 +206,11 @@ export function normalizePersistedSnapshot(raw: unknown): SommaPersistedSnapshot
   let readinessScan: ReadinessScan | null = null;
   if (isRecord(payload.readinessScan)) {
     readinessScan = {
-      sleep_quality: asNumberOrNull(payload.readinessScan.sleep_quality) ?? 3,
-      muscle_soreness: asNumberOrNull(payload.readinessScan.muscle_soreness) ?? 3,
-      energy_level: asNumberOrNull(payload.readinessScan.energy_level) ?? 3,
-      stress_level: asNumberOrNull(payload.readinessScan.stress_level) ?? 3,
-      mobility_feeling: asNumberOrNull(payload.readinessScan.mobility_feeling) ?? 3,
+      sleep_quality: clampReadinessDimension(asNumberOrNull(payload.readinessScan.sleep_quality), 3),
+      muscle_soreness: clampReadinessDimension(asNumberOrNull(payload.readinessScan.muscle_soreness), 3),
+      energy_level: clampReadinessDimension(asNumberOrNull(payload.readinessScan.energy_level), 3),
+      stress_level: clampReadinessDimension(asNumberOrNull(payload.readinessScan.stress_level), 3),
+      mobility_feeling: clampReadinessDimension(asNumberOrNull(payload.readinessScan.mobility_feeling), 3),
       timestamp: asStringOrNull(payload.readinessScan.timestamp) ?? new Date().toISOString(),
     };
   }

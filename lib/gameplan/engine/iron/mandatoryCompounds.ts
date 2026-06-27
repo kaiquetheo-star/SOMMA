@@ -1,5 +1,6 @@
 import type { EquipmentTag } from '@/store/useSommaStore';
 import type { CatalogExercise } from '@/lib/gameplan/engine/iron/types';
+import { normalizePreferredSplit, type PreferredSplit } from '@/types/biological';
 
 export const MANDATORY_COMPOUNDS_BY_DAY: Record<number, string[]> = {
   // At least one heavy incline chest press and one flat barbell bench press.
@@ -14,7 +15,7 @@ export const MANDATORY_COMPOUNDS_BY_DAY: Record<number, string[]> = {
   // At least one heavy row.
   2: ['barbell_bent_over_row', 't_bar_row', 'lever_t_bar_row', 'chest_supported_row'],
   // At least one heavy leg compound.
-  3: ['hack_squat', 'hack_squats', 'leg_press', 'barbell_back_squat'],
+  3: ['hack_squat', 'hack_squats', 'leg_press', 'barbell_back_squat', 'dumbbell_single_leg_split_squat', 'smith_single_leg_split_squat'],
   // At least one overhead press.
   4: [
     'barbell_overhead_press',
@@ -28,7 +29,7 @@ export const MANDATORY_COMPOUNDS_BY_DAY: Record<number, string[]> = {
   // Arms day does not require a mandatory compound.
   5: [],
   // At least one hinge.
-  6: ['romanian_deadlift', 'stiff_leg_deadlift', 'dumbbell_stiff_leg_deadlift', 'good_morning'],
+  6: ['romanian_deadlift', 'stiff_leg_deadlift', 'dumbbell_stiff_leg_deadlift', 'good_morning', 'barbell_hip_thrust', 'hip_thrust_barbell'],
 };
 
 export const MANDATORY_COMPOUND_GROUPS_BY_DAY: Record<number, readonly string[][]> = {
@@ -49,6 +50,32 @@ export const MANDATORY_COMPOUND_GROUPS_BY_DAY: Record<number, readonly string[][
   6: [MANDATORY_COMPOUNDS_BY_DAY[6]!],
 };
 
+/** Calendar-day mandatory groups for ABCDE (1× frequency). */
+export const ABCDE_MANDATORY_COMPOUND_GROUPS_BY_DAY: Record<number, readonly string[][]> = {
+  1: MANDATORY_COMPOUND_GROUPS_BY_DAY[1]!,
+  2: MANDATORY_COMPOUND_GROUPS_BY_DAY[3]!,
+  4: MANDATORY_COMPOUND_GROUPS_BY_DAY[2]!,
+  5: MANDATORY_COMPOUND_GROUPS_BY_DAY[6]!,
+  6: [],
+};
+
+export function mandatoryCompoundGroupsForDay(
+  dayIndex: number,
+  preferredSplit?: PreferredSplit | null,
+): readonly string[][] {
+  if (normalizePreferredSplit(preferredSplit) === 'abcde') {
+    return ABCDE_MANDATORY_COMPOUND_GROUPS_BY_DAY[dayIndex] ?? [];
+  }
+  return MANDATORY_COMPOUND_GROUPS_BY_DAY[dayIndex] ?? [];
+}
+
+export function mandatoryCompoundSlugsForDay(
+  dayIndex: number,
+  preferredSplit?: PreferredSplit | null,
+): string[] {
+  return mandatoryCompoundGroupsForDay(dayIndex, preferredSplit).flat();
+}
+
 export function hasRequiredEquipment(
   exercise: CatalogExercise,
   availableEquipment: readonly EquipmentTag[],
@@ -61,8 +88,9 @@ export function hasRequiredEquipment(
 export function hasRequiredCompound(
   exercises: readonly CatalogExercise[],
   dayIndex: number,
+  preferredSplit?: PreferredSplit | null,
 ): boolean {
-  const mandatoryGroups = MANDATORY_COMPOUND_GROUPS_BY_DAY[dayIndex] || [];
+  const mandatoryGroups = mandatoryCompoundGroupsForDay(dayIndex, preferredSplit);
   if (mandatoryGroups.length === 0) return true;
 
   return mandatoryGroups.every((group) =>
@@ -74,8 +102,9 @@ export function getMandatoryCompoundCandidates(
   catalog: readonly CatalogExercise[],
   dayIndex: number,
   environment: { available_equipment: readonly EquipmentTag[] },
+  preferredSplit?: PreferredSplit | null,
 ): CatalogExercise[] {
-  const mandatory = MANDATORY_COMPOUNDS_BY_DAY[dayIndex] || [];
+  const mandatory = mandatoryCompoundSlugsForDay(dayIndex, preferredSplit);
   return catalog
     .filter(
       (exercise) =>

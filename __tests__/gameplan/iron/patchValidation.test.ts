@@ -87,13 +87,15 @@ function ironLog(exerciseId: string, timestamp: string): EnginePerformanceRow {
   };
 }
 
-const LOW_CNS_ISOLATIONS: LibraryExercise[] = Array.from({ length: 8 }, (_, index) =>
+const LOW_CNS_MUSCLES = ['side_delts', 'triceps', 'rear_delts', 'biceps', 'calves', 'forearms', 'core'] as const;
+
+const LOW_CNS_ISOLATIONS: LibraryExercise[] = Array.from({ length: 7 }, (_, index) =>
   mockExercise({
     id: `ex-low-cns-iso-${index}`,
     slug: `low_cns_iso_${index}`,
     name: `Low CNS Isolation ${index}`,
     movement_pattern: 'isolation',
-    primary_muscle: index % 2 === 0 ? 'side_delts' : 'triceps',
+    primary_muscle: LOW_CNS_MUSCLES[index] ?? 'side_delts',
     cns_fatigue_cost: 1,
   }),
 );
@@ -156,20 +158,30 @@ const BARBELL_BENCH_PRESS = mockExercise({
 describe('Iron patch validation: Finisher Hard Cap', () => {
   it('caps low-CNS isolation work at 4 sets even when the time budget tries to inflate volume', () => {
     const catalog = buildExerciseCatalog(LOW_CNS_ISOLATIONS);
-    const tracker = createWeeklyVolumeTracker(catalog, [], [], initialBiologicalProfile);
+    const tracker = createWeeklyVolumeTracker(
+      catalog,
+      [],
+      [],
+      { ...initialBiologicalProfile, preferred_split: 'ppl_x2', frequency_iron: 6 },
+    );
     const slots: SolverSlot[] = Array.from({ length: 7 }, (_, index) => ({
       slotId: `pump_slot_${index}`,
       day: 'push',
       requiredPatterns: ['isolation'],
       isolationOnly: true,
       defaultSets: 3,
+      primaryMuscleHint: LOW_CNS_MUSCLES[index],
     }));
 
     const { picks } = solveDaySlots(
       'push',
       slots,
       catalog,
-      defaultConstraints({ available_time_minutes: 240 }),
+      defaultConstraints({
+        available_time_minutes: 240,
+        maxSessionCns: 30,
+        biological: { ...initialBiologicalProfile, preferred_split: 'ppl_x2', frequency_iron: 6 },
+      }),
       createInitialSolverState(tracker),
       tracker,
     );
@@ -189,7 +201,12 @@ describe('Iron patch validation: Finisher Hard Cap', () => {
 describe('Iron patch validation: Minimum Viable Workout Fallback', () => {
   it('injects 2 deload-volume exercises when MRV/CNS constraints would otherwise deadlock the day', () => {
     const catalog = buildExerciseCatalog([PUSH_UP, LAT_PULLDOWN, BARBELL_BACK_SQUAT]);
-    const tracker = createWeeklyVolumeTracker(catalog, [], [], initialBiologicalProfile);
+    const tracker = createWeeklyVolumeTracker(
+      catalog,
+      [],
+      [],
+      { ...initialBiologicalProfile, preferred_split: 'ppl_x2', frequency_iron: 6 },
+    );
 
     for (let i = 0; i < 3; i += 1) {
       tracker.creditVolume(catalog.bySlug.get('push_up')!, MAX_TRACKED_SETS_PER_EXERCISE);

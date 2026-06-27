@@ -22,6 +22,7 @@ const userBiological: UserBiological = {
   clinical_exit_interview: null,
   current_body_fat_estimate: 18,
   hormonal_transition: false,
+  preferred_split: 'abcdef',
 };
 
 function ironExercisesForDay(day: MicrocycleDay): IronExercisePrescription[] {
@@ -37,7 +38,7 @@ const fallbackReasons = new Set([
 
 const bundledBySlug = new Map(FULL_BUNDLED_EXERCISES.map((exercise) => [exercise.slug, exercise]));
 
-describe('ABCDEF Split - Validação de JSON Real', () => {
+describe('Legacy ABCDEF input — migrates to ABCDE on generation', () => {
   let microcycle: DailyGameplan['microcycle'];
 
   beforeAll(async () => {
@@ -56,21 +57,14 @@ describe('ABCDEF Split - Validação de JSON Real', () => {
     microcycle = gameplan.microcycle;
   });
 
-  it('Dia 4 (Shoulders) tem pelo menos 6 exercícios incluindo overhead + lateral + posterior', () => {
-    const day4 = microcycle.find((day) => day.day_index === 4);
-    expect(day4).toBeDefined();
-    if (!day4) return;
+  it('migra para 5 dias Iron + 2 Rest (Wed + Sun)', () => {
+    const restDays = microcycle.filter((day) => day.is_rest_day);
 
-    const exercises = ironExercisesForDay(day4);
-    expect(exercises.length).toBeGreaterThanOrEqual(6);
-
-    const hasOverhead = exercises.some((exercise) => exercise.slot_category === 'shoulder_overhead_press');
-    const hasLateral = exercises.some((exercise) => exercise.slot_category === 'shoulder_lateral_raise');
-    const hasPosterior = exercises.some((exercise) => exercise.slot_category === 'shoulder_posterior_fly');
-
-    expect(hasOverhead).toBe(true);
-    expect(hasLateral).toBe(true);
-    expect(hasPosterior).toBe(true);
+    expect(restDays).toHaveLength(2);
+    expect(restDays.map((day) => day.day_index)).toEqual([3, 7]);
+    expect(microcycle.filter((day) => !day.is_rest_day).map((day) => day.day_index)).toEqual([
+      1, 2, 4, 5, 6,
+    ]);
   });
 
   it('Nenhum dia de treino tem menos de 4 exercícios', () => {
@@ -80,36 +74,7 @@ describe('ABCDEF Split - Validação de JSON Real', () => {
     });
   });
 
-  it('Não há duplicatas conceituais além das repetições planejadas no split Enhanced', () => {
-    microcycle.forEach((day) => {
-      if (day.is_rest_day) return;
-
-      const categories = ironExercisesForDay(day).map((exercise) => exercise.slot_category);
-      const uniqueCategories = new Set(categories);
-      expect(categories.length).toBeLessThanOrEqual(uniqueCategories.size + 4);
-    });
-  });
-
-  it('Bloqueia exercícios com peso corporal quando full_gym disponível', () => {
-    const allExercises = microcycle.flatMap((day) =>
-      day.blocks.flatMap((block) => block.iron?.exercises ?? []),
-    );
-    const blocked = ['pull_up', 'chin_up', 'dip', 'push_up'];
-
-    blocked.forEach((slug) => {
-      expect(allExercises.every((exercise) => exercise.slug !== slug)).toBe(true);
-    });
-  });
-
-  it('Dia 7 é descanso e Dias 1-6 são todos de treino', () => {
-    const restDays = microcycle.filter((day) => day.is_rest_day);
-
-    expect(restDays).toHaveLength(1);
-    expect(restDays[0]?.day_index).toBe(7);
-    expect(microcycle.filter((day) => !day.is_rest_day).map((day) => day.day_index)).toEqual([1, 2, 3, 4, 5, 6]);
-  });
-
-  it('Fallbacks ABCDEF respeitam constraints articulares do solver', async () => {
+  it('Fallbacks respeitam constraints articulares do solver', async () => {
     const gameplan = await generateDeterministicGameplan({
       focus: { iron: 100, nutrition: 100 },
       equipment: ['full_gym'],

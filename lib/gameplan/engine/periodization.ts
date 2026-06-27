@@ -1,12 +1,14 @@
 // CLINICAL ENGINE: DETERMINISTIC ONLY. NO RANDOMNESS ALLOWED. IF INPUTS ARE CONSTANT, OUTPUT MUST BE CONSTANT.
 import { spreadTrainingDayIndices } from '@/lib/gameplan/microcycleWeek';
 import type { EnginePerformanceRow } from '@/lib/gameplan/engine/performanceLogs';
+import type { BiologicalProfile, PreferredSplit } from '@/types/biological';
 import {
   clampPillarFrequency,
   clampTrainingDaysPerWeek,
   deriveTrainingDaysFromFrequencies,
-  type BiologicalProfile,
+  normalizePreferredSplit,
 } from '@/types/biological';
+import { ABCDE_IRON_DAY_INDICES } from '@/lib/gameplan/engine/iron/splits/abcdeSplit';
 import type { LibraryExercise } from '@/types/catalog';
 import type { EquipmentTag } from '@/store/useSommaStore';
 
@@ -33,7 +35,12 @@ export function resolvePillarFrequencies(biological: BiologicalProfile): PillarF
   };
 }
 
-export function spreadPillarDayIndices(count: number): number[] {
+export function spreadPillarDayIndices(
+  count: number,
+  preferredSplit?: PreferredSplit | null,
+): number[] {
+  const split = normalizePreferredSplit(preferredSplit);
+  if (split === 'abcde' && count === 5) return [...ABCDE_IRON_DAY_INDICES];
   if (count === 6) return [1, 2, 3, 4, 5, 6];
   return spreadTrainingDayIndices(count);
 }

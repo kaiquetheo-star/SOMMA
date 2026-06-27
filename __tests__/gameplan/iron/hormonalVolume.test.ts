@@ -17,15 +17,15 @@ const mockBiological: UserBiological = {
   baseline_stress_level: 3,
   goal_iron: 'Hypertrophy',
   nutrition_goal: null,
-  training_days_per_week: 6,
+  training_days_per_week: 5,
   available_time_iron: 90,
-  frequency_iron: 6,
+  frequency_iron: 5,
   cns_fatigue_score: 0,
   current_body_fat_estimate: 18,
   hormonal_transition: false,
   mesocycle_phase: 'bulking',
   mesocycle_week: 1,
-  preferred_split: 'abcdef',
+  preferred_split: 'abcde',
 };
 
 function ironExerciseCount(day: MicrocycleDay | undefined): number {
@@ -61,8 +61,8 @@ describe('Hormonal Profile Volume Budget', () => {
     expect(ironExerciseCount(day1)).toBeLessThanOrEqual(8);
 
     const day4 = gameplan.microcycle.find((day) => day.day_index === 4);
-    expect(ironExerciseCount(day4)).toBeGreaterThanOrEqual(7);
-    expect(ironExerciseCount(day4)).toBeLessThanOrEqual(9);
+    expect(ironExerciseCount(day4)).toBeGreaterThanOrEqual(6);
+    expect(ironExerciseCount(day4)).toBeLessThanOrEqual(8);
   });
 
   it('TRT deve permitir 6 séries em compostos', () => {

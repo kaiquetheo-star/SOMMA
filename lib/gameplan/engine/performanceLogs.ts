@@ -15,6 +15,8 @@ export interface EnginePerformanceRow {
   payload?: {
     iron?: {
       exercise_id?: string;
+      exercise_slug?: string;
+      exercise_name?: string;
       sets?: {
         weight_kg?: number;
         reps?: number;
@@ -53,6 +55,8 @@ export function flattenPerformanceLogs(entries: PerformanceLogEntry[]): EnginePe
           payload: {
             iron: {
               exercise_id: iron.exercise_id,
+              exercise_slug: iron.exercise_slug,
+              exercise_name: iron.exercise_name,
               sets: iron.sets.map((set) => ({
                 weight_kg: set.weight_kg,
                 reps: set.reps,
@@ -87,4 +91,12 @@ export function filterIronLogsLastDays(
 export function filterLogsLastHours(logs: EnginePerformanceRow[], hours: number): EnginePerformanceRow[] {
   const cutoff = Date.now() - hours * 60 * 60 * 1000;
   return logs.filter((log) => Date.parse(log.timestamp) >= cutoff);
+}
+
+export function filterPerformanceEntriesLastDays(
+  entries: readonly PerformanceLogEntry[],
+  days: number,
+): PerformanceLogEntry[] {
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  return entries.filter((entry) => Date.parse(entry.timestamp) >= cutoff);
 }

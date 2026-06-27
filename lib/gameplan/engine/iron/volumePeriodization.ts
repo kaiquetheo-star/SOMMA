@@ -1,6 +1,7 @@
 import type { CatalogExercise } from '@/lib/gameplan/engine/iron/types';
 import { getVolumeBudgetForHormonalProfile } from '@/lib/gameplan/engine/iron/hormonalProfile';
 import type { MesocyclePhase, UserBiological } from '@/types/biological';
+import { normalizePreferredSplit } from '@/types/biological';
 
 export type VolumeExecutionTechnique = 'Standard' | 'Myo-Reps' | 'Drop-Set' | 'Rest-Pause';
 
@@ -51,6 +52,7 @@ export function calculateVolumeBudget(
   const mesocyclePhase = biological.mesocycle_phase ?? 'maintenance';
   const hormonalBudget = getVolumeBudgetForHormonalProfile(biological, mesocyclePhase);
   const usesEnhancedRecovery = biological.hormonal_protocol != null && biological.hormonal_protocol.type !== 'natural';
+  const usesAbcdeSplit = normalizePreferredSplit(biological.preferred_split) === 'abcde';
   let budget: VolumeBudget;
 
   if (mesocyclePhase === 'bulking' && usesEnhancedRecovery) {
@@ -141,6 +143,32 @@ export function calculateVolumeBudget(
       targetRIR: 3,
       executionTechnique: 'Standard',
     };
+  }
+
+  if (usesAbcdeSplit && mesocyclePhase !== 'deload') {
+    if (!usesEnhancedRecovery) {
+      budget = isCompound
+        ? {
+            minSets: 4,
+            maxSets: 5,
+            targetRepRange: '6-10',
+            targetRIR: 1,
+            executionTechnique: 'Standard',
+          }
+        : {
+            minSets: 3,
+            maxSets: 4,
+            targetRepRange: '10-15',
+            targetRIR: 2,
+            executionTechnique: 'Standard',
+          };
+    } else {
+      budget = {
+        ...budget,
+        minSets: Math.max(budget.minSets, isCompound ? 4 : 3),
+        maxSets: Math.max(budget.maxSets, isCompound ? 5 : 4),
+      };
+    }
   }
 
   return reduceVolumeForHighCnsFatigue(budget, cnsFatigueScore);

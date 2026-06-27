@@ -50,6 +50,8 @@ function biological(
   return {
     ...initialBiologicalProfile,
     mesocycle_phase: mesocyclePhase,
+    preferred_split: 'ppl_x2',
+    frequency_iron: 6,
     ...overrides,
   };
 }

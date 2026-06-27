@@ -113,6 +113,8 @@ export interface SolverConstraints {
   previousDayWasHiit?: boolean;
   usedExerciseIds?: ReadonlySet<string>;
   dailyIronFocus?: DailyIronFocus;
+  /** Calendar day_index for ABCDE DUP and arms-day solver relaxations. */
+  calendarDayIndex?: number;
   /** Profile readiness score, 0-100. High values bias stable machine/cable work. */
   cns_fatigue_score?: number | null;
   /** Current mesocycle phase for dynamic volume budgets. */
@@ -173,6 +175,8 @@ export interface WeeklyVolumeSnapshot {
   mev: number;
   mrvSoft: number;
   mrvHard: number;
+  /** Per-muscle session cap for the active split frequency class. */
+  maxSetsSession: number;
 }
 
 export interface ShoulderVolumeLedger {

@@ -150,5 +150,9 @@ export function calculateSelectionScore(exercise: XFrameScorableExercise): numbe
   }
   if (isHamstringsOrGlutes(primaryMuscle)) return priorityWeights.hamstrings_glutes;
 
+  if (['biceps', 'triceps', 'forearms', 'brachialis'].includes(primaryMuscle)) {
+    return priorityWeights.default * 1.5;
+  }
+
   return priorityWeights.default;
 }

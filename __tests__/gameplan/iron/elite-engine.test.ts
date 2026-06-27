@@ -74,6 +74,7 @@ describe('elite iron engine consolidation laws', () => {
     const biological = {
       ...initialBiologicalProfile,
       frequency_iron: 6,
+      preferred_split: 'ppl_x2' as const,
       available_time_iron: 90,
       goal_iron: 'Hypertrophy',
       iron_mastery: 5 as const,

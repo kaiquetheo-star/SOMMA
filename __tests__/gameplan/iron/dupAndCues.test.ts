@@ -60,6 +60,7 @@ describe('DUP and Text-Only Elite cues', () => {
       biological: {
         ...initialBiologicalProfile,
         frequency_iron: 6,
+        preferred_split: 'ppl_x2',
         available_time_iron: 90,
         goal_iron: 'Hypertrophy',
         iron_mastery: 3,

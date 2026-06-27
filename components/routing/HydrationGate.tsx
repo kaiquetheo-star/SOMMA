@@ -5,7 +5,7 @@ import { LoadingFallback } from '@/components/routing/LoadingFallback';
 import { useSommaStore } from '@/store/useSommaStore';
 
 function finalizeHydration(): void {
-  useSommaStore.setState({ _hasHydrated: true });
+  useSommaStore.setState({ _hasHydrated: true, isHydrating: false });
 }
 
 /**

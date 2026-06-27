@@ -52,9 +52,9 @@ const PREFERRED_SPLIT_OPTIONS: Array<{
   subtitle: string;
 }> = [
   {
-    id: 'abcdef',
-    label: 'ABCDEF Specialization',
-    subtitle: 'Recommended for X-Frame: six unique specialized days + Day 7 recovery.',
+    id: 'abcde',
+    label: 'ABCDE + 2 Rest',
+    subtitle: 'Recommended for X-Frame: five specialized days, mid-week + Sunday recovery.',
   },
   {
     id: 'ppl_x2',
@@ -106,7 +106,7 @@ function resolveHormonalProtocolOptionId(protocol: HormonalProtocol | undefined)
 export function BiologicalPassportForm({ value, onChange }: BiologicalPassportFormProps) {
   const age = ageFromDateOfBirth(value.date_of_birth);
   const selectedMesocyclePhase = value.mesocycle_phase ?? 'maintenance';
-  const selectedPreferredSplit = value.preferred_split ?? 'abcdef';
+  const selectedPreferredSplit = value.preferred_split ?? 'abcde';
   const selectedHormonalProtocol = resolveHormonalProtocolOptionId(value.hormonal_protocol);
 
   return (

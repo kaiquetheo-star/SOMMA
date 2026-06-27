@@ -11,6 +11,7 @@ import {
   createInitialSolverState,
   DEFAULT_MAX_SESSION_CNS,
   type DaySlotConfig,
+  isArmsDedicatedSolverSlot,
   isAxialLoadExercise,
   pickBestCandidate,
   prescribedSetsForSlot,
@@ -21,6 +22,7 @@ import { mapToIronPrescription } from '@/lib/gameplan/engine/iron/loadPrescripti
 import { getVolumeBudgetForHormonalProfile } from '@/lib/gameplan/engine/iron/hormonalProfile';
 import { PPL_DAY_SLOTS, PPL_ROTATION, resolvePplDayTemplate } from '@/lib/gameplan/engine/iron/splits/pplSplit';
 import { resolveAbcdefDayTemplate } from '@/lib/gameplan/engine/iron/splits/abcdefSplit';
+import { resolveAbcdeDayTemplate, type AbcdeDayTemplate } from '@/lib/gameplan/engine/iron/splits/abcdeSplit';
 import { getDailyIronFocus, type DailyIronFocus } from '@/lib/gameplan/engine/iron/dupLogic';
 import type {
   CatalogExercise,
@@ -35,10 +37,15 @@ import type {
 } from '@/lib/gameplan/engine/iron/types';
 import { classifyShoulderRegion } from '@/lib/gameplan/engine/iron/taxonomy/shoulderRegions';
 import { createWeeklyVolumeTracker, type WeeklyVolumeTracker } from '@/lib/gameplan/engine/iron/WeeklyVolumeTracker';
+import {
+  resolveDayFocusMuscles,
+  resolveSplitFrequencyClass,
+} from '@/lib/gameplan/engine/iron/volumeMatrix';
 import { sortIronExercises } from '@/lib/gameplan/engine/clinicalLaws';
 import type { EnginePerformanceRow } from '@/lib/gameplan/engine/performanceLogs';
 import { maxIronExercisesForMinutes } from '@/lib/gameplan/engine/volumePruning';
 import type { BiologicalProfile } from '@/types/biological';
+import { normalizeIronProfileForGeneration, normalizePreferredSplit } from '@/types/biological';
 import type { IronExercisePrescription } from '@/types/gameplan';
 import type { GameplanBlock } from '@/types/gameplan';
 import type { LibraryExercise } from '@/types/catalog';
@@ -149,6 +156,7 @@ function picksFromSolver(
       {
         ...pick,
         exercise: exerciseForSlot,
+        // History-backed loads (UUID + slug) take priority over passport cold-start in mapper.
         prescription: mapToIronPrescription(pick, exerciseForSlot, null, logs21d, goalIron, dailyFocus),
       },
     ];
@@ -161,6 +169,7 @@ function applyDraftToDayBlocks(
   catalog: ExerciseCatalog,
   logs21d: readonly EnginePerformanceRow[],
   goalIron: string | null,
+  preferredSplit?: ReturnType<typeof normalizePreferredSplit>,
 ): void {
   for (let i = 0; i < dayBlocks.length && i < draft.length; i += 1) {
     const planDay = draft[i]!;
@@ -179,7 +188,10 @@ function applyDraftToDayBlocks(
         targetRepRange: pick.targetRepRange,
         targetRIR: pick.targetRIR,
       };
-      const dailyFocus = getDailyIronFocus(block.ironSlotIndex + 1, block.splitDay);
+      const dailyFocus = getDailyIronFocus(block.dayIndex, block.splitDay, {
+        preferredSplit,
+        calendarDayIndex: block.dayIndex,
+      });
       return [
         {
           ...solverResult,
@@ -235,36 +247,57 @@ function pickFallbackExerciseViaSolver(
   allowSlotCategoryDuplicate = false,
   volumeFloorFallback = false,
   daySlotConfig?: DaySlotConfig,
-): { exercise: CatalogExercise; score: number } | null {
-  const candidates = collectCandidates(
-    slot.day,
-    catalog,
-    slot,
-    constraints,
-    state,
-    tracker,
-    currentDayIndex,
-    {
-      allowSameSlotCategoryDifferentConcept: allowSlotCategoryDuplicate,
-      ignoreCnsBudget: volumeFloorFallback,
-      ignoreMrv: volumeFloorFallback,
-      ignoreRecoveryMode: volumeFloorFallback,
-      daySlotConfig,
-    },
-  ).filter((exercise) => {
-    if (volumeFloorFallback && !tracker.canAddSets(exercise, 3).allowed) return false;
-    if (!allowSlotCategoryDuplicate) return true;
-    const candidate = exerciseWithSlotCategory(exercise, slot);
-    const candidateFamily = fallbackConceptFamily(exercise, slot);
-    return !selected.some(
-      (selectedExercise) =>
-        selectedExercise.slug === candidate.slug ||
-        (selectedExercise.slot_category === slot.category &&
-          fallbackConceptFamily(selectedExercise, slot) === candidateFamily),
-    );
-  });
+): { exercise: CatalogExercise; score: number; usedLastResort: boolean } | null {
+  const filterCandidates = (candidates: CatalogExercise[]): CatalogExercise[] =>
+    candidates.filter((exercise) => {
+      if (!allowSlotCategoryDuplicate) return true;
+      const candidate = exerciseWithSlotCategory(exercise, slot);
+      const candidateFamily = fallbackConceptFamily(exercise, slot);
+      return !selected.some(
+        (selectedExercise) =>
+          selectedExercise.slug === candidate.slug ||
+          (selectedExercise.slot_category === slot.category &&
+            fallbackConceptFamily(selectedExercise, slot) === candidateFamily),
+      );
+    });
 
-  return pickBestCandidate(candidates, tracker, constraints, state, currentDayIndex, slot);
+  const baseOptions = {
+    allowSameSlotCategoryDifferentConcept: allowSlotCategoryDuplicate,
+    daySlotConfig,
+  };
+  const armsRelaxation = isArmsDedicatedSolverSlot(slot, constraints);
+
+  const tiers = volumeFloorFallback
+    ? [
+        { ...baseOptions, ignoreCnsBudget: true, ignoreMrv: true, ignoreRecoveryMode: true, armsDedicatedRelaxation: armsRelaxation },
+        {
+          ...baseOptions,
+          ignoreCnsBudget: true,
+          ignoreMrv: true,
+          ignoreRecoveryMode: true,
+          ignoreMastery: true,
+          ignoreBodyweightBlacklist: true,
+          ignoreJointStress: true,
+          armsDedicatedRelaxation: true,
+        },
+      ]
+    : [{ ...baseOptions }];
+
+  for (let index = 0; index < tiers.length; index += 1) {
+    const tierOptions = tiers[index]!;
+    const candidates = filterCandidates(
+      collectCandidates(slot.day, catalog, slot, constraints, state, tracker, currentDayIndex, tierOptions),
+    );
+    const selection = pickBestCandidate(candidates, tracker, constraints, state, currentDayIndex, slot);
+    if (selection) {
+      return {
+        ...selection,
+        usedLastResort: volumeFloorFallback && index === tiers.length - 1,
+      };
+    }
+  }
+
+  return null;
 }
 
 function validateIronDayBlockVolume(
@@ -278,7 +311,7 @@ function validateIronDayBlockVolume(
   const usedExerciseIds = new Set(solverState.usedExerciseIds);
 
   const validatedBlocks = dayBlocks.map((block) => {
-    const template = resolveAbcdefDayTemplate(block.ironSlotIndex);
+    const template = resolveAbcdeDayTemplate(block.ironSlotIndex);
     const hormonalBudget = getVolumeBudgetForHormonalProfile(
       input.biological,
       input.biological.mesocycle_phase ?? 'maintenance',
@@ -312,7 +345,11 @@ function validateIronDayBlockVolume(
       return (selectedCategoryCounts.get(slot.category) ?? 0) < (allowedCategoryCounts.get(slot.category) ?? 1);
     });
     const fallbackPicks: EnrichedIronPick[] = [];
-    const dailyFocus = getDailyIronFocus(block.ironSlotIndex + 1, block.splitDay);
+    const preferredSplit = normalizePreferredSplit(input.biological.preferred_split);
+    const dailyFocus = getDailyIronFocus(block.ironSlotIndex + 1, block.splitDay, {
+      preferredSplit,
+      calendarDayIndex: block.dayIndex,
+    });
     const sessionCnsAccum = block.picks.reduce((sum, pick) => sum + pick.exercise.cns_fatigue_cost, 0);
     const sessionAxialLoad = block.picks.reduce(
       (sum, pick) => sum + (pick.exercise.axial_loading ?? (isAxialLoadExercise(pick.exercise) ? 3 : 0)),
@@ -342,7 +379,7 @@ function validateIronDayBlockVolume(
       const selection = pickFallbackExerciseViaSolver(
         slot,
         catalog,
-        { ...constraints, dailyIronFocus: dailyFocus },
+        { ...constraints, dailyIronFocus: dailyFocus, calendarDayIndex: block.dayIndex },
         fallbackState,
         tracker,
         block.dayIndex,
@@ -353,8 +390,8 @@ function validateIronDayBlockVolume(
       );
       if (!selection) continue;
 
-      const { exercise, score } = selection;
-      const isMinimumViableVolumeFloor = block.picks.length < 2;
+      const { exercise, score, usedLastResort } = selection;
+      const isMinimumViableVolumeFloor = block.picks.length < 2 && usedLastResort;
       const { prescribedSets, budget } = prescribedSetsForSlot(slot, exercise, constraints);
       const fallbackSets = isMinimumViableVolumeFloor
         ? Math.min(2, prescribedSets)
@@ -440,48 +477,85 @@ function validateNoFallbacks(dayBlocks: readonly IronDayBlock[]): void {
 }
 
 /**
- * Heuristic iron microcycle — ABCDEF by default when `frequency_iron === 6`;
+ * Heuristic iron microcycle — ABCDE by default when `frequency_iron === 5`;
  * PPL×2 remains available via `preferred_split`.
  * Validates + auto-corrects the full week draft before prescriptions ship to UI.
  */
 export function generateIronMicrocycle(input: GenerateIronMicrocycleInput): IronDayBlock[] {
+  const normalizedBiological = normalizeIronProfileForGeneration(input.biological);
   const catalog = buildExerciseCatalog([...input.libraryExercises]);
   if (catalog.exercises.length === 0) {
     throw new Error('INSUFFICIENT_IRON_CATALOG: no valid hypertrophy rows.');
   }
 
-  const constraints = buildConstraints(input);
-  const tracker = createWeeklyVolumeTracker(catalog, input.logs7d, input.logs21d, input.biological);
+  const microcycleInput: GenerateIronMicrocycleInput = {
+    ...input,
+    biological: normalizedBiological,
+  };
+
+  const constraints = buildConstraints(microcycleInput);
+  const tracker = createWeeklyVolumeTracker(
+    catalog,
+    input.logs7d,
+    input.logs21d,
+    normalizedBiological,
+  );
   let solverState = createInitialSolverState(tracker);
 
-  const frequencyIron = input.biological.frequency_iron ?? 6;
-  const preferredSplit = input.biological.preferred_split ?? 'abcdef';
-  const useAbcdefSplit = frequencyIron === 6 && preferredSplit !== 'ppl_x2';
+  const frequencyIron = normalizedBiological.frequency_iron ?? 5;
+  const preferredSplit = normalizePreferredSplit(normalizedBiological.preferred_split);
+  const useAbcdeSplit = preferredSplit === 'abcde' && frequencyIron === 5;
+  const useAbcdefSplit = preferredSplit === 'abcdef' && frequencyIron === 6;
+  const useSplitTemplate = useAbcdeSplit || useAbcdefSplit;
   const rotation = resolveSplitRotation(frequencyIron);
   const draft: MicrocycleDayPlan[] = [];
   const dayBlocks: IronDayBlock[] = [];
 
   for (let ironSlot = 0; ironSlot < input.ironDayIndices.length; ironSlot += 1) {
-    const template =
-      useAbcdefSplit
+    const template = useAbcdeSplit
+      ? resolveAbcdeDayTemplate(ironSlot)
+      : useAbcdefSplit
         ? resolveAbcdefDayTemplate(ironSlot)
-        : { splitDay: rotation[ironSlot % rotation.length] ?? 'push', focusLabel: PPL_FOCUS_LABELS[rotation[ironSlot % rotation.length] ?? 'push'], slots: PPL_DAY_SLOTS[rotation[ironSlot % rotation.length] ?? 'push'] };
+        : {
+            splitDay: rotation[ironSlot % rotation.length] ?? 'push',
+            focusLabel: PPL_FOCUS_LABELS[rotation[ironSlot % rotation.length] ?? 'push'],
+            slots: PPL_DAY_SLOTS[rotation[ironSlot % rotation.length] ?? 'push'],
+          };
     const splitDay = template.splitDay;
     const minExercises = 'minExercises' in template ? template.minExercises : 2;
-    const daySlots = useAbcdefSplit
+    const daySlots = useSplitTemplate
       ? trimSlotsForTemplate(template.slots, input.availableMinutes, minExercises)
       : trimSlotsForTimeBudget(template.slots, input.availableMinutes);
-    const dailyIronFocus = getDailyIronFocus(ironSlot + 1, splitDay);
-    const dayConstraints: SolverConstraints = {
-      ...constraints,
-      dailyIronFocus,
-    };
 
     solverState = {
       ...solverState,
       sessionCnsAccum: 0,
       sessionAxialLoad: 0,
       shoulderSets: { anterior: 0, lateral: 0, posterior: 0 },
+    };
+
+    const abcdeTemplate = useAbcdeSplit ? (template as AbcdeDayTemplate) : null;
+    const calendarDayIndex: number | undefined = abcdeTemplate
+      ? abcdeTemplate.calendarDayIndex
+      : useSplitTemplate
+        ? ironSlot + 1
+        : undefined;
+    const resolvedCalendarDay =
+      calendarDayIndex ?? input.ironDayIndices[ironSlot] ?? ironSlot + 1;
+
+    tracker.setVolumeCreditContext({
+      frequencyClass: resolveSplitFrequencyClass(preferredSplit),
+      dayFocusMuscles: resolveDayFocusMuscles(preferredSplit, resolvedCalendarDay),
+    });
+
+    const dailyIronFocus = getDailyIronFocus(ironSlot + 1, splitDay, {
+      preferredSplit,
+      calendarDayIndex: resolvedCalendarDay,
+    });
+    const dayConstraints: SolverConstraints = {
+      ...constraints,
+      dailyIronFocus,
+      calendarDayIndex: resolvedCalendarDay,
     };
 
     const { picks, state } = solveDaySlots(
@@ -492,7 +566,7 @@ export function generateIronMicrocycle(input: GenerateIronMicrocycleInput): Iron
       solverState,
       tracker,
       input.ironDayIndices[ironSlot],
-      useAbcdefSplit ? ironSlot + 1 : undefined,
+      calendarDayIndex,
     );
     solverState = state;
 
@@ -518,13 +592,13 @@ export function generateIronMicrocycle(input: GenerateIronMicrocycleInput): Iron
       coherenceValidated: false,
     });
 
-    const shouldAudit = !useAbcdefSplit && draft.length === input.ironDayIndices.length;
+    const shouldAudit = !useSplitTemplate && draft.length === input.ironDayIndices.length;
     if (shouldAudit && draft.length > 0) {
       const draftClone = cloneMicrocycle(draft);
       const report = validateMicrocycleCoherence(draftClone, catalog, constraints, tracker);
       if (!report.ok) {
         autoCorrectMicrocycle(draftClone, catalog, constraints, tracker);
-        applyDraftToDayBlocks(dayBlocks, draftClone, catalog, input.logs21d, input.goalIron);
+        applyDraftToDayBlocks(dayBlocks, draftClone, catalog, input.logs21d, input.goalIron, preferredSplit);
         for (let i = 0; i < draft.length; i += 1) {
           draft[i] = draftClone[i]!;
         }
@@ -532,13 +606,13 @@ export function generateIronMicrocycle(input: GenerateIronMicrocycleInput): Iron
     }
   }
 
-  if (!useAbcdefSplit) {
+  if (!useSplitTemplate) {
     const finalDraft = cloneMicrocycle(draft);
     const finalReport = validateMicrocycleCoherence(finalDraft, catalog, constraints, tracker);
     if (!finalReport.ok) {
       autoCorrectMicrocycle(finalDraft, catalog, constraints, tracker);
     }
-    applyDraftToDayBlocks(dayBlocks, finalDraft, catalog, input.logs21d, input.goalIron);
+    applyDraftToDayBlocks(dayBlocks, finalDraft, catalog, input.logs21d, input.goalIron, preferredSplit);
 
     for (const block of dayBlocks) {
       (block as { coherenceValidated: boolean }).coherenceValidated = finalReport.ok || true;
@@ -549,8 +623,8 @@ export function generateIronMicrocycle(input: GenerateIronMicrocycleInput): Iron
     }
   }
 
-  const finalBlocks = useAbcdefSplit
-    ? validateIronDayBlockVolume(dayBlocks, catalog, input, constraints, tracker, solverState)
+  const finalBlocks = useSplitTemplate
+    ? validateIronDayBlockVolume(dayBlocks, catalog, microcycleInput, constraints, tracker, solverState)
     : dayBlocks;
 
   validateNoFallbacks(finalBlocks);

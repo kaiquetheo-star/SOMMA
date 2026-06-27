@@ -13,6 +13,7 @@ import {
   type IronExerciseTemplate,
 } from '@/constants/iron-exercises';
 import { useRequireDailyScan } from '@/hooks/useRequireDailyScan';
+import { useStoreHydrating } from '@/hooks/useStoreHydrated';
 import { useWorkoutBlockReady } from '@/hooks/useWorkoutBlockReady';
 import { useWorkoutNavigation } from '@/hooks/useWorkoutNavigation';
 import { useRestTimer } from '@/hooks/useRestTimer';
@@ -22,6 +23,10 @@ import {
   type LibraryExercise,
 } from '@/lib/catalog/library';
 import { unlockRestTimerAudio } from '@/lib/audio/restTimerChime';
+import {
+  ironExerciseLogsFromPendingSession,
+  lastLoggedWeightFromPerformanceHistory,
+} from '@/lib/iron/lastLoggedWeight';
 import { resolveIronExerciseView } from '@/lib/iron/resolveExercise';
 import { hapticSetLogged } from '@/lib/haptics';
 import { targetWeightFromPassport } from '@/lib/physics/rmCalculator';
@@ -100,9 +105,12 @@ export default function IronModeScreen() {
   const { blockId, title } = useLocalSearchParams<{ blockId?: string; title?: string }>();
   useRequireDailyScan({ blockId, title, pillar: 'iron' });
   const { activeBlock, isReady, waitingForBlock } = useWorkoutBlockReady(blockId);
+  const isHydrating = useStoreHydrating();
   const { finishBlock } = useWorkoutNavigation();
   const equipment = useSommaStore((state) => state.user_environment.available_equipment);
   const userBiological = useSommaStore((state) => state.user_biological);
+  const performanceLogs = useSommaStore((state) => state.performance_logs);
+  const pendingSession = useSommaStore((state) => state.pendingSession);
   const logIronSet = useSommaStore((state) => state.logIronSet);
 
   const localFallback = useMemo(() => resolveIronExercise(equipment), [equipment]);
@@ -126,9 +134,24 @@ export default function IronModeScreen() {
   >([]);
   const exerciseDraftsRef = useRef<Record<string, ExerciseDraft>>({});
   const activeExerciseKeyRef = useRef<string | null>(null);
+  const restoredPendingSessionRef = useRef<string | null>(null);
 
   const resolvedBlockId = blockId ?? 'block-main-iron';
   const prescriptions = activeBlock?.iron?.exercises ?? [];
+
+  useEffect(() => {
+    const isDev = typeof __DEV__ !== 'undefined' && __DEV__;
+    if (!isDev) return;
+    const state = useSommaStore.getState();
+    const ironBlock = state.weeklyMicrocycle
+      ?.flatMap((day) => day.blocks ?? [])
+      .find((block) => block.pillar === 'iron');
+    console.log('[SOMMA Iron] mount', {
+      isHydrating: state.isHydrating,
+      performance_logs_length: state.performance_logs.length,
+      iron_exercises_length: ironBlock?.iron?.exercises?.length ?? prescriptions.length,
+    });
+  }, [isHydrating, prescriptions.length]);
 
   const exerciseQueue = useMemo(() => {
     if (!prescriptions.length) {
@@ -150,11 +173,19 @@ export default function IronModeScreen() {
       const overrideId = adaptedOverrideByIndex[index];
       const activeId = overrideId ?? prescription.exercise_id;
       const libraryRow = getExerciseById(catalog, activeId);
+      const exerciseSlug = prescription.slug ?? libraryRow?.slug ?? null;
+      const historyKg = lastLoggedWeightFromPerformanceHistory(
+        activeId,
+        performanceLogs,
+        pendingSession,
+        resolvedBlockId,
+        exerciseSlug,
+      );
       return resolveIronExerciseView({
         prescription,
         library: libraryRow,
         fallbackName: localFallback.name,
-        fallbackWeight: prescription.target_weight_kg ?? 0,
+        fallbackWeight: prescription.target_weight_kg ?? historyKg ?? 0,
         fallbackReps: prescription.target_reps,
         fallbackSets: prescription.target_sets,
         exerciseIdOverride: overrideId,
@@ -167,6 +198,9 @@ export default function IronModeScreen() {
     localFallback,
     userBiological,
     adaptedOverrideByIndex,
+    performanceLogs,
+    pendingSession,
+    resolvedBlockId,
   ]);
 
   const exercise = exerciseQueue[exerciseIndex] ?? exerciseQueue[0];
@@ -184,6 +218,15 @@ export default function IronModeScreen() {
 
   const isBodyweight = weight <= 0;
   const exerciseComplete = logs.length >= totalSets;
+
+  useEffect(() => {
+    if (restoredPendingSessionRef.current === resolvedBlockId) return;
+    const restored = ironExerciseLogsFromPendingSession(pendingSession, resolvedBlockId);
+    if (restored.length === 0) return;
+
+    restoredPendingSessionRef.current = resolvedBlockId;
+    setAllExerciseLogs(restored);
+  }, [pendingSession, resolvedBlockId]);
 
   useEffect(() => {
     if (!exercise) return;
@@ -206,8 +249,16 @@ export default function IronModeScreen() {
       }
 
       const sessionWeight = lastLoggedWeightFromSession(exercise.exercise_id, allExerciseLogs);
+      const historyWeight = lastLoggedWeightFromPerformanceHistory(
+        exercise.exercise_id,
+        performanceLogs,
+        pendingSession,
+        resolvedBlockId,
+        exercise.exercise_slug,
+      );
       const baseline =
         sessionWeight ??
+        historyWeight ??
         (prescribedTargetKg != null && prescribedTargetKg > 0
           ? prescribedTargetKg
           : exercise.target_weight_kg);
@@ -240,10 +291,13 @@ export default function IronModeScreen() {
     exerciseIndex,
     logs,
     pendingReportedRir,
+    pendingSession,
     pendingSet,
+    performanceLogs,
     phase,
     prescribedTargetKg,
     reps,
+    resolvedBlockId,
     restBeforeSet,
     weight,
   ]);
@@ -409,6 +463,15 @@ export default function IronModeScreen() {
   const isLastExercise = exerciseIndex >= exerciseQueue.length - 1;
   const canCompleteRitual = canCompleteExercise && isLastExercise;
   const canAdvanceExercise = canCompleteExercise && !isLastExercise;
+
+  if (isHydrating) {
+    return (
+      <LoadingFallback
+        message="Restoring your session logs…"
+        eyebrow="Iron · Strength"
+      />
+    );
+  }
 
   if (!isReady || waitingForBlock) {
     return (

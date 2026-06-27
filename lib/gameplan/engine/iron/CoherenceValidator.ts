@@ -3,7 +3,6 @@ import { supportsAdvancedMetabolicTechnique } from '@/lib/catalog/tacticalEnrich
 import { PPL_DAY_SLOTS } from '@/lib/gameplan/engine/iron/splits/pplSplit';
 import { classifyShoulderRegion } from '@/lib/gameplan/engine/iron/taxonomy/shoulderRegions';
 import {
-  MRV_HARD,
   type WeeklyVolumeTracker,
 } from '@/lib/gameplan/engine/iron/WeeklyVolumeTracker';
 import type {
@@ -266,13 +265,14 @@ function checkPushPullRatio(
 
 function checkWeeklyMrv(tracker: WeeklyVolumeTracker): CoherenceViolation[] {
   const violations: CoherenceViolation[] = [];
+  const mrvHard = tracker.snapshot.mrvHard;
 
   for (const [muscle, volume] of tracker.snapshot.byMuscle) {
-    if (volume > MRV_HARD) {
+    if (volume > mrvHard) {
       violations.push({
         code: 'WEEKLY_MRV_EXCEEDED',
         severity: 'error',
-        detail: `${muscle} at ${volume.toFixed(1)} effective weekly sets (MRV hard ${MRV_HARD})`,
+        detail: `${muscle} at ${volume.toFixed(1)} effective weekly sets (MRV hard ${mrvHard})`,
       });
     }
   }
@@ -683,9 +683,10 @@ function fixWeeklyMrv(
       }
       if (!exercise || pick.prescribedSets <= 2) continue;
 
+      const mrvHard = tracker.snapshot.mrvHard;
       const overloaded = [...tracker.snapshot.byMuscle.entries()].some(
         ([muscle, volume]) =>
-          volume > MRV_HARD &&
+          volume > mrvHard &&
           (muscle === exercise.primary_muscle ||
             exercise.synergist_muscles.includes(muscle)),
       );

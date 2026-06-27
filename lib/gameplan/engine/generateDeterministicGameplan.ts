@@ -27,8 +27,10 @@ import {
 import { generateLongevityAddon } from '@/lib/gameplan/engine/longevityMapper';
 import {
     filterIronLogsLastDays,
+    filterPerformanceEntriesLastDays,
     flattenPerformanceLogs,
 } from '@/lib/gameplan/engine/performanceLogs';
+import { abcdeRestDayFocusLabel } from '@/lib/gameplan/engine/iron/splits/abcdeSplit';
 import {
     deriveActiveTrainingDays,
     equipmentMatches,
@@ -52,6 +54,11 @@ import {
 import { computeNutritionSnapshot } from '@/lib/physics/metabolicTelemetry';
 import type { EquipmentTag, FocusPreference, UserStats } from '@/store/useSommaStore';
 import type { BiologicalProfile } from '@/types/biological';
+import {
+    normalizeIronProfileForGeneration,
+    normalizePreferredSplit,
+    type PreferredSplit,
+} from '@/types/biological';
 import type {
     DailyGameplan,
     GameplanBlock,
@@ -110,8 +117,55 @@ function countPillarBlocks(microcycle: MicrocycleDay[], pillar: 'iron'): number 
   );
 }
 
-function usesHeuristicIronEngine(frequencyIron: number): boolean {
+function usesHeuristicIronEngine(frequencyIron: number, preferredSplit: PreferredSplit): boolean {
+  const split = normalizePreferredSplit(preferredSplit);
+  if (split === 'ppl_x2') return frequencyIron === 6;
+  if (split === 'abcde') return frequencyIron === 5;
   return frequencyIron === 6;
+}
+
+function buildAbcdeRestDayBlocks(dayIndex: number): GameplanBlock[] {
+  if (dayIndex === 3) {
+    return [
+      {
+        id: `block-d${dayIndex}-spirit-healer`,
+        pillar: 'spirit',
+        title: 'Healer Zone',
+        subtitle: '4-7-8 breathwork · mid-week CNS downshift',
+        duration_minutes: 12,
+        order: 0,
+        status: 'pending',
+        spirit: {
+          mode: 'breathwork',
+          tempo_id: 'tempo_478',
+          duration_minutes: 12,
+          prescribed_reason: 'Mid-week recovery · Healer Zone & mobility reset.',
+        },
+      },
+    ];
+  }
+
+  if (dayIndex === 7) {
+    return [
+      {
+        id: `block-d${dayIndex}-spirit-reset`,
+        pillar: 'spirit',
+        title: 'Spirit Reset',
+        subtitle: 'Parasympathetic recovery · weekly close',
+        duration_minutes: 15,
+        order: 0,
+        status: 'pending',
+        spirit: {
+          mode: 'breathwork',
+          tempo_id: 'tempo_478',
+          duration_minutes: 15,
+          prescribed_reason: 'Sunday spirit reset · nutrition and nervous system recovery.',
+        },
+      },
+    ];
+  }
+
+  return [];
 }
 
 function nutritionFocusForDay(day: MicrocycleDay): string {
@@ -388,6 +442,8 @@ function appendNutritionTargets(
 export async function generateDeterministicGameplan(
   input: GenerateDeterministicGameplanInput,
 ): Promise<DailyGameplan> {
+  const biological = normalizeIronProfileForGeneration(input.biological);
+  const preferredSplit = normalizePreferredSplit(biological.preferred_split);
   const exerciseCatalog = await fetchLibraryExercises();
 
   const equipmentFiltered = exerciseCatalog.filter((row) => equipmentMatches(row, input.equipment));
@@ -397,25 +453,25 @@ export async function generateDeterministicGameplan(
     throw new Error('INSUFFICIENT_CATALOG: library_exercises empty or no equipment match.');
   }
 
-  const pillarFreq = resolvePillarFrequencies(input.biological);
+  const pillarFreq = resolvePillarFrequencies(biological);
   const trainingDaysPerWeek = deriveActiveTrainingDays(pillarFreq);
   const pillarTime: PillarTimeBudget = {
-    available_time_iron: input.biological.available_time_iron ?? 45,
+    available_time_iron: biological.available_time_iron ?? 45,
   };
 
   const flatLogs = flattenPerformanceLogs(input.performanceLogs);
   const ironLogs3w = filterIronLogsLastDays(flatLogs, MESOCYCLE_DAYS);
   const ironLogs7d = filterIronLogsLastDays(flatLogs, WEEKLY_VOLUME_DAYS);
   const loadSnapshot = computeTrainingLoadSnapshot(input.performanceLogs, {
-    goalIron: input.biological.goal_iron,
-    mesocycleWeek: resolveMesocycleWeek(input.biological),
+    goalIron: biological.goal_iron,
+    mesocycleWeek: resolveMesocycleWeek(biological),
   });
   const { rpe: yesterdayMainRpe } = yesterdayEffectiveRpe(input.performanceLogs);
 
   const autoreg = detectIronAutoregulation(
-    input.biological,
+    biological,
     yesterdayMainRpe,
-    telemetrySuggestsPoorRecovery(loadSnapshot, input.biological.goal_iron),
+    telemetrySuggestsPoorRecovery(loadSnapshot, biological.goal_iron),
   );
   const baseRoutine = applyIronRoutineAutoregulation(
     resolveBaseRoutineIds(catalog, input.equipment),
@@ -424,23 +480,26 @@ export async function generateDeterministicGameplan(
     autoreg,
   );
 
-  const ironDayIndices = spreadPillarDayIndices(pillarFreq.frequency_iron).sort((a, b) => a - b);
+  const ironDayIndices = spreadPillarDayIndices(
+    pillarFreq.frequency_iron,
+    preferredSplit,
+  ).sort((a, b) => a - b);
 
   const protocolDate = input.protocolDate ?? todayDateKey();
   const week_start_date = getWeekStartMonday(protocolDate);
 
   let ironByDayIndex = new Map<number, IronDayBlock>();
-  if (usesHeuristicIronEngine(pillarFreq.frequency_iron)) {
+  if (usesHeuristicIronEngine(pillarFreq.frequency_iron, preferredSplit)) {
     const ironMicrocycle = generateIronMicrocycle({
       libraryExercises: catalog,
-      biological: input.biological,
+      biological,
       equipment: input.equipment,
       logs7d: ironLogs7d,
       logs21d: ironLogs3w,
       ironDayIndices,
       weekStartDate: week_start_date,
       blockedJointProfiles: autoreg.blocked_joint_profiles,
-      goalIron: input.biological.goal_iron,
+      goalIron: biological.goal_iron,
       availableMinutes: pillarTime.available_time_iron,
     });
     ironByDayIndex = new Map(ironMicrocycle.map((day) => [day.dayIndex, day]));
@@ -449,7 +508,7 @@ export async function generateDeterministicGameplan(
   let ironSlot = 0;
   const { ctx: generation } = buildGenerationContext({
     protocolDate,
-    biological: input.biological,
+    biological,
   });
 
   const microcycle: MicrocycleDay[] = Array.from({ length: 7 }, (_, index) => {
@@ -458,12 +517,19 @@ export async function generateDeterministicGameplan(
     const active = wantsIron;
 
     if (!active) {
+      const restFocus =
+        preferredSplit === 'abcde'
+          ? (abcdeRestDayFocusLabel(day_index) ?? 'Rest & Recovery')
+          : 'Rest & Recovery';
+      const restBlocks =
+        preferredSplit === 'abcde' ? buildAbcdeRestDayBlocks(day_index) : [];
+
       return {
         day_index,
         is_rest_day: true,
-        focus_label: 'Rest & Recovery',
+        focus_label: restFocus,
         date: dateForDayIndex(week_start_date, day_index),
-        blocks: [],
+        blocks: restBlocks,
       };
     }
 
@@ -498,11 +564,11 @@ export async function generateDeterministicGameplan(
           ironLogs3w,
           ironLogs7d,
           autoreg,
-          input.biological.goal_iron,
+          biological.goal_iron,
           pillarTime,
-          input.biological,
+          biological,
           1,
-          input.biological.clinical_exit_interview,
+          biological.clinical_exit_interview,
           generation,
         );
       }
@@ -547,20 +613,20 @@ export async function generateDeterministicGameplan(
       ...loadSnapshot,
       is_deload_week: loadSnapshot.is_deload_week === true,
     },
-    input.biological,
+    biological,
   );
 
   orderedMicrocycle = applyIntensityStrategies(
     orderedMicrocycle,
-    input.biological,
+    biological,
     input.performanceLogs,
     catalog,
   );
 
   const adaptationInput: AdaptiveStateMachineInput = {
-    biological: input.biological,
-    logs7d: ironLogs7d,
-    logs21d: ironLogs3w,
+    biological,
+    logs7d: filterPerformanceEntriesLastDays(input.performanceLogs, WEEKLY_VOLUME_DAYS),
+    logs21d: filterPerformanceEntriesLastDays(input.performanceLogs, MESOCYCLE_DAYS),
     readinessScan: input.readinessScan,
     biometricCheckpoints: input.biometricCheckpoints,
   };
@@ -568,11 +634,11 @@ export async function generateDeterministicGameplan(
   orderedMicrocycle = adaptationResult.microcycle;
 
   orderedMicrocycle = sanitizeMicrocycleIronVolume(orderedMicrocycle, {
-    biological: input.biological,
+    biological,
     catalog: buildExerciseCatalog(catalog),
   });
   orderedMicrocycle = injectLongevityAddons(orderedMicrocycle);
-  orderedMicrocycle = appendNutritionTargets(orderedMicrocycle, input.biological);
+  orderedMicrocycle = appendNutritionTargets(orderedMicrocycle, biological);
 
   const todayIndex = getDayIndexForDate(protocolDate, week_start_date);
   const blocks = orderedMicrocycle.find((day) => day.day_index === todayIndex)?.blocks ?? [];

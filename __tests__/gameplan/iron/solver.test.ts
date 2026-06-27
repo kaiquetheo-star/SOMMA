@@ -4,8 +4,12 @@ import {
   createInitialSolverState,
   solveDaySlots,
 } from '@/lib/gameplan/engine/iron/ConstraintSolver';
+import { mapToIronPrescription } from '@/lib/gameplan/engine/iron/loadPrescriptionMapper';
 import { createWeeklyVolumeTracker } from '@/lib/gameplan/engine/iron/WeeklyVolumeTracker';
+import type { EnginePerformanceRow } from '@/lib/gameplan/engine/performanceLogs';
+import { lastLoggedWeightFromPerformanceHistory } from '@/lib/iron/lastLoggedWeight';
 import { initialBiologicalProfile } from '@/types/biological';
+import type { PerformanceLogEntry } from '@/types/performance';
 import type { LibraryExercise } from '@/types/catalog';
 import type { EquipmentTag } from '@/store/useSommaStore';
 import type {
@@ -252,5 +256,92 @@ describe('solveDaySlots — V8 constraint solver', () => {
     expect(first.picks).toHaveLength(1);
     expect(catalog.byId.get(first.picks[0]!.exerciseId)?.slug).toBe('face_pull');
     expect(second.picks).toHaveLength(0);
+  });
+
+  it('E: recovers prior logged weight from local performance history for prescription', () => {
+    const catalog = buildExerciseCatalog([CABLE_LATERAL]);
+    const exercise = catalog.byId.get('ex-cable-lateral')!;
+    const logs21d: EnginePerformanceRow[] = [
+      {
+        pillar: 'iron',
+        exercise_id: exercise.id,
+        weight_used: 20,
+        reps_completed: 12,
+        rpe_score: 7,
+        timestamp: '2026-06-20T18:00:00.000Z',
+        payload: {
+          iron: {
+            exercise_id: exercise.id,
+            sets: [{ weight_kg: 20, reps: 12, reported_rir: 2, target_rir: 2 }],
+          },
+        },
+      },
+    ];
+
+    const prescription = mapToIronPrescription(
+      {
+        slotId: 'shoulder_x_frame',
+        exerciseId: exercise.id,
+        prescribedSets: 3,
+        score: 1,
+        diagnostic_reason: 'test',
+        intensity_technique: 'standard',
+      },
+      exercise,
+      null,
+      logs21d,
+      'Hypertrophy',
+      null,
+    );
+
+    expect(prescription.target_weight_kg).toBeCloseTo(20.5, 1);
+    expect(prescription.progression_note).toMatch(/Last logged|RPE/i);
+  });
+
+  it('F: lastLoggedWeightFromPerformanceHistory reads committed session logs', () => {
+    const performanceLogs: PerformanceLogEntry[] = [
+      {
+        id: 'session-1',
+        type: 'session',
+        pillar: 'iron',
+        block_id: 'block-d1-iron',
+        timestamp: '2026-06-20T18:00:00.000Z',
+        data: {
+          sessionId: 'session-1',
+          blockId: 'block-d1-iron',
+          completedAt: '2026-06-20T18:00:00.000Z',
+          exercises: [
+            {
+              exerciseId: 'ex-barbell-back-squat',
+              exerciseSlug: 'barbell_back_squat',
+              exerciseName: 'Barbell Back Squat',
+              completedAt: '2026-06-20T18:00:00.000Z',
+              sets: [
+                {
+                  setIndex: 1,
+                  weightKg: 120,
+                  reps: 5,
+                  rir: 2,
+                  restSecondsUsed: 120,
+                  loggedAt: '2026-06-20T18:00:00.000Z',
+                  targetReps: 5,
+                  targetRir: 2,
+                },
+              ],
+            },
+          ],
+        },
+      },
+    ];
+
+    expect(
+      lastLoggedWeightFromPerformanceHistory(
+        'ex-barbell-back-squat',
+        performanceLogs,
+        null,
+        undefined,
+        'barbell_back_squat',
+      ),
+    ).toBe(120);
   });
 });

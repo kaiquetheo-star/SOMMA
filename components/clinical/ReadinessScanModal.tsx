@@ -19,6 +19,11 @@ const CATEGORY_LABELS: Array<keyof Omit<ReadinessScan, 'timestamp'>> = [
   'mobility_feeling',
 ];
 
+function clampReadinessScore(value: number): ReadinessScan['sleep_quality'] {
+  const rounded = Math.min(5, Math.max(1, Math.round(value)));
+  return rounded as ReadinessScan['sleep_quality'];
+}
+
 const CATEGORY_TITLES: Record<keyof Omit<ReadinessScan, 'timestamp'>, string> = {
   sleep_quality: 'Qualidade do sono',
   muscle_soreness: 'Dor muscular',
@@ -114,7 +119,7 @@ export function ReadinessScanModal({ visible, onClose, onSubmit, existingScan }:
                     step={1}
                     min={1}
                     max={5}
-                    onChange={setter}
+                    onChange={(next) => setter(clampReadinessScore(next))}
                   />
                 </View>
               </View>

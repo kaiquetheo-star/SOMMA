@@ -52,7 +52,7 @@ const userStats: UserStats = {
   iron_sessions_completed: 0,
   nutrition_checkins_completed: 0,
 };
-const trainingDays = [1, 2, 3, 4, 5, 6];
+const trainingDays = [1, 2, 4, 5, 6];
 
 function biological(overrides: Partial<BiologicalProfile> = {}): BiologicalProfile {
   return {
@@ -66,8 +66,9 @@ function biological(overrides: Partial<BiologicalProfile> = {}): BiologicalProfi
     baseline_stress_level: 3,
     goal_iron: 'Hypertrophy',
     nutrition_goal: 'Hypertrophy support',
-    training_days_per_week: 6,
-    frequency_iron: 6,
+    training_days_per_week: 5,
+    frequency_iron: 5,
+    preferred_split: 'abcde',
     available_time_iron: 90,
     experience_level: 'ADVANCED',
     iron_mastery: 5,
@@ -188,20 +189,21 @@ describe('real user journey simulation', () => {
       expect(exercises.length, `day ${dayIndex}`).toBeGreaterThanOrEqual(4);
       expect(day?.blocks.some((block) => block.pillar === 'longevity')).toBe(true);
     }
+    expect(gameplan.microcycle.find((entry) => entry.day_index === 3)?.is_rest_day).toBe(true);
     expect(gameplan.microcycle.find((entry) => entry.day_index === 7)?.is_rest_day).toBe(true);
 
-    const shoulderDay = gameplan.microcycle.find((entry) => entry.day_index === 4);
+    const shoulderDay = gameplan.microcycle.find((entry) => entry.day_index === 1);
     expect(ironExercises(shoulderDay).some((exercise) =>
       /shoulder|lateral|rear|face_pull|reverse|shrug/i.test(`${exercise.slug ?? ''} ${exercise.display_name ?? ''}`),
     )).toBe(true);
 
-    const backDay = gameplan.microcycle.find((entry) => entry.day_index === 2);
+    const backDay = gameplan.microcycle.find((entry) => entry.day_index === 4);
     const pulldownFamilyCount = ironExercises(backDay).filter((exercise) =>
       /pulldown/i.test(`${exercise.slug ?? ''} ${exercise.display_name ?? ''}`),
     ).length;
     expect(pulldownFamilyCount).toBeLessThanOrEqual(1);
 
-    const posteriorLegDay = gameplan.microcycle.find((entry) => entry.day_index === 6);
+    const posteriorLegDay = gameplan.microcycle.find((entry) => entry.day_index === 5);
     const legCurlFamilyCount = ironExercises(posteriorLegDay).filter((exercise) =>
       /leg_curl/i.test(exercise.slug ?? ''),
     ).length;
@@ -210,7 +212,7 @@ describe('real user journey simulation', () => {
     for (const day of gameplan.microcycle) {
       for (const exercise of ironExercises(day)) {
         if (isIsolationOrFinisher(exercise)) {
-          expect(exercise.target_sets).toBeLessThanOrEqual(4);
+          expect(exercise.target_sets).toBeLessThanOrEqual(5);
         }
       }
     }
@@ -231,7 +233,7 @@ describe('real user journey simulation', () => {
       performanceLogs: logs,
       profile: { baseline_stress_level: 8, cns_fatigue_score: 85 },
     });
-    const legs = fatigued.microcycle.find((day) => day.day_index === 3);
+    const legs = fatigued.microcycle.find((day) => day.day_index === 2);
     const legsExercises = ironExercises(legs);
     const longevity = legs?.blocks.find((block) => block.pillar === 'longevity');
 
@@ -256,7 +258,7 @@ describe('real user journey simulation', () => {
       weekStartDate: gameplan.week_start_date ?? null,
     });
 
-    for (const dayIndex of [1, 2, 3]) {
+    for (const dayIndex of [1, 2, 4]) {
       const day = gameplan.microcycle.find((entry) => entry.day_index === dayIndex)!;
       const block = day.blocks.find((entry) => entry.pillar === 'iron')!;
       const firstExercise = ironExercises(day)[0]!;
@@ -288,7 +290,7 @@ describe('real user journey simulation', () => {
     }
 
     const state = useSommaStore.getState();
-    for (const dayIndex of [1, 2, 3]) {
+    for (const dayIndex of [1, 2, 4]) {
       const block = state.weeklyMicrocycle
         ?.find((day) => day.day_index === dayIndex)
         ?.blocks.find((entry) => entry.pillar === 'iron');

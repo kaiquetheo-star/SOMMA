@@ -1,4 +1,6 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createJSONStorage } from 'zustand/middleware';
 
-export const sommaPersistStorage = createJSONStorage(() => AsyncStorage);
+import { createChunkedSecureStore } from '@/lib/storage/secureStoreChunked';
+
+/** Mobile: chunked SecureStore — supports large performance_logs + microcycle payloads. */
+export const sommaPersistStorage = createJSONStorage(() => createChunkedSecureStore());

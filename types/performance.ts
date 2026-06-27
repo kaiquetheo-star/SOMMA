@@ -19,6 +19,8 @@ export interface LegacyIronSessionLog {
   block_id: string;
   exercise_name: string;
   exercise_id: string;
+  /** Stable catalog key when exercise UUID changes between protocol generations */
+  exercise_slug?: string;
   sets: IronSetLog[];
   completed_at: string;
 }
@@ -140,6 +142,7 @@ export function ironExercisesFromPerformanceLog(entry: PerformanceLogEntry): Leg
     return session.exercises.map((exercise) => ({
       block_id: session.blockId,
       exercise_id: exercise.exerciseId,
+      exercise_slug: exercise.exerciseSlug,
       exercise_name: exercise.exerciseName ?? exercise.exerciseSlug,
       sets: setsFromSessionExercise(exercise),
       completed_at: exercise.completedAt,
