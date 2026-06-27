@@ -164,7 +164,7 @@ export async function insertPerformanceQueueRows(
     session = result.data.session;
     sessionError = result.error;
   } catch (err) {
-    console.warn(
+    console.error(
       '[SOMMA] auth.getSession threw:',
       err instanceof Error ? err.message : err,
     );
@@ -187,13 +187,13 @@ export async function insertPerformanceQueueRows(
     const { error: insertError } = await supabase.from('performance_logs').insert(rows);
 
     if (insertError) {
-      console.warn('[SOMMA] performance_logs insert failed:', insertError.message);
+      console.error('[SOMMA] performance_logs insert failed:', insertError.message);
       return { insertedCount: 0, userId };
     }
 
     return { insertedCount: rows.length, userId };
   } catch (err) {
-    console.warn(
+    console.error(
       '[SOMMA] performance_logs insert threw:',
       err instanceof Error ? err.message : err,
     );
@@ -271,7 +271,7 @@ export async function syncPerformanceQueueAndRecalibrate(
         : error instanceof Error
           ? error.message
           : 'Recalibration failed';
-      console.warn('[SOMMA] Head Coach recalibration failed:', message);
+      console.error('[SOMMA] Head Coach recalibration failed:', message, error);
       return {
         insertedCount,
         gameplan: null,
@@ -280,9 +280,10 @@ export async function syncPerformanceQueueAndRecalibrate(
       };
     }
   } catch (err) {
-    console.warn(
+    console.error(
       '[SOMMA] Performance sync error:',
       err instanceof Error ? err.message : err,
+      err,
     );
     return { insertedCount: 0, gameplan: null, source: null, cns_fatigue_score: null };
   }

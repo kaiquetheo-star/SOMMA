@@ -138,14 +138,12 @@ export async function recalibrateFromPerformanceQueue(
       cns_fatigue_score: cnsFatigueScore,
     };
   } catch (error) {
-    console.warn(
-      '[SOMMA] Local recalibration failed:',
-      error instanceof Error ? error.message : error,
-    );
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('[SOMMA] Local recalibration failed:', message, error);
     return {
       processedCount: queue.length,
       gameplan: null,
-      source: 'local',
+      source: 'fallback',
       cns_fatigue_score: cnsFatigueScore,
     };
   }

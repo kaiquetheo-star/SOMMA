@@ -566,7 +566,10 @@ export const useSommaStore = create<SommaState>()(
         try {
           await get().regenerateDailyGameplan();
         } catch (err) {
-          console.warn('[SOMMA] Month 2 recalibration after Exit Interview failed:', err);
+          const message =
+            err instanceof Error ? err.message : 'Recalibration after Exit Interview failed';
+          console.warn('[SOMMA] Month 2 recalibration after Exit Interview failed:', message);
+          set({ gameplan_error: message });
         }
       },
 
@@ -716,7 +719,10 @@ export const useSommaStore = create<SommaState>()(
           set({ lastWorkoutSummary: summary });
           return summary;
         } catch (err) {
-          console.warn('[SOMMA] prepareWorkoutSummary failed:', err);
+          const message =
+            err instanceof Error ? err.message : 'Could not prepare workout summary';
+          console.error('[SOMMA] prepareWorkoutSummary failed:', message, err);
+          set({ gameplan_error: message });
           return null;
         }
       },
@@ -768,7 +774,10 @@ export const useSommaStore = create<SommaState>()(
             set(patch);
           }
         } catch (err) {
-          console.warn('[SOMMA] flushPerformanceQueue failed:', err);
+          const message =
+            err instanceof Error ? err.message : 'Performance queue flush failed';
+          console.error('[SOMMA] flushPerformanceQueue failed:', message, err);
+          set({ gameplan_error: message });
         } finally {
           set({ performance_syncing: false });
         }
@@ -871,7 +880,10 @@ export const useSommaStore = create<SommaState>()(
             }
           }
         } catch (err) {
-          console.warn('[SOMMA] Local recalibration failed:', err);
+          const message =
+            err instanceof Error ? err.message : 'Post-workout recalibration failed';
+          console.error('[SOMMA] Local recalibration failed:', message, err);
+          set({ gameplan_error: message });
         } finally {
           set((current) => ({
             performance_syncing: false,
@@ -953,8 +965,11 @@ export const useSommaStore = create<SommaState>()(
 
         try {
           await useSommaStore.persist.clearStorage();
-        } catch {
-          // Storage may be unavailable on some web/private modes
+        } catch (err) {
+          console.warn(
+            '[SOMMA] clearStorage failed (may be unavailable in private browsing):',
+            err instanceof Error ? err.message : err,
+          );
         }
       },
 

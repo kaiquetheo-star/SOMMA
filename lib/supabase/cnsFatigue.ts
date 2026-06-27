@@ -22,7 +22,7 @@ export async function applyCnsFatigueFromQueue(
     .eq('id', userId);
 
   if (error) {
-    console.warn('[SOMMA] cns_fatigue_score update failed:', error.message);
+    console.error('[SOMMA] cns_fatigue_score update failed:', error.message);
     return clampCnsFatigueProfile(currentScore + delta);
   }
 

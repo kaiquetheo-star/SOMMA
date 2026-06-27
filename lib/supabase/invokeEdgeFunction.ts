@@ -63,7 +63,11 @@ export async function invokeEdgeFunctionPost(
     if (rawText) {
       try {
         data = JSON.parse(rawText) as unknown;
-      } catch {
+      } catch (parseError) {
+        console.warn('[SOMMA] Edge response JSON parse failed', {
+          functionName,
+          preview: rawText.slice(0, 200),
+        });
         data = {
           error: 'INVALID_JSON',
           message: rawText.slice(0, 300),
