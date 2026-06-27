@@ -5,12 +5,14 @@
  * Deploy: supabase functions deploy generate_weekly_microcycle
  */
 // CLINICAL ENGINE: DETERMINISTIC ONLY. NO RANDOMNESS ALLOWED. IF INPUTS ARE CONSTANT, OUTPUT MUST BE CONSTANT.
-import { corsHeaders } from '../_shared/cors.ts';
+import { buildCorsHeaders } from '../_shared/cors.ts';
 import { handleHeadCoachRequest } from '../generate_daily_protocol/index.ts';
 
 Deno.serve(async (req) => {
+  const cors = buildCorsHeaders(req.headers.get('origin'));
+
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers: cors });
   }
 
   const method = req.method;
@@ -22,11 +24,10 @@ Deno.serve(async (req) => {
     });
     return response;
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error('[generate_weekly_microcycle] Unhandled error:', message);
-    return new Response(JSON.stringify({ error: 'GENERATION_FAILED', message }), {
+    console.error('[generate_weekly_microcycle] Unhandled error');
+    return new Response(JSON.stringify({ error: 'GENERATION_FAILED', message: 'Internal server error' }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...cors, 'Content-Type': 'application/json' },
     });
   }
 });

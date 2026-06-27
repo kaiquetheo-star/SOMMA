@@ -43,12 +43,7 @@ export async function invokeEdgeFunctionPost(
     'x-client-info': 'somma-longevity-os',
   };
 
-  console.log('[SOMMA] Edge fetch invoke', {
-    functionName,
-    url,
-    headerKeys: Object.keys(headers),
-    allowedHeaders: EDGE_ALLOWED_HEADERS,
-  });
+  console.log('[SOMMA] Edge fetch invoke', { functionName });
 
   try {
     const response = await fetch(url, {
