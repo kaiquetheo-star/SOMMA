@@ -5,6 +5,7 @@ import { ActivityIndicator, Alert, FlatList, Pressable, Text, View } from 'react
 import { ExerciseCueCard } from '@/components/iron/ExerciseCueCard';
 import { RirSelector } from '@/components/iron/RirSelector';
 import { RestTimerOverlay } from '@/components/iron/RestTimerOverlay';
+import { CueGlassCard, TempoVisualizer } from '@/components/iron/TempoVisualizer';
 import { ValueStepper } from '@/components/iron/ValueStepper';
 import { LoadingFallback } from '@/components/routing/LoadingFallback';
 import { WorkoutShell } from '@/components/workout/WorkoutShell';
@@ -587,10 +588,19 @@ export default function IronModeScreen() {
                   </Text>
                 </View>
 
+                <TempoVisualizer tempo={queuedExercise.tempo} />
+
+                <CueGlassCard
+                  setup={queuedExercise.cue_card?.setup}
+                  vector={queuedExercise.cue_card?.vector}
+                  catchCue={queuedExercise.cue_card?.catch}
+                />
+
                 <ExerciseCueCard
                   instructions={queuedExercise.instructions ?? {}}
                   progressionNote={queuedExercise.progression_note}
                   biomechanics={biomechanicsFromLibrary(queuedLibrary)}
+                  excludeKeys={['setup']}
                 />
 
                 <View className="flex-row justify-end">

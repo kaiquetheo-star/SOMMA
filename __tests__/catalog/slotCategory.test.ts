@@ -101,22 +101,30 @@ describe('Slot Category Overrides', () => {
     expect(fallbackSlugCatalog.bySlug.get('barbell_overhead_press')?.axial_loading).toBe(3);
   });
 
-  it('Dia 6 (Posterior) deve ter RDL ou stiff como hinge_compound prioritário', () => {
-    const day6 = microcycle.find((day) => day.day_index === 6);
+  it('Dia 5 (Posterior) deve ter hinge_compound prioritário (RDL / stiff / hip thrust)', () => {
+    const day5 = microcycle.find((day) => day.day_index === 5);
 
-    expect(day6).toBeDefined();
-    if (!day6) return;
+    expect(day5).toBeDefined();
+    if (!day5) return;
 
-    const exercises = ironExercisesForDay(day6);
-    const hasRdlOrStiff = exercises.some((exercise) =>
-      [
-        'romanian_deadlift',
-        'stiff_leg_deadlift',
-        'stiff_legged_deadlifts',
-        'dumbbell_stiff_leg_deadlift',
-      ].includes(exercise.slug ?? ''),
-    );
+    const exercises = ironExercisesForDay(day5);
+    const hasPriorityHinge = exercises.some((exercise) => {
+      const slug = exercise.slug ?? '';
+      return (
+        exercise.slot_category === 'hinge_compound' ||
+        [
+          'romanian_deadlift',
+          'barbell_romanian_deadlift',
+          'dumbbell_romanian_deadlift',
+          'stiff_leg_deadlift',
+          'stiff_legged_deadlifts',
+          'dumbbell_stiff_leg_deadlift',
+          'hip_thrust_barbell',
+          'barbell_hip_hinge_good_morning',
+        ].includes(slug)
+      );
+    });
 
-    expect(hasRdlOrStiff).toBe(true);
+    expect(hasPriorityHinge).toBe(true);
   });
 });

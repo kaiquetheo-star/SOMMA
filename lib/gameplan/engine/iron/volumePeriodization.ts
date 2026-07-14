@@ -35,11 +35,68 @@ export function isCompoundExercise(exercise: Pick<CatalogExercise, 'tactical_rol
   return exercise.movement_pattern !== 'isolation';
 }
 
+/** Phase-budget deload weeks (volume periodization). */
+export const DEFAULT_PHASE_BUDGET_DELOAD_WEEKS = [4, 6] as const;
+
+/** Clinical-month deload week (Clinical Law III — 4-week clinical month). */
+export const DEFAULT_CLINICAL_DELOAD_WEEK = 4;
+
+export type DeloadSource = 'phase_budget' | 'clinical' | 'both';
+
+export interface PhaseBudgetDeloadSpec {
+  deloadWeeks?: readonly number[];
+}
+
+export interface ClinicalMonthDeloadSpec {
+  deloadWeek?: number;
+}
+
+export interface DeloadWeekResolution {
+  isDeloadWeek: boolean;
+  deload_source: DeloadSource | null;
+  phaseBudgetActive: boolean;
+  clinicalActive: boolean;
+}
+
+/**
+ * Unify phase-budget and clinical deload calendars.
+ * When both fire (e.g. week 4), honor both — never override one with the other.
+ */
+export function resolveDeloadWeek(
+  weekNumber: number,
+  phaseBudget: PhaseBudgetDeloadSpec | null | undefined,
+  clinicalMonth: ClinicalMonthDeloadSpec | null | undefined,
+): DeloadWeekResolution {
+  const safeWeek = Number.isFinite(weekNumber) ? Math.round(weekNumber) : 0;
+  const budgetWeeks = phaseBudget?.deloadWeeks ?? DEFAULT_PHASE_BUDGET_DELOAD_WEEKS;
+  const clinicalWeek = clinicalMonth?.deloadWeek ?? DEFAULT_CLINICAL_DELOAD_WEEK;
+
+  const phaseBudgetActive = budgetWeeks.includes(safeWeek);
+  const clinicalActive = safeWeek === clinicalWeek;
+
+  let deload_source: DeloadSource | null = null;
+  if (phaseBudgetActive && clinicalActive) deload_source = 'both';
+  else if (phaseBudgetActive) deload_source = 'phase_budget';
+  else if (clinicalActive) deload_source = 'clinical';
+
+  return {
+    isDeloadWeek: phaseBudgetActive || clinicalActive,
+    deload_source,
+    phaseBudgetActive,
+    clinicalActive,
+  };
+}
+
 export function resolveEffectiveMesocyclePhase(
   mesocyclePhase: MesocyclePhase | null | undefined,
   mesocycleWeek?: number | null,
 ): MesocyclePhase {
-  if (mesocycleWeek === 4 || mesocycleWeek === 6) return 'deload';
+  if (
+    mesocycleWeek != null &&
+    resolveDeloadWeek(mesocycleWeek, null, null).phaseBudgetActive
+  ) {
+    return 'deload';
+  }
   return mesocyclePhase ?? 'maintenance';
 }
 

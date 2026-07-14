@@ -69,17 +69,18 @@ export function ValueStepper({
       <Text className="text-center font-body text-[10px] uppercase tracking-[0.4em] text-[#6B7568]">
         {label}
       </Text>
-      <View className="mt-3 flex-row items-center justify-center gap-6">
+      <View className="mt-3 flex-row items-center justify-center gap-8">
         <Pressable
           onPress={decrement}
           disabled={disabled}
           accessibilityLabel={`Decrease ${label}`}
-          className="h-12 w-12 items-center justify-center rounded-full border border-white/15 active:bg-white/10"
+          hitSlop={12}
+          className="h-14 w-14 items-center justify-center rounded-full bg-white/[0.06] active:bg-matte-gold/15"
         >
-          <Text className="font-body-medium text-2xl text-[#E8E4DC]">−</Text>
+          <Text className="font-body-medium text-3xl text-[#E8E4DC]">−</Text>
         </Pressable>
 
-        <View className="min-w-[100px] items-center" pointerEvents="box-none">
+        <View className="min-w-[112px] items-center" pointerEvents="box-none">
           {allowDirectInput ? (
             <View className="flex-row items-baseline justify-center gap-1">
               <TextInput
@@ -94,7 +95,7 @@ export function ValueStepper({
                 accessibilityLabel={label}
                 placeholder="0"
                 placeholderTextColor="#4A5D44"
-                className="min-w-[72px] text-center font-display-bold text-5xl text-[#E8E4DC]"
+                className="min-w-[80px] text-center font-body-medium text-5xl text-[#E8E4DC]"
                 style={
                   Platform.OS === 'web'
                     ? ({
@@ -104,8 +105,9 @@ export function ValueStepper({
                         borderWidth: 0,
                         backgroundColor: 'transparent',
                         cursor: disabled ? 'not-allowed' : 'text',
+                        fontFamily: 'Inter, system-ui, sans-serif',
                       } as object)
-                    : undefined
+                    : { fontFamily: 'Inter' }
                 }
                 {...webTextInputProps()}
               />
@@ -115,7 +117,10 @@ export function ValueStepper({
             </View>
           ) : (
             <>
-              <Text className="font-display-bold text-5xl text-[#E8E4DC]">
+              <Text
+                className="font-body-medium text-5xl text-[#E8E4DC]"
+                style={{ fontFamily: Platform.OS === 'web' ? 'Inter, system-ui, sans-serif' : 'Inter' }}
+              >
                 {formatDisplay(value, step)}
               </Text>
               {unit ? (
@@ -129,9 +134,10 @@ export function ValueStepper({
           onPress={increment}
           disabled={disabled}
           accessibilityLabel={`Increase ${label}`}
-          className="h-12 w-12 items-center justify-center rounded-full border border-white/15 active:bg-white/10"
+          hitSlop={12}
+          className="h-14 w-14 items-center justify-center rounded-full bg-white/[0.06] active:bg-matte-gold/15"
         >
-          <Text className="font-body-medium text-2xl text-[#E8E4DC]">+</Text>
+          <Text className="font-body-medium text-3xl text-[#E8E4DC]">+</Text>
         </Pressable>
       </View>
       {allowDirectInput && !disabled ? (

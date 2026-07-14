@@ -10,12 +10,23 @@ export const MANDATORY_COMPOUNDS_BY_DAY: Record<number, string[]> = {
     'incline_bench_press_barbell',
     'dumbbell_incline_bench_press',
     'incline_bench_press_dumbbell',
+    'incline_dumbbell_press_30',
     'barbell_bench_press',
   ],
   // At least one heavy row.
-  2: ['barbell_bent_over_row', 't_bar_row', 'lever_t_bar_row', 'chest_supported_row'],
+  2: ['barbell_bent_over_row', 't_bar_row', 'lever_t_bar_row', 'chest_supported_row', 'pendlay_row'],
   // At least one heavy leg compound.
-  3: ['hack_squat', 'hack_squats', 'leg_press', 'barbell_back_squat', 'dumbbell_single_leg_split_squat', 'smith_single_leg_split_squat'],
+  3: [
+    'hack_squat',
+    'hack_squats',
+    'hack_squat_machine',
+    'leg_press',
+    'barbell_back_squat',
+    'dumbbell_single_leg_split_squat',
+    'smith_single_leg_split_squat',
+    'pendulum_squat',
+    'belt_squat',
+  ],
   // At least one overhead press.
   4: [
     'barbell_overhead_press',
@@ -25,11 +36,23 @@ export const MANDATORY_COMPOUNDS_BY_DAY: Record<number, string[]> = {
     'dumbbell_standing_overhead_press',
     'arnold_press',
     'dumbbell_arnold_press_v_2',
+    'machine_shoulder_press',
   ],
   // Arms day does not require a mandatory compound.
   5: [],
   // At least one hinge.
-  6: ['romanian_deadlift', 'stiff_leg_deadlift', 'dumbbell_stiff_leg_deadlift', 'good_morning', 'barbell_hip_thrust', 'hip_thrust_barbell'],
+  6: [
+    'romanian_deadlift',
+    'barbell_romanian_deadlift',
+    'dumbbell_romanian_deadlift',
+    'stiff_leg_deadlift',
+    'dumbbell_stiff_leg_deadlift',
+    'good_morning',
+    'barbell_hip_hinge_good_morning',
+    'barbell_hip_thrust',
+    'hip_thrust_barbell',
+    'conventional_deadlift',
+  ],
 };
 
 export const MANDATORY_COMPOUND_GROUPS_BY_DAY: Record<number, readonly string[][]> = {
@@ -40,6 +63,7 @@ export const MANDATORY_COMPOUND_GROUPS_BY_DAY: Record<number, readonly string[][
       'incline_bench_press_barbell',
       'dumbbell_incline_bench_press',
       'incline_bench_press_dumbbell',
+      'incline_dumbbell_press_30',
     ],
     ['barbell_bench_press'],
   ],

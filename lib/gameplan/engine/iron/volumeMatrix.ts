@@ -120,3 +120,14 @@ export function defaultVolumeCreditContext(
     dayFocusMuscles: new Set(),
   };
 }
+
+/** ACWR / hormonal recovery — −30% effective sets (RP deload band). Split-agnostic scale. */
+export function applyRecoveryVolumeMultiplier(
+  sets: number,
+  isRecoveryMode: boolean,
+  preferredSplit: PreferredSplit | string | null | undefined = null,
+): number {
+  if (!isRecoveryMode || sets <= 0) return sets;
+  const multiplier = resolveVolumeMatrix(preferredSplit).recoveryVolumeMultiplier;
+  return Math.max(1, Math.round(sets * multiplier));
+}

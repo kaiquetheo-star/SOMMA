@@ -128,7 +128,7 @@ describe('metabolic telemetry and final orchestration', () => {
     );
   });
 
-  it('D: applies automatic deload volume and load reductions', () => {
+  it('D: applies automatic deload load reduction; volume deferred to recovery composition', () => {
     const injected = injectRecoveryProtocols(
       microcycleFixture(),
       telemetry({ is_deload_week: true }),
@@ -136,7 +136,9 @@ describe('metabolic telemetry and final orchestration', () => {
     );
     const exercise = injected[0]?.blocks[0]?.iron?.exercises[0];
 
-    expect(exercise?.target_sets).toBe(2);
+    // Set-volume cut is owned by recoveryComposition (additive) — injector keeps sets,
+    // applies load −15% and stamps diagnostic_reason.
+    expect(exercise?.target_sets).toBe(4);
     expect(exercise?.target_weight_kg).toBe(85);
     expect(exercise?.diagnostic_reason).toBe('deload_mesocycle_week_4');
   });

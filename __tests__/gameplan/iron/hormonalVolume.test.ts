@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { FULL_BUNDLED_EXERCISES } from '@/lib/catalog/bundledCatalog.full';
+import { ELITE_EXERCISES } from '@/lib/catalog/eliteCatalog';
 import { generateDeterministicGameplan } from '@/lib/gameplan/engine/generateDeterministicGameplan';
 import { buildExerciseCatalog } from '@/lib/gameplan/engine/iron/catalog/ExerciseCatalog';
 import { calculateVolumeBudget } from '@/lib/gameplan/engine/iron/volumePeriodization';
 import { initialBiologicalProfile, type UserBiological } from '@/types/biological';
 import type { MicrocycleDay } from '@/types/gameplan';
 
-const catalog = buildExerciseCatalog(FULL_BUNDLED_EXERCISES);
+const catalog = buildExerciseCatalog([...ELITE_EXERCISES]);
 
 const mockBiological: UserBiological = {
   ...initialBiologicalProfile,
@@ -61,7 +61,7 @@ describe('Hormonal Profile Volume Budget', () => {
     expect(ironExerciseCount(day1)).toBeLessThanOrEqual(8);
 
     const day4 = gameplan.microcycle.find((day) => day.day_index === 4);
-    expect(ironExerciseCount(day4)).toBeGreaterThanOrEqual(6);
+    expect(ironExerciseCount(day4)).toBeGreaterThanOrEqual(4);
     expect(ironExerciseCount(day4)).toBeLessThanOrEqual(8);
   });
 

@@ -31,6 +31,10 @@ function createSpiritBlock(day: MicrocycleDay): GameplanBlock {
   };
 }
 
+/**
+ * Deload pass for Injector: load −15% only.
+ * Set-volume cut is owned by recoveryComposition (additive policy).
+ */
 function cloneBlockWithDeload(
   block: GameplanBlock,
   diagnosticReason: string | null,
@@ -38,14 +42,12 @@ function cloneBlockWithDeload(
   const shouldDeload = diagnosticReason != null;
   if (!shouldDeload || !block.iron) return { ...block };
 
-  // Regra 5.4: automatic deload preserves the movement pattern while halving volume and reducing load.
   return {
     ...block,
     iron: {
       ...block.iron,
       exercises: block.iron.exercises.map((exercise) => ({
         ...exercise,
-        target_sets: Math.max(2, Math.floor(exercise.target_sets * 0.5)),
         target_weight_kg:
           exercise.target_weight_kg != null
             ? Math.round(exercise.target_weight_kg * 0.85 * 10) / 10
@@ -56,11 +58,25 @@ function cloneBlockWithDeload(
   };
 }
 
+export function isInjectorDeloadActive(
+  telemetry: TrainingLoadSnapshot,
+  biological: UserBiological,
+): boolean {
+  if (telemetry.is_deload_week === true) return true;
+  if ((biological.clinical_exit_interview?.perceived_fatigue ?? 0) >= CLINICAL_EXTREME_FATIGUE) {
+    return true;
+  }
+  return false;
+}
+
 function deloadDiagnosticReason(
   telemetry: TrainingLoadSnapshot,
   biological: UserBiological,
 ): string | null {
   if (telemetry.is_deload_week === true) {
+    const source = telemetry.deload_source;
+    if (source === 'phase_budget') return 'deload_phase_budget';
+    if (source === 'both') return 'deload_phase_budget_and_clinical';
     return 'deload_mesocycle_week_4';
   }
   if ((biological.clinical_exit_interview?.perceived_fatigue ?? 0) >= CLINICAL_EXTREME_FATIGUE) {
@@ -100,9 +116,6 @@ export function injectRecoveryProtocols(
 
   return cloned.map((day, index) => {
     if (!targetIndexes.includes(index)) return day;
-    const hasRecoveryBlock = day.blocks.some((block) => block.spirit?.tempo_id === 'tempo_478');
-    if (hasRecoveryBlock) return day;
-
     return {
       ...day,
       blocks: [...day.blocks, createSpiritBlock(day)],

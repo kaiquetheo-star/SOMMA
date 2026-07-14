@@ -345,9 +345,18 @@ export function matchesSlotCategory(exercise: CatalogExercise, category: string 
     case 'quad_compound':
       return (exercise.movement_pattern === 'squat' || exercise.movement_pattern === 'lunge') && /squat|lunge|leg_press|hack|pendulum|bulgarian|split/.test(text);
     case 'quad_isolation':
-      return exercise.primary_muscle === 'quads' && /extension/.test(text);
+      return (
+        exercise.primary_muscle === 'quads' &&
+        (exercise.movement_pattern === 'isolation' || /extension|sissy/.test(text)) &&
+        /extension|sissy|terminal_knee|quad_pulse/.test(text)
+      );
     case 'adductor':
-      return exercise.primary_muscle === 'adductors' || /adductor|inner_thigh/.test(text);
+      return (
+        exercise.primary_muscle === 'adductors' ||
+        /adductor|inner_thigh|copenhagen/.test(text) ||
+        (exercise.synergist_muscles.includes('adductors') &&
+          (exercise.movement_pattern === 'lunge' || /split_squat|bulgarian/.test(text)))
+      );
     case 'calf_raise':
       return exercise.primary_muscle === 'calves' && /calf|raise/.test(text);
     case 'calf_raise_seated':
@@ -837,7 +846,7 @@ export function collectCandidates(
 
     const { prescribedSets: setsToAdd } = prescribedSetsForSlot(slot, exercise, constraints);
     const volumeCheck = tracker.canAddSets(exercise, setsToAdd);
-    if (!options.ignoreMrv && !volumeCheck.allowed) {
+    if (!options.ignoreMrv && volumeCheck.clampedSets <= 0) {
       logCandidateRejection(slot, exercise, volumeCheck.reason ?? 'MRV_HARD atingido');
       continue;
     }
@@ -956,7 +965,8 @@ function pickLowCnsFinisher(
   for (const hint of hints) {
     const slot = createFinisherSlot(day, hint, finisherIndex);
     const candidates = collectCandidates(day, catalog, slot, constraints, state, tracker, currentDayIndex, {
-      ignoreMrv: true,
+      // Finishers must still respect hard MRV — weekly authority is the backstop.
+      ignoreMrv: false,
     }).filter((exercise) => exercise.cns_fatigue_cost <= 2);
 
     const selection = pickBestCandidate(candidates, tracker, constraints, state, currentDayIndex);
@@ -1017,14 +1027,27 @@ function pushSolverPick(
   budget?: VolumeBudget,
   phase?: ReturnType<typeof resolveEffectiveMesocyclePhase>,
 ): void {
-  tracker.creditVolume(exercise, prescribedSets);
+  const isAbsoluteRescue =
+    diagnosticReason === 'injury_constraint' ||
+    diagnosticReason === 'minimum_viable_path_absolute_last_resort';
+  const volumeGate = tracker.canAddSets(exercise, prescribedSets);
+  const clampedSets = isAbsoluteRescue
+    ? Math.max(1, Math.min(prescribedSets, 2))
+    : Math.min(prescribedSets, volumeGate.clampedSets);
+  if (clampedSets <= 0) return;
+
+  const resolvedDiagnostic =
+    diagnosticReason ??
+    (clampedSets < prescribedSets ? 'volume_authority_mrv_soft_cap' : undefined);
+
+  tracker.creditVolume(exercise, clampedSets);
   state.usedExerciseIds.add(exercise.id);
   const conceptKey = conceptKeyForSlot(exercise, slot);
   if (conceptKey) state.usedConceptKeys.add(conceptKey);
   state.selectedExercises.push(exerciseWithSlotCategory(exercise, slot));
   state.sessionCnsAccum += exercise.cns_fatigue_cost;
   state.sessionAxialLoad += exercise.axial_loading ?? (isAxialLoadExercise(exercise) ? 3 : 0);
-  state.shoulderSets = applyShoulderLedger(state.shoulderSets, exercise, prescribedSets);
+  state.shoulderSets = applyShoulderLedger(state.shoulderSets, exercise, clampedSets);
   state.dayHadAxialLoad ||= isAxialLoadExercise(exercise);
 
   const slotTechnique = advancedTechniqueAllowed(slot.intensity_technique, exercise)
@@ -1037,21 +1060,21 @@ function pushSolverPick(
   picks.push({
     slotId: slot.slotId,
     exerciseId: exercise.id,
-    prescribedSets,
+    prescribedSets: clampedSets,
     score,
     diagnostic_reason: diagnosticReasonForPrescribedSets(
       slot,
       exercise,
-      prescribedSets,
+      clampedSets,
       phase ?? 'maintenance',
       budget ?? {
-        minSets: prescribedSets,
-        maxSets: prescribedSets,
+        minSets: clampedSets,
+        maxSets: clampedSets,
         targetRepRange: `${exercise.default_reps}-${exercise.default_reps}`,
         targetRIR: 2,
         executionTechnique: 'Standard',
       },
-      diagnosticReason,
+      resolvedDiagnostic,
     ),
     intensity_technique: slotTechnique ?? budgetTechnique,
     technique_params: slotTechnique ? slot.technique_params : undefined,

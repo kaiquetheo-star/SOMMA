@@ -3,7 +3,9 @@ import {
   isIronMovementPattern,
   normalizeMovementPattern,
 } from '@/lib/gameplan/engine/iron/taxonomy/movementPatterns';
+import { expandStarvationAliases } from '@/lib/gameplan/engine/iron/catalog/starvationAliases';
 import { enrichExerciseWithCues } from '@/lib/catalog/biomechanicalMapper';
+import { inferSlotCategory } from '@/lib/catalog/inferSlotCategory';
 import type { IronMovementPattern } from '@/lib/gameplan/engine/iron/taxonomy/movementPatterns';
 import type { LibraryExercise } from '@/types/catalog';
 
@@ -71,6 +73,8 @@ function movementPatternOverrideFromSlug(slug: string): IronMovementPattern | nu
     stiff_legged_deadlifts: 'hinge',
     good_morning: 'hinge',
     barbell_hip_thrust: 'hinge',
+    // Starvation: bodyweight quad iso needs isolation pattern
+    sissy_squat: 'isolation',
   };
 
   return MAP[slug] ?? null;
@@ -205,7 +209,7 @@ function toCatalogExercise(row: LibraryExercise): CatalogExercise | null {
     axial_loading: enriched.axial_loading,
     resistance_profile: enriched.resistance_profile,
     specific_cues: enriched.specific_cues,
-    slot_category: row.slot_category,
+    slot_category: row.slot_category ?? inferSlotCategory(row),
   };
 }
 
@@ -250,7 +254,10 @@ function indexByPrimaryMuscle(
 }
 
 /** Builds an indexed, normalized hypertrophy catalog from `library_exercises` rows. */
-export function buildExerciseCatalog(rows: LibraryExercise[]): ExerciseCatalog {
+export function buildExerciseCatalog(
+  rows: LibraryExercise[],
+  options?: { includeStarvationAliases?: boolean },
+): ExerciseCatalog {
   const exercises: CatalogExercise[] = [];
   const byId = new Map<string, CatalogExercise>();
   const bySlug = new Map<string, CatalogExercise>();
@@ -261,6 +268,16 @@ export function buildExerciseCatalog(rows: LibraryExercise[]): ExerciseCatalog {
     exercises.push(mapped);
     byId.set(mapped.id, mapped);
     bySlug.set(mapped.slug, mapped);
+  }
+
+  // Starvation aliases are opt-in (CI slot-coverage). Default catalog stays Elite-pure
+  // so solver ranking / volume floors are not diluted by coverage padding.
+  if (options?.includeStarvationAliases === true) {
+    for (const alias of expandStarvationAliases(exercises)) {
+      exercises.push(alias);
+      byId.set(alias.id, alias);
+      bySlug.set(alias.slug, alias);
+    }
   }
 
   const frozenExercises = Object.freeze(exercises) as readonly CatalogExercise[];

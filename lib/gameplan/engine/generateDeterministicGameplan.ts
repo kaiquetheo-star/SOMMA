@@ -2,6 +2,8 @@
 import { fetchLibraryExercises } from '@/lib/catalog/library';
 import {
     adaptGameplan,
+    detectHighRpeVolumeLever,
+    detectReadinessVolumeLever,
     type AdaptiveStateMachineInput,
     type BiometricCheckpoint,
     type ReadinessScan,
@@ -18,7 +20,11 @@ import {
     type IronDayBlock,
 } from '@/lib/gameplan/engine/iron/generateIronMicrocycle';
 import { applyIntensityStrategies } from '@/lib/gameplan/engine/iron/IntensityStrategyEngine';
-import { injectRecoveryProtocols } from '@/lib/gameplan/engine/iron/recoveryInjector';
+import {
+    injectRecoveryProtocols,
+    isInjectorDeloadActive,
+} from '@/lib/gameplan/engine/iron/recoveryInjector';
+import { emitMotorTelemetry } from '@/lib/gameplan/engine/iron/motorTelemetry';
 import {
     applyIronRoutineAutoregulation,
     buildIronBlock,
@@ -41,6 +47,8 @@ import {
 import type { PillarTimeBudget } from '@/lib/gameplan/engine/prescription';
 import { pruneIronBlocksInMicrocycle } from '@/lib/gameplan/engine/volumePruning';
 import { sanitizeMicrocycleIronVolume } from '@/lib/gameplan/microcycleValidation';
+import { enforceWeeklyAuthority } from '@/lib/gameplan/engine/iron/volumeAuthority';
+import { createWeeklyVolumeTracker } from '@/lib/gameplan/engine/iron/WeeklyVolumeTracker';
 import {
     dateForDayIndex,
     getDayIndexForDate,
@@ -612,6 +620,7 @@ export async function generateDeterministicGameplan(
     {
       ...loadSnapshot,
       is_deload_week: loadSnapshot.is_deload_week === true,
+      deload_source: loadSnapshot.deload_source ?? null,
     },
     biological,
   );
@@ -633,12 +642,44 @@ export async function generateDeterministicGameplan(
   const adaptationResult = await adaptGameplan(orderedMicrocycle, adaptationInput);
   orderedMicrocycle = adaptationResult.microcycle;
 
+  const exerciseCatalogForAuthority = buildExerciseCatalog(catalog);
   orderedMicrocycle = sanitizeMicrocycleIronVolume(orderedMicrocycle, {
     biological,
-    catalog: buildExerciseCatalog(catalog),
+    catalog: exerciseCatalogForAuthority,
   });
+  const volumeTracker = createWeeklyVolumeTracker(
+    exerciseCatalogForAuthority,
+    ironLogs7d,
+    ironLogs3w,
+    biological,
+  );
+  const recoverySignals = {
+    readiness: detectReadinessVolumeLever(input.readinessScan),
+    rpe: detectHighRpeVolumeLever(adaptationInput.logs7d),
+    injector: isInjectorDeloadActive(loadSnapshot, biological),
+  };
+  orderedMicrocycle = enforceWeeklyAuthority(
+    orderedMicrocycle,
+    volumeTracker,
+    exerciseCatalogForAuthority,
+    {
+      preferredSplit,
+      recoverySignals,
+    },
+  );
   orderedMicrocycle = injectLongevityAddons(orderedMicrocycle);
   orderedMicrocycle = appendNutritionTargets(orderedMicrocycle, biological);
+
+  emitMotorTelemetry({
+    recoveryLevers: {
+      acwr: volumeTracker.isRecoveryMode,
+      readiness: recoverySignals.readiness,
+      rpe: recoverySignals.rpe,
+      injector: recoverySignals.injector,
+    },
+    deloadSource: loadSnapshot.deload_source ?? null,
+    microcycle: orderedMicrocycle,
+  });
 
   const todayIndex = getDayIndexForDate(protocolDate, week_start_date);
   const blocks = orderedMicrocycle.find((day) => day.day_index === todayIndex)?.blocks ?? [];

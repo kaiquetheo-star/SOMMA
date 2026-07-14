@@ -1,5 +1,5 @@
 import { resolveIronGoalType, type IronGoalType } from '@/lib/physics/rmCalculator';
-import { isDeloadMesocycleWeek } from '@/lib/gameplan/engine/clinicalLaws';
+import { resolveDeloadWeek, type DeloadSource } from '@/lib/gameplan/engine/iron/volumePeriodization';
 import {
   ironExercisesFromPerformanceLog,
   type PerformanceLogEntry,
@@ -62,6 +62,8 @@ export interface TrainingLoadSnapshot {
   acwr?: number | null;
   /** Regra 5.4: explicit deload flag for deterministic recovery injection. */
   is_deload_week?: boolean;
+  /** Which calendar(s) activated deload — phase budget, clinical, or both. */
+  deload_source?: DeloadSource | null;
   /** Mean RPE across Iron sessions (14d) */
   globalRpeMean: number | null;
   ironGoal: IronGoalType;
@@ -266,11 +268,15 @@ export function computeTrainingLoadSnapshot(
     .map((session) => session.rpe)
     .filter((rpe): rpe is number => rpe != null);
 
+  const deload =
+    mesocycleWeek != null ? resolveDeloadWeek(mesocycleWeek, null, null) : null;
+
   return {
     computedAt: new Date(now).toISOString(),
     pillars: { iron },
     acwr: iron.acwr,
-    is_deload_week: mesocycleWeek != null ? isDeloadMesocycleWeek(mesocycleWeek) : false,
+    is_deload_week: deload?.isDeloadWeek === true,
+    deload_source: deload?.deload_source ?? null,
     globalRpeMean: mean(globalSamples) != null ? Math.round(mean(globalSamples)! * 10) / 10 : null,
     ironGoal,
     ironAcwrThresholds,

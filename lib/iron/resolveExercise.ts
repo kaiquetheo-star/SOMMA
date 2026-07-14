@@ -1,4 +1,5 @@
 import { computeRestSecondsFromCns } from '@/types/catalog';
+import type { ExerciseCueCard, ExerciseTempo } from '@/types/catalog';
 import type { IronExercisePrescription } from '@/types/gameplan';
 import type { LibraryExercise } from '@/lib/catalog/library';
 
@@ -17,6 +18,8 @@ export interface ResolvedIronExerciseView {
   progression_note?: string;
   rest_seconds: number;
   primary_muscle: string | null;
+  tempo?: ExerciseTempo | null;
+  cue_card?: ExerciseCueCard | null;
 }
 
 interface ResolveOptions {
@@ -67,5 +70,7 @@ export function resolveIronExerciseView(options: ResolveOptions): ResolvedIronEx
       prescription.rest_seconds ??
       computeRestSecondsFromCns(cns),
     primary_muscle: library?.primary_muscle ?? null,
+    tempo: prescription.tempo ?? null,
+    cue_card: prescription.cue_card ?? null,
   };
 }

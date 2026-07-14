@@ -9,7 +9,7 @@ import {
 import type { LibraryExercise } from '@/types/catalog';
 
 const DROP_SET_NOTE =
-  'Drop-Set: Execute até a falha, reduza 20% da carga e repita até a falha novamente. Sem descanso.';
+  'Drop-Set: Execute até a falha, reduza 20% da carga e repita até a falha novamente. Sem descanso. (Não use a série drop como âncora de progressão — preserve o Best Working Set.)';
 const REST_PAUSE_NOTE =
   'Rest-Pause: Última série até a falha, descanse 15s, repita com a mesma carga até a falha técnica.';
 const PRE_EXHAUST_NOTE = 'Pré-Exaustão: Execute este isolador antes do composto principal para aumentar recrutamento local.';

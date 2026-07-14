@@ -1,5 +1,6 @@
 import type { LibraryExercise } from '@/types/catalog';
 import { applyFivePhaseClinicalMatrix, classifyClinicalPhase } from '@/lib/gameplan/engine/clinicalMatrix';
+import { resolveDeloadWeek } from '@/lib/gameplan/engine/iron/volumePeriodization';
 import type {
   GameplanBlock,
   IronExercisePrescription,
@@ -154,7 +155,8 @@ export function clampCnsFatigueScore(value: number): number {
 }
 
 export function isDeloadMesocycleWeek(mesocycleWeek: number): boolean {
-  return clampMesocycleWeek(mesocycleWeek) === DELOAD_MESOCYCLE_WEEK;
+  // Unified calendar: honor phase-budget (4/6) and clinical (4) without clamp-override.
+  return resolveDeloadWeek(mesocycleWeek, null, null).isDeloadWeek;
 }
 
 function normalizeExerciseName(name: string): string {

@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { generateDeterministicGameplan } from '@/lib/gameplan/engine/generateDeterministicGameplan';
-import { FULL_BUNDLED_EXERCISES } from '@/lib/catalog/bundledCatalog.full';
+import { ELITE_EXERCISES } from '@/lib/catalog/eliteCatalog';
 import type { DailyGameplan, IronExercisePrescription, MicrocycleDay } from '@/types/gameplan';
 import type { UserBiological } from '@/types/biological';
 
@@ -36,7 +36,7 @@ const fallbackReasons = new Set([
   'minimum_viable_path_absolute_last_resort',
 ]);
 
-const bundledBySlug = new Map(FULL_BUNDLED_EXERCISES.map((exercise) => [exercise.slug, exercise]));
+const bundledBySlug = new Map(ELITE_EXERCISES.map((exercise) => [exercise.slug, exercise]));
 
 describe('Legacy ABCDEF input — migrates to ABCDE on generation', () => {
   let microcycle: DailyGameplan['microcycle'];

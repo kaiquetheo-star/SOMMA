@@ -8,6 +8,8 @@ import {
 } from '@/lib/gameplan/engine/iron/volumePeriodization';
 import { initialBiologicalProfile } from '@/types/biological';
 
+export { enforceWeeklyAuthority } from '@/lib/gameplan/engine/iron/volumeAuthority';
+
 const MAX_FINISHER_OR_ISOLATION_SETS = 4;
 const MAX_REASONABLE_SETS_PER_EXERCISE = 8;
 
@@ -97,7 +99,9 @@ function sanitizeTargetSetsWithBudget(
     diagnostic.includes('deload') ||
     diagnostic.includes('rescue') ||
     diagnostic.includes('minimum_viable') ||
-    diagnostic.includes('injury_constraint');
+    diagnostic.includes('injury_constraint') ||
+    diagnostic.includes('volume_authority') ||
+    diagnostic.includes('recovery_volume');
   const mesocyclePhase = diagnostic.includes('deload')
     ? 'deload'
     : resolveEffectiveMesocyclePhase(

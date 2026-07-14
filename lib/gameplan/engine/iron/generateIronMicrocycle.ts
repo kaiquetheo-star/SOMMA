@@ -269,11 +269,15 @@ function pickFallbackExerciseViaSolver(
 
   const tiers = volumeFloorFallback
     ? [
-        { ...baseOptions, ignoreCnsBudget: true, ignoreMrv: true, ignoreRecoveryMode: true, armsDedicatedRelaxation: armsRelaxation },
         {
           ...baseOptions,
           ignoreCnsBudget: true,
-          ignoreMrv: true,
+          ignoreRecoveryMode: true,
+          armsDedicatedRelaxation: armsRelaxation,
+        },
+        {
+          ...baseOptions,
+          ignoreCnsBudget: true,
           ignoreRecoveryMode: true,
           ignoreMastery: true,
           ignoreBodyweightBlacklist: true,
@@ -393,9 +397,13 @@ function validateIronDayBlockVolume(
       const { exercise, score, usedLastResort } = selection;
       const isMinimumViableVolumeFloor = block.picks.length < 2 && usedLastResort;
       const { prescribedSets, budget } = prescribedSetsForSlot(slot, exercise, constraints);
-      const fallbackSets = isMinimumViableVolumeFloor
+      const requestedFallbackSets = isMinimumViableVolumeFloor
         ? Math.min(2, prescribedSets)
         : Math.max(2, prescribedSets);
+      const volumeGate = tracker.canAddSets(exercise, requestedFallbackSets);
+      const fallbackSets = Math.min(requestedFallbackSets, volumeGate.clampedSets);
+      if (fallbackSets <= 0) continue;
+
       const solverResult: SolverResult = {
         slotId: `${slot.slotId}_volume_floor_fallback`,
         exerciseId: exercise.id,
@@ -403,7 +411,9 @@ function validateIronDayBlockVolume(
         score,
         diagnostic_reason: isMinimumViableVolumeFloor
           ? 'minimum_viable_path_absolute_last_resort'
-          : 'volume_floor_fallback',
+          : fallbackSets < requestedFallbackSets
+            ? 'volume_floor_fallback_mrv_clamped'
+            : 'volume_floor_fallback',
         intensity_technique: slot.intensity_technique,
         technique_params: slot.technique_params,
         targetRepRange: budget.targetRepRange,
@@ -609,13 +619,26 @@ export function generateIronMicrocycle(input: GenerateIronMicrocycleInput): Iron
   if (!useSplitTemplate) {
     const finalDraft = cloneMicrocycle(draft);
     const finalReport = validateMicrocycleCoherence(finalDraft, catalog, constraints, tracker);
-    if (!finalReport.ok) {
+    let coherenceOk = finalReport.ok;
+
+    if (!coherenceOk) {
+      console.warn(
+        '[Iron] PPL coherence validation failed — applying deterministic autoCorrect fallback',
+      );
       autoCorrectMicrocycle(finalDraft, catalog, constraints, tracker);
+      const postCorrect = validateMicrocycleCoherence(finalDraft, catalog, constraints, tracker);
+      coherenceOk = postCorrect.ok;
+      if (!coherenceOk) {
+        console.warn(
+          '[Iron] PPL coherence still failing after autoCorrect — coherenceValidated=false',
+        );
+      }
     }
+
     applyDraftToDayBlocks(dayBlocks, finalDraft, catalog, input.logs21d, input.goalIron, preferredSplit);
 
     for (const block of dayBlocks) {
-      (block as { coherenceValidated: boolean }).coherenceValidated = finalReport.ok || true;
+      (block as { coherenceValidated: boolean }).coherenceValidated = coherenceOk;
     }
   } else {
     for (const block of dayBlocks) {

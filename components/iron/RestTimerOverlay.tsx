@@ -1,4 +1,17 @@
+import { useEffect, useRef } from 'react';
 import { Pressable, Text, View } from 'react-native';
+import Animated, {
+  Easing,
+  useAnimatedProps,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
+import Svg, { Circle, G } from 'react-native-svg';
+
+import { SommaColors } from '@/constants/theme';
+import { hapticRestTick, hapticSetLogged } from '@/lib/haptics';
+
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 interface RestTimerOverlayProps {
   remaining: number;
@@ -12,24 +25,77 @@ function formatTimer(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+const SIZE = 220;
+const STROKE = 6;
+const RADIUS = (SIZE - STROKE) / 2;
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+
+/**
+ * Quiet Luxury rest overlay — Obsidian glass + Matte Gold radial progress (Reanimated).
+ * Haptics: medium on open, light when the timer completes.
+ */
 export function RestTimerOverlay({ remaining, total, onSkip }: RestTimerOverlayProps) {
-  const progress = total > 0 ? remaining / total : 0;
+  const progress = useSharedValue(total > 0 ? remaining / total : 0);
+  const completedRef = useRef(false);
+
+  useEffect(() => {
+    void hapticSetLogged();
+  }, []);
+
+  useEffect(() => {
+    const next = total > 0 ? Math.max(0, remaining / total) : 0;
+    progress.value = withTiming(next, {
+      duration: 280,
+      easing: Easing.out(Easing.cubic),
+    });
+    if (remaining <= 0 && !completedRef.current) {
+      completedRef.current = true;
+      void hapticRestTick();
+    }
+  }, [remaining, total, progress]);
+
+  const animatedProps = useAnimatedProps(() => ({
+    strokeDashoffset: CIRCUMFERENCE * (1 - progress.value),
+  }));
 
   return (
-    <View className="absolute inset-0 z-10 items-center justify-center bg-obsidian/95 px-8">
+    <View className="absolute inset-0 z-10 items-center justify-center bg-obsidian/92 px-8">
       <Text className="font-body text-[10px] uppercase tracking-[0.45em] text-matte-gold/80">
         Rest · Breathe
       </Text>
-      <Text className="mt-6 font-display-bold text-7xl text-matte-gold">
-        {formatTimer(remaining)}
-      </Text>
-      <View className="mt-8 h-1 w-full overflow-hidden rounded-full bg-white/10">
-        <View
-          className="h-full rounded-full bg-matte-gold/70"
-          style={{ width: `${progress * 100}%` }}
-        />
+
+      <View className="mt-10 items-center justify-center">
+        <Svg width={SIZE} height={SIZE}>
+          <G rotation={-90} origin={`${SIZE / 2}, ${SIZE / 2}`}>
+            <Circle
+              cx={SIZE / 2}
+              cy={SIZE / 2}
+              r={RADIUS}
+              stroke="rgba(255,255,255,0.08)"
+              strokeWidth={STROKE}
+              fill="transparent"
+            />
+            <AnimatedCircle
+              cx={SIZE / 2}
+              cy={SIZE / 2}
+              r={RADIUS}
+              stroke={SommaColors.matteGold}
+              strokeWidth={STROKE}
+              fill="transparent"
+              strokeLinecap="round"
+              strokeDasharray={`${CIRCUMFERENCE} ${CIRCUMFERENCE}`}
+              animatedProps={animatedProps}
+            />
+          </G>
+        </Svg>
+        <View className="absolute items-center">
+          <Text className="font-display-bold text-6xl text-matte-gold">
+            {formatTimer(Math.max(0, remaining))}
+          </Text>
+        </View>
       </View>
-      <Pressable onPress={onSkip} className="mt-10 active:opacity-70">
+
+      <Pressable onPress={onSkip} className="mt-12 active:opacity-70">
         <Text className="font-body text-xs uppercase tracking-[0.35em] text-[#6B7568]">
           Skip rest
         </Text>

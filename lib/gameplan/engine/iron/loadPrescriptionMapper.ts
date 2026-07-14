@@ -14,11 +14,18 @@ import {
 import { effectiveRpeFromSet } from '@/lib/physics/loadTelemetry';
 import { computeRestSecondsFromCns } from '@/types/catalog';
 import type { IronExercisePrescription } from '@/types/gameplan';
+import type { IronSetLog } from '@/types/performance';
 
 const isIronPrescriptionDebug =
   (typeof __DEV__ !== 'undefined' && __DEV__) || process.env.NODE_ENV !== 'production';
 
 const COMPOUND_PATTERNS = new Set(['push', 'pull', 'squat', 'hinge', 'lunge', 'carry']);
+
+export interface BestWorkingSet {
+  weightKg: number;
+  reps: number;
+  reportedRpe: number | null;
+}
 
 function isCompoundPattern(pattern: string): boolean {
   return COMPOUND_PATTERNS.has(pattern);
@@ -34,11 +41,99 @@ function engineRowsToSamples(logs: readonly EnginePerformanceRow[]): Performance
   }));
 }
 
+function setWeightKg(set: IronSetLog | { weight_kg?: number; weightKg?: number }): number | null {
+  const raw =
+    'weight_kg' in set && set.weight_kg != null
+      ? set.weight_kg
+      : 'weightKg' in set && typeof set.weightKg === 'number'
+        ? set.weightKg
+        : null;
+  if (raw == null || !Number.isFinite(raw) || raw <= 0) return null;
+  return raw;
+}
+
+function setReps(set: IronSetLog | { reps?: number }): number | null {
+  if (set.reps == null || !Number.isFinite(set.reps) || set.reps <= 0) return null;
+  return set.reps;
+}
+
+/**
+ * Best Working Set — highest load among sets that reached the DUP top-of-range.
+ * Ignores failed drop-set remnants that sit below the rep target.
+ */
+export function findBestWorkingSet(
+  log: EnginePerformanceRow | null | undefined,
+  targetRepsTop: number,
+): BestWorkingSet | null {
+  if (!log) return null;
+
+  const sets = log.payload?.iron?.sets ?? [];
+  let best: BestWorkingSet | null = null;
+
+  for (const set of sets) {
+    const weightKg = setWeightKg(set);
+    const reps = setReps(set);
+    if (weightKg == null || reps == null) continue;
+    if (reps < targetRepsTop) continue;
+
+    const reportedRpe = effectiveRpeFromSet(set);
+    if (
+      best == null ||
+      weightKg > best.weightKg ||
+      (weightKg === best.weightKg && reps > best.reps)
+    ) {
+      best = {
+        weightKg,
+        reps,
+        reportedRpe: reportedRpe != null && Number.isFinite(reportedRpe) ? reportedRpe : null,
+      };
+    }
+  }
+
+  if (best) return best;
+
+  // No set hit the top — keep anchor weight as heaviest set that still logged reps,
+  // but double-progression gate will hold load and push for more reps.
+  let fallback: BestWorkingSet | null = null;
+  for (const set of sets) {
+    const weightKg = setWeightKg(set);
+    const reps = setReps(set);
+    if (weightKg == null || reps == null) continue;
+    const reportedRpe = effectiveRpeFromSet(set);
+    if (
+      fallback == null ||
+      weightKg > fallback.weightKg ||
+      (weightKg === fallback.weightKg && reps > fallback.reps)
+    ) {
+      fallback = {
+        weightKg,
+        reps,
+        reportedRpe: reportedRpe != null && Number.isFinite(reportedRpe) ? reportedRpe : null,
+      };
+    }
+  }
+
+  if (fallback) return fallback;
+
+  if (log.weight_used != null && log.weight_used > 0) {
+    return {
+      weightKg: Math.round(log.weight_used * 10) / 10,
+      reps: log.reps_completed ?? 0,
+      reportedRpe: log.rpe_score ?? null,
+    };
+  }
+
+  return null;
+}
+
 function lastReportedRpe(
   logs: readonly EnginePerformanceRow[],
   exerciseId: string,
   exerciseSlug: string,
+  bestSet: BestWorkingSet | null,
 ): number | null {
+  if (bestSet?.reportedRpe != null) return bestSet.reportedRpe;
+
   const lastLog = findLastLogForExercise(logs, exerciseId, exerciseSlug);
   if (!lastLog) return null;
 
@@ -58,28 +153,46 @@ function lastReportedRpe(
   return null;
 }
 
-/** SRS §3.3 — RPE ≤ 8 → +2.5%; RPE ≥ 9 → deload ~5%. */
-function applyRpeOverload(weightKg: number, rpe: number | null): { weight: number; note: string } {
-  if (rpe == null) return { weight: weightKg, note: '' };
+/**
+ * Double progression + RPE gate.
+ * RPE ≥ 9 → −5% load.
+ * RPE ≤ 8 → +2.5% load ONLY if reps hit DUP top; otherwise hold load and add reps.
+ */
+export function applyDoubleProgression(input: {
+  weightKg: number;
+  rpe: number | null;
+  bestSetReps: number;
+  targetRepsTop: number;
+}): { weight: number; targetReps: number; note: string } {
+  const { weightKg, rpe, bestSetReps, targetRepsTop } = input;
 
-  if (rpe >= 9) {
+  if (rpe != null && rpe >= 9) {
     return {
       weight: Math.round(weightKg * 0.95 * 10) / 10,
+      targetReps: targetRepsTop,
       note: 'RPE ≥9 — −5% load (deload)',
     };
   }
 
-  if (rpe <= 8) {
+  if (rpe != null && rpe <= 8) {
+    if (bestSetReps >= targetRepsTop) {
+      return {
+        weight: Math.round(weightKg * 1.025 * 10) / 10,
+        targetReps: targetRepsTop,
+        note: 'RPE ≤8 and hit rep top — +2.5% load',
+      };
+    }
     return {
-      weight: Math.round(weightKg * 1.025 * 10) / 10,
-      note: 'RPE ≤8 — +2.5% load',
+      weight: weightKg,
+      targetReps: targetRepsTop,
+      note: `RPE ≤8 but reps ${bestSetReps}/${targetRepsTop} — add reps before load`,
     };
   }
 
-  return { weight: weightKg, note: '' };
+  return { weight: weightKg, targetReps: targetRepsTop, note: '' };
 }
 
-function repRangeForExercise(exercise: CatalogExercise, prescribedSets: number): {
+function repRangeForExercise(exercise: CatalogExercise, _prescribedSets: number): {
   targetReps: number;
   targetRir: number;
   lo: number;
@@ -87,9 +200,7 @@ function repRangeForExercise(exercise: CatalogExercise, prescribedSets: number):
 } {
   const hi = exercise.default_reps;
   const lo = Math.max(6, hi - 2);
-  const targetReps = hi;
-  const targetRir = 2;
-  return { targetReps, targetRir, lo, hi };
+  return { targetReps: hi, targetRir: 2, lo, hi };
 }
 
 function repRangeForDupFocus(
@@ -133,24 +244,22 @@ export function mapToIronPrescription(
   goalIron: string | null,
   dailyFocus: DailyIronFocus | null = null,
 ): IronExercisePrescription {
-  const periodizedRange = !dailyFocus && solverResult.targetRepRange
-    ? solverResult.targetRepRange
-        .split('-')
-        .map((value) => Number.parseInt(value, 10))
-        .filter((value) => Number.isFinite(value))
-    : undefined;
-  const fallback = repRangeForDupFocus(
-    exercise,
-    solverResult.prescribedSets,
-    dailyFocus,
-  );
+  const periodizedRange =
+    !dailyFocus && solverResult.targetRepRange
+      ? solverResult.targetRepRange
+          .split('-')
+          .map((value) => Number.parseInt(value, 10))
+          .filter((value) => Number.isFinite(value))
+      : undefined;
+  const fallback = repRangeForDupFocus(exercise, solverResult.prescribedSets, dailyFocus);
   const lo = periodizedRange?.[0] ?? fallback.lo;
   const hi = periodizedRange?.[1] ?? fallback.hi;
-  const targetReps = hi;
+  let targetReps = hi;
   const targetRir = solverResult.targetRIR ?? fallback.targetRir;
   const samples = engineRowsToSamples(recentLogs);
   const resolvedE1rm = e1rm ?? estimateBestE1RMFromLogs(samples, exercise.id);
   const lastLog = findLastLogForExercise(recentLogs, exercise.id, exercise.slug);
+  const bestSet = findBestWorkingSet(lastLog, hi);
   const dayFocus = dailyFocus?.focus ?? 'metabolic_hypertrophy';
 
   if (isIronPrescriptionDebug) {
@@ -158,6 +267,8 @@ export function mapToIronPrescription(
       exercise_id: exercise.id,
       slug: exercise.slug,
       lastLog_weight: lastLog?.weight_used ?? null,
+      best_working_set_kg: bestSet?.weightKg ?? null,
+      best_working_set_reps: bestSet?.reps ?? null,
       lastLog_exercise_id: lastLog?.payload?.iron?.exercise_id ?? lastLog?.exercise_id ?? null,
       lastLog_slug: lastLog?.payload?.iron?.exercise_slug ?? null,
     });
@@ -166,23 +277,25 @@ export function mapToIronPrescription(
   let targetWeight: number | null = null;
   const notes: string[] = [];
 
-  if (lastLog?.weight_used != null && lastLog.weight_used > 0) {
-    targetWeight = Math.round(lastLog.weight_used * 10) / 10;
-    notes.push(`Last logged ${targetWeight} kg — calibrate @ ${targetRir} RIR`);
+  if (bestSet != null) {
+    targetWeight = Math.round(bestSet.weightKg * 10) / 10;
+    notes.push(`Best working set ${targetWeight} kg × ${bestSet.reps} — calibrate @ ${targetRir} RIR`);
+
+    const lastRpe = lastReportedRpe(recentLogs, exercise.id, exercise.slug, bestSet);
+    const progressed = applyDoubleProgression({
+      weightKg: targetWeight,
+      rpe: lastRpe,
+      bestSetReps: bestSet.reps,
+      targetRepsTop: hi,
+    });
+    targetWeight = progressed.weight;
+    targetReps = progressed.targetReps;
+    if (progressed.note) notes.push(progressed.note);
   } else if (isCompoundPattern(exercise.movement_pattern) && resolvedE1rm != null) {
     targetWeight = targetWeightFromE1RM(resolvedE1rm, goalIron, targetReps, targetRir);
     notes.push(`E1RM ${resolvedE1rm} kg (Epley, 21d)`);
-  } else if (!isCompoundPattern(exercise.movement_pattern)) {
-    notes.push('Calibrate first set @ prescribed RIR');
   } else {
     notes.push('Calibrate first set @ prescribed RIR');
-  }
-
-  if (targetWeight != null) {
-    const lastRpe = lastReportedRpe(recentLogs, exercise.id, exercise.slug);
-    const adjusted = applyRpeOverload(targetWeight, lastRpe);
-    targetWeight = adjusted.weight;
-    if (adjusted.note) notes.push(adjusted.note);
   }
 
   if (isIronPrescriptionDebug) {
@@ -210,7 +323,6 @@ export function mapToIronPrescription(
     rest_seconds: computeRestSecondsFromCns(exercise.cns_fatigue_cost),
     progression_note: notes.join(' · ') || 'Calibrate First Set',
     execution_technique: displayTechnique(solverResult.intensity_technique),
-    // Regra 4.1 + Regra 5.1: DUP cadence overrides catalog default for the day stimulus.
     tempo: dailyFocus?.defaultTempo ?? exercise.tempo,
     cue_card: mapToExerciseCueCard(exercise, dayFocus),
     tactical_role: exercise.tactical_role,

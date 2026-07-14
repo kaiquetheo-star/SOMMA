@@ -3,11 +3,11 @@ import { generateDeterministicGameplan } from '@/lib/gameplan/engine/generateDet
 import { buildExerciseCatalog } from '@/lib/gameplan/engine/iron/catalog/ExerciseCatalog';
 import { ABCDE_IRON_DAY_INDICES, ABCDE_REST_DAY_INDICES } from '@/lib/gameplan/engine/iron/splits/abcdeSplit';
 import { ABCDE_MEV } from '@/lib/gameplan/engine/iron/WeeklyVolumeTracker';
-import { FULL_BUNDLED_EXERCISES } from '@/lib/catalog/bundledCatalog.full';
+import { ELITE_EXERCISES } from '@/lib/catalog/eliteCatalog';
 import type { DailyGameplan, IronExercisePrescription, MicrocycleDay } from '@/types/gameplan';
 import type { UserBiological } from '@/types/biological';
 
-const catalog = buildExerciseCatalog(FULL_BUNDLED_EXERCISES);
+const catalog = buildExerciseCatalog([...ELITE_EXERCISES]);
 
 const userBiological: UserBiological = {
   date_of_birth: '1994-05-14',
