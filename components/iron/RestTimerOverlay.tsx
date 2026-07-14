@@ -59,7 +59,10 @@ export function RestTimerOverlay({ remaining, total, onSkip }: RestTimerOverlayP
   }));
 
   return (
-    <View className="absolute inset-0 z-10 items-center justify-center bg-obsidian/92 px-8">
+    <View
+      className="absolute inset-0 z-10 items-center justify-center bg-obsidian px-8"
+      style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
+    >
       <Text className="font-body text-[10px] uppercase tracking-[0.45em] text-matte-gold/80">
         Rest · Breathe
       </Text>

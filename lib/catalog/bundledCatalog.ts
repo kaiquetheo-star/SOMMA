@@ -4,7 +4,7 @@
  * Regenerate: npx tsx scripts/extractEliteCatalog.ts
  */
 import { enrichExerciseWithCues } from '@/lib/catalog/biomechanicalMapper';
-import { ELITE_EXERCISES, ELITE_EXERCISE_COUNT } from '@/lib/catalog/eliteCatalog';
+import { ELITE_EXERCISES } from '@/lib/catalog/eliteCatalog';
 import { inferSlotCategory } from '@/lib/catalog/inferSlotCategory';
 import type { CatalogExercise, LibraryExercise } from '@/types/catalog';
 
@@ -26,10 +26,6 @@ export function getBundledExercises(): CatalogExercise[] {
     );
   }
   return ELITE_EXERCISES.map((exercise) => enrichExerciseWithCues(withEliteSlotCategory(exercise)));
-}
-
-export function getBundledExerciseCount(): number {
-  return ELITE_EXERCISE_COUNT;
 }
 
 /** Re-export for callers that need the raw seed-shaped rows (pre X-Frame cues). */

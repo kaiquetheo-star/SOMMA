@@ -13,19 +13,6 @@ import type { PerformanceLogEntry } from '@/types/performance';
 
 export type GameplanSource = 'ai' | 'deterministic' | 'fallback' | 'stub' | 'local';
 
-export function parseGameplanSource(value: unknown): GameplanSource | null {
-  if (
-    value === 'ai' ||
-    value === 'deterministic' ||
-    value === 'fallback' ||
-    value === 'stub' ||
-    value === 'local'
-  ) {
-    return value;
-  }
-  return null;
-}
-
 async function finalizeGameplanOrdering(gameplan: DailyGameplan): Promise<DailyGameplan> {
   const catalog = await fetchLibraryExercises();
   const microcycle = applyNeuroMechanicalOrderingToMicrocycle(gameplan.microcycle, catalog);

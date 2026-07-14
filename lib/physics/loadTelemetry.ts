@@ -330,28 +330,6 @@ function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-export function formatExerciseProgressionHint(
-  entries: PerformanceLogEntry[],
-  exerciseId: string,
-  prescribedRir: number,
-): string | null {
-  const exerciseLog = entries
-    .flatMap((row) => ironExercisesFromPerformanceLog(row))
-    .find((iron) => iron.exercise_id === exerciseId);
-  const lastSet = exerciseLog?.sets[exerciseLog.sets.length - 1];
-  if (!lastSet) return null;
-
-  const reported = lastSet.reported_rir ?? lastSet.rir;
-  if (reported == null) return null;
-
-  const rpe = rirToRpe(reported);
-  if (rpe >= 9) return `Last set · ${reported} RIR · deload or +1 RIR next`;
-  if (rpe <= 8 && reported <= prescribedRir) {
-    return `Last set · ${reported} RIR · +2.5% load eligible`;
-  }
-  return `Last set · ${reported} RIR · hold load`;
-}
-
 /** Highest-priority autoreg signal from load telemetry (for Head Coach). */
 export function telemetrySuggestsPoorRecovery(
   snapshot: TrainingLoadSnapshot,

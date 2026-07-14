@@ -61,7 +61,7 @@ export function WeeklyBiometricCheckin({ checkpoints, onAddCheckpoint }: WeeklyB
         </View>
       ) : null}
 
-      <View className="mt-5 space-y-3">
+      <View className="mt-5 gap-3">
         <View className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
           <Text className="font-body text-xs uppercase tracking-[0.32em] text-[#6B7568]">Peso (kg)</Text>
           <TextInput
@@ -107,7 +107,7 @@ export function WeeklyBiometricCheckin({ checkpoints, onAddCheckpoint }: WeeklyB
       </Pressable>
 
       {formattedHistory.length > 0 ? (
-        <View className="mt-6 space-y-3">
+        <View className="mt-6 gap-3">
           {formattedHistory.map((checkpoint) => (
             <View
               key={checkpoint.date}

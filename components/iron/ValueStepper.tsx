@@ -14,6 +14,8 @@ interface ValueStepperProps {
   disabled?: boolean;
   /** Allow typing the value directly (required for web load entry) */
   allowDirectInput?: boolean;
+  /** Single-row layout for dense modals (e.g. readiness check-in). */
+  compact?: boolean;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -38,6 +40,7 @@ export function ValueStepper({
   onChange,
   disabled = false,
   allowDirectInput = false,
+  compact = false,
 }: ValueStepperProps) {
   const [draft, setDraft] = useState(formatDisplay(value, step));
 
@@ -63,6 +66,46 @@ export function ValueStepper({
     onChange(next);
     setDraft(formatDisplay(next, step));
   };
+
+  if (compact) {
+    return (
+      <View
+        className={`flex-row items-center gap-3 ${disabled ? 'opacity-50' : ''}`}
+        style={{ zIndex: 2 }}
+      >
+        <Text
+          className="min-w-0 flex-1 font-body text-[10px] uppercase tracking-[0.22em] text-[#6B7568]"
+          numberOfLines={2}
+        >
+          {label}
+        </Text>
+        <Pressable
+          onPress={decrement}
+          disabled={disabled}
+          accessibilityLabel={`Decrease ${label}`}
+          hitSlop={10}
+          className="h-9 w-9 items-center justify-center rounded-full bg-white/[0.06] active:bg-matte-gold/15"
+        >
+          <Text className="font-body-medium text-xl text-[#E8E4DC]">−</Text>
+        </Pressable>
+        <Text
+          className="min-w-[36px] text-center font-body-medium text-2xl text-[#E8E4DC]"
+          style={{ fontFamily: Platform.OS === 'web' ? 'Inter, system-ui, sans-serif' : 'Inter' }}
+        >
+          {formatDisplay(value, step)}
+        </Text>
+        <Pressable
+          onPress={increment}
+          disabled={disabled}
+          accessibilityLabel={`Increase ${label}`}
+          hitSlop={10}
+          className="h-9 w-9 items-center justify-center rounded-full bg-white/[0.06] active:bg-matte-gold/15"
+        >
+          <Text className="font-body-medium text-xl text-[#E8E4DC]">+</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <View className={disabled ? 'opacity-50' : ''} style={{ zIndex: 2 }}>

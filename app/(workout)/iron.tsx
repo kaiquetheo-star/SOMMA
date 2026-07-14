@@ -508,6 +508,45 @@ export default function IronModeScreen() {
             ? 'Next movement'
             : `Log ${totalSets} sets to finish`
       }
+      footer={
+        inRirGate ? (
+          <View className="gap-4 rounded-2xl border border-matte-gold/35 bg-[#0A0E0C]/95 px-6 py-5">
+            <RirSelector
+              value={pendingReportedRir}
+              prescribedRir={exercise?.target_rir ?? 2}
+              onChange={setPendingReportedRir}
+            />
+            <Pressable
+              onPress={handleConfirmRir}
+              disabled={pendingReportedRir == null}
+              className={`overflow-hidden rounded-2xl border px-8 py-4 active:opacity-80 ${
+                pendingReportedRir != null
+                  ? 'border-matte-gold/50 bg-matte-gold/15'
+                  : 'border-white/10 bg-white/5 opacity-50'
+              }`}
+            >
+              <Text className="text-center font-body-medium text-sm uppercase tracking-[0.35em] text-matte-gold">
+                Confirm set {currentSet}
+              </Text>
+            </Pressable>
+          </View>
+        ) : canLogSet ? (
+          <Pressable
+            onPress={handleLogSet}
+            className="overflow-hidden rounded-2xl border border-matte-gold/50 bg-matte-gold/15 px-8 py-5 active:opacity-80"
+          >
+            <Text className="text-center font-body-medium text-sm uppercase tracking-[0.35em] text-matte-gold">
+              Log Set {currentSet}
+            </Text>
+          </Pressable>
+        ) : exerciseComplete && !isActive && !canCompleteRitual ? (
+          <View className="overflow-hidden rounded-2xl border border-matte-gold bg-matte-gold px-8 py-5">
+            <Text className="text-center font-display-bold text-sm uppercase tracking-[0.35em] text-obsidian">
+              Exercise completed
+            </Text>
+          </View>
+        ) : undefined
+      }
     >
       <View className="relative flex-1">
         {isActive ? (
@@ -522,7 +561,7 @@ export default function IronModeScreen() {
           data={exerciseQueue}
           keyExtractor={(item, index) => `${item.exercise_id}-${index}`}
           showsVerticalScrollIndicator
-          contentContainerClassName={`gap-5 ${canLogSet || inRirGate ? 'pb-36' : 'pb-4'}`}
+          contentContainerClassName="gap-5 pb-4"
           ListHeaderComponent={
             <Text className="font-body text-[10px] uppercase tracking-[0.35em] text-[#6B7568]">
               {exerciseQueue.length > 1
@@ -531,18 +570,18 @@ export default function IronModeScreen() {
             </Text>
           }
           renderItem={({ item: queuedExercise, index }) => {
-            const isActive = index === exerciseIndex;
+            const isActiveCard = index === exerciseIndex;
             const queuedLibrary = getExerciseById(catalog, queuedExercise.exercise_id);
             const itemCanAdapt =
               Boolean(queuedExercise.alternative_exercise_id) &&
               queuedExercise.alternative_exercise_id !== queuedExercise.exercise_id;
             const cardClass = `gap-3 rounded-2xl border px-4 py-4 ${
-              isActive
+              isActiveCard
                 ? 'border-matte-gold/35 bg-matte-gold/[0.06]'
                 : 'border-white/8 bg-white/[0.02] opacity-80'
             }`;
 
-            if (!isActive) {
+            if (!isActiveCard) {
               return (
                 <Pressable
                   onPress={() => {
@@ -688,48 +727,6 @@ export default function IronModeScreen() {
             );
           }}
         />
-
-        {inRirGate ? (
-          <View className="absolute bottom-0 left-0 right-0 gap-4 rounded-2xl border border-matte-gold/35 bg-[#0A0E0C]/95 px-6 py-5">
-            <RirSelector
-              value={pendingReportedRir}
-              prescribedRir={exercise?.target_rir ?? 2}
-              onChange={setPendingReportedRir}
-            />
-            <Pressable
-              onPress={handleConfirmRir}
-              disabled={pendingReportedRir == null}
-              className={`overflow-hidden rounded-2xl border px-8 py-4 active:opacity-80 ${
-                pendingReportedRir != null
-                  ? 'border-matte-gold/50 bg-matte-gold/15'
-                  : 'border-white/10 bg-white/5 opacity-50'
-              }`}
-            >
-              <Text className="text-center font-body-medium text-sm uppercase tracking-[0.35em] text-matte-gold">
-                Confirm set {currentSet}
-              </Text>
-            </Pressable>
-          </View>
-        ) : null}
-
-        {exerciseComplete && !inRirGate && !isActive ? (
-          <View className="absolute bottom-0 left-0 right-0 overflow-hidden rounded-2xl border border-matte-gold bg-matte-gold px-8 py-5">
-            <Text className="text-center font-display-bold text-sm uppercase tracking-[0.35em] text-obsidian">
-              Exercise completed
-            </Text>
-          </View>
-        ) : null}
-
-        {canLogSet ? (
-          <Pressable
-            onPress={handleLogSet}
-            className="absolute bottom-0 left-0 right-0 overflow-hidden rounded-2xl border border-matte-gold/50 bg-matte-gold/15 px-8 py-5 active:opacity-80"
-          >
-            <Text className="text-center font-body-medium text-sm uppercase tracking-[0.35em] text-matte-gold">
-              Log Set {currentSet}
-            </Text>
-          </Pressable>
-        ) : null}
       </View>
     </WorkoutShell>
   );

@@ -75,9 +75,3 @@ export function resolveIronExercise(equipment: EquipmentTag[]): IronExerciseTemp
   }
   return IRON_EXERCISE_LIBRARY.find((ex) => ex.id === 'pushup')!;
 }
-
-export function getAlternateExercise(exerciseId: string): IronExerciseTemplate {
-  const current = IRON_EXERCISE_LIBRARY.find((ex) => ex.id === exerciseId);
-  const alternateId = current?.alternate_id ?? 'pushup';
-  return IRON_EXERCISE_LIBRARY.find((ex) => ex.id === alternateId) ?? IRON_EXERCISE_LIBRARY[2];
-}

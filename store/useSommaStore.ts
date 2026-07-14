@@ -38,7 +38,6 @@ import {
     normalizeBodyFatFields,
     withFixedBiologicalProfile,
 } from '@/types/biological';
-import type { ClinicalExitInterview } from '@/types/clinical';
 import type {
     DailyGameplan,
     GameplanBlock,
@@ -365,21 +364,13 @@ interface SommaState {
   submitReadinessScan: (scan: ReadinessScan) => void;
   submitBiometricCheckpoint: (checkpoint: BiometricCheckpoint) => void;
   setShowReadinessModal: (show: boolean) => void;
-  submitClinicalExitInterview: (interview: ClinicalExitInterview) => Promise<void>;
-  getClinicalReviewTrigger: () => null;
   performance_logs: PerformanceLogEntry[];
   performanceQueue: PerformanceQueueItem[];
   pendingSession: IronSessionLog | null;
   performance_syncing: boolean;
   lastWorkoutSummary: WorkoutSessionSummary | null;
-  setUserEnvironment: (patch: Partial<UserEnvironment>) => void;
   setUserStats: (patch: Partial<UserStats>) => void;
-  setUserFoundation: (patch: Partial<UserFoundation>) => void;
   setUserBiological: (patch: Partial<BiologicalProfile>) => void;
-  setWeeklyMicrocycle: (
-    gameplan: DailyGameplan | null,
-    source?: SommaState['gameplan_source'],
-  ) => void;
   gameplan_loading: boolean;
   gameplan_source: 'ai' | 'fallback' | 'stub' | 'deterministic' | 'local' | null;
   /** Set when Head Coach / Edge generation fails — Home shows Neural Link Failed */
@@ -409,8 +400,6 @@ interface SommaState {
   resetStore: () => Promise<void>;
   /** Replace persisted offline data from a backup JSON payload */
   restoreFromBackup: (raw: unknown) => Promise<void>;
-  /** @deprecated Use resetStore */
-  resetSommaState: () => void;
 }
 
 const initialEnvironment: UserEnvironment = {
@@ -458,23 +447,9 @@ export const useSommaStore = create<SommaState>()(
       gameplan_source: null,
       gameplan_error: null,
 
-      setUserEnvironment: (patch) =>
-        set((state) => ({
-          user_environment: {
-            ...state.user_environment,
-            ...patch,
-            updated_at: patch.updated_at ?? new Date().toISOString(),
-          },
-        })),
-
       setUserStats: (patch) =>
         set((state) => ({
           user_stats: { ...state.user_stats, ...patch },
-        })),
-
-      setUserFoundation: (patch) =>
-        set((state) => ({
-          user_foundation: { ...state.user_foundation, ...patch },
         })),
 
       setUserBiological: (patch) =>
@@ -553,39 +528,7 @@ export const useSommaStore = create<SommaState>()(
 
       setShowReadinessModal: (show) => set({ showReadinessModal: show }),
 
-      getClinicalReviewTrigger: () => null,
-
-      submitClinicalExitInterview: async (interview) => {
-        set((state) => ({
-          user_biological: {
-            ...state.user_biological,
-            clinical_exit_interview: interview,
-          },
-        }));
-
-        try {
-          await get().regenerateDailyGameplan();
-        } catch (err) {
-          console.warn('[SOMMA] Month 2 recalibration after Exit Interview failed:', err);
-        }
-      },
-
       clearGameplanError: () => set({ gameplan_error: null }),
-
-      setWeeklyMicrocycle: (gameplan, source) =>
-        set((state) =>
-          gameplan
-            ? {
-                ...applyGameplanToState(gameplan, source ?? state.gameplan_source),
-              }
-            : {
-                weeklyMicrocycle: null,
-                protocolDate: null,
-                weekStartDate: null,
-                protocolGeneratedAt: null,
-                gameplan_source: source ?? state.gameplan_source,
-              },
-        ),
 
       ensureDailyGameplan: () => {
         const state = get();
@@ -984,10 +927,6 @@ export const useSommaStore = create<SommaState>()(
         };
 
         set(patch);
-      },
-
-      resetSommaState: () => {
-        void useSommaStore.getState().resetStore();
       },
     }),
     {

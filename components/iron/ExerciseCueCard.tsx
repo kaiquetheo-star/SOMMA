@@ -11,7 +11,7 @@ interface ExerciseCueCardProps {
   instructions: Record<string, string>;
   progressionNote?: string;
   biomechanics?: IronExerciseBiomechanics | null;
-  /** Keys already shown in InstructionPanel — omitted from deep-dive list */
+  /** Keys already shown in the primary cue strip — omitted from deep-dive list */
   excludeKeys?: string[];
 }
 

@@ -1,9 +1,5 @@
 import type { BiologicalProfile, TrainingExperienceLevel } from '@/types/biological';
 import type { MovementPattern } from '@/types/catalog';
-import {
-  ironExercisesFromPerformanceLog,
-  type PerformanceLogEntry,
-} from '@/types/performance';
 
 /** Iron prescription goal — maps from profiles.goal_iron */
 export type IronGoalType = 'hypertrophy' | 'strength' | 'default';
@@ -20,8 +16,6 @@ export interface PerformanceLogSample {
     };
   } | null;
 }
-
-const THREE_WEEKS_MS = 21 * 24 * 60 * 60 * 1000;
 
 /** Epley estimated 1-rep max: 1RM = weight × (1 + reps / 30) */
 export function calculateE1RM(weightKg: number, reps: number): number {
@@ -213,64 +207,4 @@ export function hasIronHistoryForExercise(
   exerciseId: string,
 ): boolean {
   return estimateBestE1RMFromLogs(logs, exerciseId) != null;
-}
-
-function performanceEntriesToSamples(entries: PerformanceLogEntry[]): PerformanceLogSample[] {
-  const cutoff = Date.now() - THREE_WEEKS_MS;
-  const samples: PerformanceLogSample[] = [];
-
-  for (const entry of entries) {
-    if (entry.pillar !== 'iron') continue;
-    if (Date.parse(entry.timestamp) < cutoff) continue;
-
-    for (const iron of ironExercisesFromPerformanceLog(entry)) {
-      if (!iron.sets.length) continue;
-      samples.push({
-        exercise_id: iron.exercise_id,
-        weight_used: iron.sets[iron.sets.length - 1]?.weight_kg ?? null,
-        reps_completed: iron.sets[iron.sets.length - 1]?.reps ?? null,
-        timestamp: entry.timestamp,
-        payload: {
-          iron: {
-            exercise_id: iron.exercise_id,
-            sets: iron.sets.map((set) => ({
-              weight_kg: set.weight_kg,
-              reps: set.reps,
-            })),
-          },
-        },
-      });
-    }
-  }
-
-  return samples;
-}
-
-/**
- * Local performance_logs (Zustand) → E1RM → goal-aware target weight.
- */
-export function getTargetWeightFromLogs(
-  entries: PerformanceLogEntry[],
-  exerciseId: string,
-  targetReps: number,
-  targetRIR: number,
-  goalType: string | null,
-): number | null {
-  if (!exerciseId) return null;
-  const logs = performanceEntriesToSamples(entries);
-  const e1rm = estimateBestE1RMFromLogs(logs, exerciseId);
-  if (e1rm == null) return null;
-  return targetWeightFromE1RM(e1rm, goalType, targetReps, targetRIR);
-}
-
-/** @deprecated Use getTargetWeightFromLogs — local-first only */
-export async function getTargetWeight(
-  _userId: string,
-  exerciseId: string,
-  targetReps: number,
-  targetRIR: number,
-  goalType: string | null,
-  performanceLogs: PerformanceLogEntry[] = [],
-): Promise<number | null> {
-  return getTargetWeightFromLogs(performanceLogs, exerciseId, targetReps, targetRIR, goalType);
 }

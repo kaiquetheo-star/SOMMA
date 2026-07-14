@@ -28,6 +28,17 @@ export default function Root({ children }: { children: React.ReactNode }) {
 }
 
 const responsiveBackground = `
+html, body, #root {
+  height: 100%;
+}
+html, body {
+  margin: 0;
+}
+body > div {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
 body {
   background-color: #fff;
 }

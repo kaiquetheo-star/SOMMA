@@ -7,10 +7,3 @@ export const WORKOUT_ROUTES: Partial<Record<WorkoutPillar, Href>> = {
   nutrition: '/(tabs)/analytics',
   spirit: '/(tabs)/home',
 };
-
-export const PILLAR_LABELS: Record<WorkoutPillar, string> = {
-  iron: 'Iron',
-  nutrition: 'Nutrition',
-  spirit: 'Recovery',
-  longevity: 'Longevity',
-};
