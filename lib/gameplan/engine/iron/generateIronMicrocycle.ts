@@ -132,7 +132,6 @@ function buildConstraints(
       masteryFromExperience(input.biological.experience_level),
     available_time_minutes: input.availableMinutes,
     weekStartDate: input.weekStartDate,
-    cns_fatigue_score: input.biological.cns_fatigue_score,
     mesocycle_phase: input.biological.mesocycle_phase,
     mesocycle_week: input.biological.mesocycle_week,
     biological: input.biological,
@@ -271,17 +270,13 @@ function pickFallbackExerciseViaSolver(
     ? [
         {
           ...baseOptions,
-          ignoreCnsBudget: true,
-          ignoreRecoveryMode: true,
           armsDedicatedRelaxation: armsRelaxation,
         },
         {
           ...baseOptions,
-          ignoreCnsBudget: true,
-          ignoreRecoveryMode: true,
           ignoreMastery: true,
           ignoreBodyweightBlacklist: true,
-          ignoreJointStress: true,
+          // Joint-stress blocks are injury safety — never relaxed, even as last resort.
           armsDedicatedRelaxation: true,
         },
       ]
@@ -397,9 +392,11 @@ function validateIronDayBlockVolume(
       const { exercise, score, usedLastResort } = selection;
       const isMinimumViableVolumeFloor = block.picks.length < 2 && usedLastResort;
       const { prescribedSets, budget } = prescribedSetsForSlot(slot, exercise, constraints);
+      // Anti-collapse dignity floor: even last-resort fills keep a real dose.
+      const dignityFloor = exercise.movement_pattern === 'isolation' ? 2 : 3;
       const requestedFallbackSets = isMinimumViableVolumeFloor
-        ? Math.min(2, prescribedSets)
-        : Math.max(2, prescribedSets);
+        ? Math.min(dignityFloor, prescribedSets)
+        : Math.max(dignityFloor, prescribedSets);
       const volumeGate = tracker.canAddSets(exercise, requestedFallbackSets);
       const fallbackSets = Math.min(requestedFallbackSets, volumeGate.clampedSets);
       if (fallbackSets <= 0) continue;

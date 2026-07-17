@@ -64,7 +64,7 @@ function sanitizeTargetSets(exercise: {
 export interface MicrocycleIronVolumeSanitizeContext {
   biological?: Pick<
     BiologicalProfile,
-    'mesocycle_phase' | 'mesocycle_week' | 'cns_fatigue_score' | 'hormonal_protocol'
+    'mesocycle_phase' | 'mesocycle_week' | 'hormonal_protocol'
   > | null;
   catalog?: Pick<ExerciseCatalog, 'byId' | 'bySlug'> | ReadonlyMap<string, CatalogExercise> | null;
 }
@@ -117,7 +117,6 @@ function sanitizeTargetSetsWithBudget(
     catalogExercise,
     biological,
     isCompoundExercise(catalogExercise),
-    context.biological.cns_fatigue_score ?? 0,
   );
 
   if (safe > budget.maxSets) {

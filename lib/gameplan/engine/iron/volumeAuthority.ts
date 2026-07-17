@@ -1,7 +1,6 @@
 /**
  * Final weekly volume authority — runs after all Iron post-passes.
- * Recalculates ledger, prunes MRV_HARD overshoot → MRV_SOFT, enforces maxSetsSession,
- * and applies Recovery Composition Policy (additive levers, 40% floor).
+ * Recalculates ledger, prunes MRV_HARD overshoot → MRV_SOFT, enforces maxSetsSession.
  */
 import type { ExerciseCatalog, CatalogExercise } from '@/lib/gameplan/engine/iron/types';
 import type { WeeklyVolumeTracker } from '@/lib/gameplan/engine/iron/WeeklyVolumeTracker';
@@ -9,14 +8,22 @@ import {
   resolveVolumeLimitsForSplit,
   type VolumeLimits,
 } from '@/lib/gameplan/engine/iron/volumeMatrix';
-import {
-  applyRecoveryCompositionToSets,
-  composeRecoveryFromSignals,
-  type RecoveryVolumeSignals,
-} from '@/lib/gameplan/engine/iron/recoveryComposition';
 import type { IronExercisePrescription, MicrocycleDay } from '@/types/gameplan';
-import type { PreferredSplit } from '@/types/biological';
+import type { PreferredSplit, UserBiological } from '@/types/biological';
 import { normalizePreferredSplit } from '@/types/biological';
+
+/** Dignity floor — authority pass never trims below this set count per exercise. */
+export const MIN_SETS_PER_EXERCISE = 2;
+/** Compounds never leave the authority pass below 3 working sets. */
+export const MIN_SETS_COMPOUND = 3;
+/** Isolations never leave the authority pass below 2 working sets. */
+export const MIN_SETS_ISOLATION = 2;
+
+function minSetsForExercise(catalogExercise: CatalogExercise): number {
+  return catalogExercise.movement_pattern === 'isolation'
+    ? MIN_SETS_ISOLATION
+    : MIN_SETS_COMPOUND;
+}
 
 interface MutableExerciseRef {
   dayIndex: number;
@@ -133,12 +140,29 @@ function debitOneSet(
   ref: MutableExerciseRef,
   reason: string,
 ): void {
-  if (ref.exercise.target_sets <= 1) return;
+  if (ref.exercise.target_sets <= minSetsForExercise(ref.catalogExercise)) return;
   writeExercise(microcycle, ref, {
     ...ref.exercise,
     target_sets: ref.exercise.target_sets - 1,
     diagnostic_reason: reason,
   });
+}
+
+function enforceMinSetsPerExercise(
+  microcycle: MicrocycleDay[],
+  refs: MutableExerciseRef[],
+): void {
+  for (const ref of refs) {
+    const floor = minSetsForExercise(ref.catalogExercise);
+    if (ref.exercise.target_sets > 0 && ref.exercise.target_sets < floor) {
+      writeExercise(microcycle, ref, {
+        ...ref.exercise,
+        target_sets: floor,
+        diagnostic_reason:
+          ref.exercise.diagnostic_reason ?? 'volume_authority_min_sets_floor',
+      });
+    }
+  }
 }
 
 function pruneMuscleToSoftCap(
@@ -152,7 +176,8 @@ function pruneMuscleToSoftCap(
     const candidates = refs
       .filter(
         (ref) =>
-          ref.catalogExercise.primary_muscle === muscle && ref.exercise.target_sets > 1,
+          ref.catalogExercise.primary_muscle === muscle &&
+          ref.exercise.target_sets > minSetsForExercise(ref.catalogExercise),
       )
       .sort(compareTrimOrder);
     const victim = candidates[0];
@@ -179,7 +204,7 @@ function enforceMaxSetsSession(
     let sessionSets = bucket.reduce((sum, ref) => sum + ref.exercise.target_sets, 0);
     while (sessionSets > maxSetsSession) {
       const candidates = bucket
-        .filter((ref) => ref.exercise.target_sets > 1)
+        .filter((ref) => ref.exercise.target_sets > minSetsForExercise(ref.catalogExercise))
         .sort(compareTrimOrder);
       const victim = candidates[0];
       if (!victim) break;
@@ -189,31 +214,9 @@ function enforceMaxSetsSession(
   }
 }
 
-function applyComposedRecoveryScale(
-  microcycle: MicrocycleDay[],
-  refs: MutableExerciseRef[],
-  signals: RecoveryVolumeSignals,
-): void {
-  const composition = composeRecoveryFromSignals(signals);
-  if (composition.totalPenalty <= 0) return;
-
-  for (const ref of refs) {
-    const scaled = applyRecoveryCompositionToSets(ref.exercise.target_sets, composition);
-    if (scaled === ref.exercise.target_sets) continue;
-    writeExercise(microcycle, ref, {
-      ...ref.exercise,
-      target_sets: scaled,
-      diagnostic_reason:
-        ref.exercise.diagnostic_reason ??
-        `recovery_composition_${composition.dominant ?? 'none'}`,
-    });
-  }
-}
-
 export interface EnforceWeeklyAuthorityOptions {
   preferredSplit?: PreferredSplit | string | null;
-  /** Extra recovery levers beyond tracker.isRecoveryMode (ACWR). */
-  recoverySignals?: Omit<RecoveryVolumeSignals, 'acwr'>;
+  biological?: Pick<UserBiological, 'hormonal_protocol' | 'hormonal_transition'> | null;
 }
 
 /**
@@ -222,7 +225,7 @@ export interface EnforceWeeklyAuthorityOptions {
  */
 export function enforceWeeklyAuthority(
   microcycle: MicrocycleDay[],
-  tracker: Pick<WeeklyVolumeTracker, 'isRecoveryMode' | 'snapshot'>,
+  tracker: Pick<WeeklyVolumeTracker, 'snapshot'>,
   catalog: ExerciseCatalog,
   preferredSplitOrOptions?: PreferredSplit | string | null | EnforceWeeklyAuthorityOptions,
 ): MicrocycleDay[] {
@@ -242,15 +245,16 @@ export function enforceWeeklyAuthority(
     maxSetsSession: tracker.snapshot.maxSetsSession,
   };
 
-  // Prefer matrix limits when snapshot is stale (e.g. empty week start).
-  const matrixLimits = resolveVolumeLimitsForSplit(normalizePreferredSplit(split));
+  const matrixLimits = resolveVolumeLimitsForSplit(
+    normalizePreferredSplit(split),
+    options.biological,
+  );
   const mrvSoft = limits.mrvSoft || matrixLimits.mrvSoft;
   const mrvHard = limits.mrvHard || matrixLimits.mrvHard;
   const maxSetsSession = limits.maxSetsSession || matrixLimits.maxSetsSession;
 
   let refs = collectExerciseRefs(next, catalog);
 
-  // a)+b) Recalculate and prune any primary muscle above MRV_HARD down to MRV_SOFT.
   let volumeByMuscle = rebuildPrimaryVolume(refs);
   const overshotMuscles = [...volumeByMuscle.entries()]
     .filter(([, total]) => total > mrvHard)
@@ -262,26 +266,9 @@ export function enforceWeeklyAuthority(
     refs = collectExerciseRefs(next, catalog);
   }
 
-  // c) Per-day primary muscle session cap.
   enforceMaxSetsSession(next, refs, maxSetsSession);
   refs = collectExerciseRefs(next, catalog);
-
-  // Recovery composition: ACWR + Readiness + RPE + Injector (additive, 40% floor).
-  const recoverySignals: RecoveryVolumeSignals = {
-    acwr: tracker.isRecoveryMode,
-    readiness: options.recoverySignals?.readiness === true,
-    rpe: options.recoverySignals?.rpe === true,
-    mapper: options.recoverySignals?.mapper === true,
-    injector: options.recoverySignals?.injector === true,
-  };
-  if (
-    recoverySignals.acwr ||
-    recoverySignals.readiness ||
-    recoverySignals.rpe ||
-    recoverySignals.injector
-  ) {
-    applyComposedRecoveryScale(next, refs, recoverySignals);
-  }
+  enforceMinSetsPerExercise(next, refs);
 
   return next;
 }

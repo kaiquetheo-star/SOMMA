@@ -201,7 +201,7 @@ describe('solveDaySlots — V9 tactical intelligence', () => {
     ]);
   });
 
-  it('prefers low-stability-demand machine work over barbell squat under high CNS fatigue', () => {
+  it('prefers the higher-scored low-stability machine work deterministically', () => {
     const catalog = buildExerciseCatalog([BARBELL_SQUAT, HACK_SQUAT]);
     const tracker = createWeeklyVolumeTracker(catalog, [], [], initialBiologicalProfile);
     const slot: SolverSlot = {
@@ -216,7 +216,7 @@ describe('solveDaySlots — V9 tactical intelligence', () => {
       'legs',
       [slot],
       catalog,
-      defaultConstraints({ cns_fatigue_score: 85 }),
+      defaultConstraints(),
       createInitialSolverState(tracker),
       tracker,
     );

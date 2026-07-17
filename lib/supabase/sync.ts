@@ -1,6 +1,4 @@
 import { isSupabaseConfigured } from '@/lib/config';
-import { applyCnsFatigueFromQueue } from '@/lib/supabase/cnsFatigue';
-import { clampCnsFatigueProfile } from '@/types/biological';
 import {
   fetchDailyGameplan,
   type GameplanSource,
@@ -21,7 +19,6 @@ export interface SyncPerformanceResult {
   insertedCount: number;
   gameplan: DailyGameplan | null;
   source: GameplanSource | null;
-  cns_fatigue_score: number | null;
 }
 
 function toNullableUuid(value: string | null | undefined): string | null {
@@ -222,39 +219,28 @@ export async function syncPerformanceQueueAndRecalibrate(
 ): Promise<SyncPerformanceResult> {
   try {
     if (queue.length === 0) {
-      return { insertedCount: 0, gameplan: null, source: null, cns_fatigue_score: null };
+      return { insertedCount: 0, gameplan: null, source: null };
     }
 
     const { insertedCount, userId } = await insertPerformanceQueueRows(queue);
     if (insertedCount === 0) {
-      return { insertedCount: 0, gameplan: null, source: null, cns_fatigue_score: null };
-    }
-
-    let cnsFatigueScore: number | null = null;
-    if (userId) {
-      const current = clampCnsFatigueProfile(context.biological.cns_fatigue_score);
-      cnsFatigueScore = await applyCnsFatigueFromQueue(userId, queue, current);
+      return { insertedCount: 0, gameplan: null, source: null };
     }
 
     if (context.recalibrate === false) {
-      return { insertedCount, gameplan: null, source: null, cns_fatigue_score: cnsFatigueScore };
+      return { insertedCount, gameplan: null, source: null };
     }
 
     if (!isSupabaseConfigured || !userId) {
-      return { insertedCount, gameplan: null, source: null, cns_fatigue_score: cnsFatigueScore };
+      return { insertedCount, gameplan: null, source: null };
     }
-
-    const biologicalForRecalibrate =
-      cnsFatigueScore != null
-        ? { ...context.biological, cns_fatigue_score: cnsFatigueScore }
-        : context.biological;
 
     try {
       const result = await fetchDailyGameplan({
         focus: context.focus,
         equipment: context.equipment,
         forceRefresh: true,
-        biological: biologicalForRecalibrate,
+        biological: context.biological,
         userStats: context.userStats,
         performanceLogs: context.performanceLogs,
       });
@@ -263,7 +249,6 @@ export async function syncPerformanceQueueAndRecalibrate(
         insertedCount,
         gameplan: result.gameplan,
         source: result.source,
-        cns_fatigue_score: cnsFatigueScore,
       };
     } catch (error) {
       const message = isGameplanFetchError(error)
@@ -276,7 +261,6 @@ export async function syncPerformanceQueueAndRecalibrate(
         insertedCount,
         gameplan: null,
         source: 'fallback',
-        cns_fatigue_score: cnsFatigueScore,
       };
     }
   } catch (err) {
@@ -284,7 +268,7 @@ export async function syncPerformanceQueueAndRecalibrate(
       '[SOMMA] Performance sync error:',
       err instanceof Error ? err.message : err,
     );
-    return { insertedCount: 0, gameplan: null, source: null, cns_fatigue_score: null };
+    return { insertedCount: 0, gameplan: null, source: null };
   }
 }
 

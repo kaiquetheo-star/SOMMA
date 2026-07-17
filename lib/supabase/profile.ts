@@ -2,7 +2,6 @@ import type { BiologicalProfile } from '@/types/biological';
 import {
   clampPillarTimeMinutes,
   clampPillarFrequency,
-  clampCnsFatigueProfile,
   DEFAULT_AVAILABLE_TIME_IRON,
   DEFAULT_FREQUENCY_IRON,
   FIXED_DATE_OF_BIRTH,
@@ -22,7 +21,7 @@ import { useSommaStore } from '@/store/useSommaStore';
 import { getSupabase } from '@/lib/supabase/client';
 
 const PROFILE_BIOLOGY_SELECT =
-  'focus_preference, weight_kg, body_fat_percentage, current_injuries, baseline_stress_level, training_days_per_week, available_time_iron, frequency_iron, cns_fatigue_score';
+  'focus_preference, weight_kg, body_fat_percentage, current_injuries, baseline_stress_level, training_days_per_week, available_time_iron, frequency_iron';
 
 /** Ensures the Supabase client has a JWT before PostgREST calls (avoids opaque 401s). */
 async function requireAuthenticatedUserId(expectedUserId?: string): Promise<string> {
@@ -64,7 +63,6 @@ function mapProfileBiology(row: Record<string, unknown> | null): BiologicalProfi
       available_time_iron: null,
       iron_mastery: 5,
       frequency_iron: null,
-      cns_fatigue_score: null,
       clinical_exit_interview: null,
       current_body_fat_estimate: null,
     };
@@ -114,9 +112,6 @@ function mapProfileBiology(row: Record<string, unknown> | null): BiologicalProfi
     frequency_iron: clampPillarFrequency(
       row.frequency_iron != null ? Number(row.frequency_iron) : null,
       DEFAULT_FREQUENCY_IRON,
-    ),
-    cns_fatigue_score: clampCnsFatigueProfile(
-      row.cns_fatigue_score != null ? Number(row.cns_fatigue_score) : null,
     ),
     clinical_exit_interview: null,
     current_body_fat_estimate:
@@ -245,7 +240,6 @@ export async function syncFoundationToSupabase(
       training_days_per_week: payload.biological.training_days_per_week,
       available_time_iron: payload.biological.available_time_iron,
       frequency_iron: payload.biological.frequency_iron,
-      cns_fatigue_score: payload.biological.cns_fatigue_score,
     }),
     supabase.from('user_environment').upsert({
       user_id: authedUserId,

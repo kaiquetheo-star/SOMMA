@@ -1,12 +1,10 @@
 import type { LibraryExercise } from '@/types/catalog';
 import { applyFivePhaseClinicalMatrix, classifyClinicalPhase } from '@/lib/gameplan/engine/clinicalMatrix';
-import { resolveDeloadWeek } from '@/lib/gameplan/engine/iron/volumePeriodization';
 import type {
   GameplanBlock,
   IronExercisePrescription,
   MicrocycleDay,
 } from '@/types/gameplan';
-import type { PerformanceQueueItem } from '@/types/performance';
 
 const TITLE_CASE_SMALL_WORDS = new Set([
   'a',
@@ -26,21 +24,6 @@ const TITLE_CASE_SMALL_WORDS = new Set([
 
 /** Neuro-Mechanical Recruitment — Iron exercise buckets (1 = first) — alias of ClinicalPhase */
 export type IronRecruitmentRank = 1 | 2 | 3 | 4 | 5;
-
-/** Clinical Law III — CNS fatigue deltas (sync.ts) */
-export const CNS_DELTA_IRON_SET = 2;
-export const CNS_FATIGUE_MAX = 100;
-/** Rolling profile score at/above this → poor_recovery autoreg (Clinical Law III) */
-export const CNS_FATIGUE_AUTOREG_THRESHOLD = 70;
-
-/** Clinical Law III — Mesocycle deload */
-export const DELOAD_MESOCYCLE_WEEK = 4;
-export const DELOAD_IRON_EXERCISE_CAP = 4;
-export const DELOAD_LOAD_FACTOR = 0.6;
-
-/** Clinical Law II — Subjective readiness autoreg */
-export const READINESS_AUTOREG_THRESHOLD = 4;
-export const READINESS_LOAD_FACTOR = 0.85;
 
 export const BIOMECH_SLUG_MALASANA = 'squat_malasana';
 export const BIOMECH_SLUG_CHEST_OPENER = 'sphinx';
@@ -144,21 +127,6 @@ export function applyNeuroMechanicalOrderingToMicrocycle(
   });
 }
 
-export function clampMesocycleWeek(value: number | null | undefined): number {
-  if (value == null || !Number.isFinite(value)) return 1;
-  return Math.min(4, Math.max(1, Math.round(value)));
-}
-
-export function clampCnsFatigueScore(value: number): number {
-  if (!Number.isFinite(value)) return 0;
-  return Math.min(CNS_FATIGUE_MAX, Math.max(0, Math.round(value * 10) / 10));
-}
-
-export function isDeloadMesocycleWeek(mesocycleWeek: number): boolean {
-  // Unified calendar: honor phase-budget (4/6) and clinical (4) without clamp-override.
-  return resolveDeloadWeek(mesocycleWeek, null, null).isDeloadWeek;
-}
-
 function normalizeExerciseName(name: string): string {
   return name.toLowerCase();
 }
@@ -191,90 +159,16 @@ export function resolveBiomechanicalPrerequisiteSlugs(exerciseNames: string[]): 
   return [...new Set(slugs)];
 }
 
-export function applyDeloadToIronExercise(
-  exercise: IronExercisePrescription,
-): IronExercisePrescription {
-  const scaledWeight =
-    exercise.target_weight_kg != null
-      ? Math.round(exercise.target_weight_kg * DELOAD_LOAD_FACTOR * 10) / 10
-      : null;
-  return {
-    ...exercise,
-    target_weight_kg: scaledWeight,
-    target_rir: Math.max(exercise.target_rir ?? 2, 3),
-    progression_note: [exercise.progression_note, 'Deload week (−40% load)']
-      .filter(Boolean)
-      .join(' · '),
-  };
-}
-
-export function capIronExercisesForDeload<T>(exercises: T[], isDeload: boolean): T[] {
-  if (!isDeload) return exercises;
-  return exercises.slice(0, DELOAD_IRON_EXERCISE_CAP);
-}
-
-/** CNS delta for a single performance queue item */
-export function cnsDeltaFromQueueItem(item: PerformanceQueueItem): number {
-  if (item.kind === 'iron_set') return CNS_DELTA_IRON_SET;
-  if (item.type === 'session' && item.data) {
-    return item.data.exercises.reduce(
-      (sum, exercise) => sum + exercise.sets.length * CNS_DELTA_IRON_SET,
-      0,
-    );
-  }
-
-  const pillar = item.input.pillar;
-  if (pillar === 'iron') {
-    const setCount = item.session?.iron?.sets.length ?? 1;
-    return setCount * CNS_DELTA_IRON_SET;
-  }
-  return 0;
-}
-
-export function totalCnsDeltaFromQueue(queue: PerformanceQueueItem[]): number {
-  return queue.reduce((sum, item) => sum + cnsDeltaFromQueueItem(item), 0);
-}
-
-/** Clinical Law II — mutate selected day protocol after readiness scan */
+/**
+ * Readiness-based load autoregulation removed (linear motor lobotomy).
+ * Readiness scans are informational only — never mutate the protocol.
+ */
 export function applyReadinessAutoregulationToMicrocycle(
   microcycle: MicrocycleDay[],
-  dayIndex: number,
-  readinessScore: number,
+  _dayIndex: number,
+  _readinessScore: number,
 ): MicrocycleDay[] {
-  if (readinessScore >= READINESS_AUTOREG_THRESHOLD) return microcycle;
-
-  return microcycle.map((day) => {
-    if (day.day_index !== dayIndex) return day;
-
-    const blocks = day.blocks.map((block) => {
-        if (block.pillar !== 'iron' || !block.iron?.exercises) return block;
-
-        const exercises = block.iron.exercises.map((exercise) => ({
-          ...exercise,
-          target_weight_kg:
-            exercise.target_weight_kg != null
-              ? Math.round(exercise.target_weight_kg * READINESS_LOAD_FACTOR * 10) / 10
-              : null,
-          progression_note: [exercise.progression_note, 'Autoregulation Mode (−15%)']
-            .filter(Boolean)
-            .join(' · '),
-        }));
-
-        return {
-          ...block,
-          subtitle: [block.subtitle, 'Autoregulation'].filter(Boolean).join(' · '),
-          iron: { ...block.iron, exercises },
-        };
-      });
-
-    return {
-      ...day,
-      focus_label: day.focus_label.includes('Autoregulation')
-        ? day.focus_label
-        : `${day.focus_label} · Autoregulation`,
-      blocks,
-    };
-  });
+  return microcycle;
 }
 
 export function ironExerciseNamesFromBlock(

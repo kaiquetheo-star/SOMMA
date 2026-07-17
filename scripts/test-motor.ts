@@ -25,7 +25,6 @@ const userBiological: UserBiological = {
   available_time_iron: 90,
   iron_mastery: null,
   frequency_iron: 6,
-  cns_fatigue_score: 0,
   mesocycle_phase: 'bulking',
   mesocycle_week: 1,
   mesocycle_goal: 'hypertrophy',

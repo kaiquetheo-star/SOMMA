@@ -8,3 +8,9 @@ export async function hapticRestComplete(): Promise<void> {}
 export async function hapticPhaseChange(): Promise<void> {}
 
 export async function hapticRoundEnd(): Promise<void> {}
+
+export async function hapticButtonTap(): Promise<void> {}
+
+export async function hapticRestStart(): Promise<void> {}
+
+export async function hapticRestWarning(): Promise<void> {}

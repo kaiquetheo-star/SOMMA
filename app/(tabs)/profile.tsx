@@ -10,7 +10,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BackupRestorePanel } from '@/components/profile/BackupRestorePanel';
-import { LoadTelemetryStrip } from '@/components/iron/LoadTelemetryStrip';
 import { ValueStepper } from '@/components/iron/ValueStepper';
 import { useSommaStore } from '@/store/useSommaStore';
 import {
@@ -40,7 +39,6 @@ export default function ProfileScreen() {
   const setUserBiological = useSommaStore((state) => state.setUserBiological);
   const fetchDailyGameplanAsync = useSommaStore((state) => state.fetchDailyGameplanAsync);
   const gameplanLoading = useSommaStore((state) => state.gameplan_loading);
-  const performanceLogs = useSommaStore((state) => state.performance_logs);
 
   const [draft, setDraft] = useState<BiologicalProfile>(storedBiological);
   const [timeBudgetId, setTimeBudgetId] = useState<TimeBudgetPresetId>('45');
@@ -123,8 +121,6 @@ export default function ProfileScreen() {
         </Text>
 
         <View className="mt-10 gap-10">
-            <LoadTelemetryStrip performanceLogs={performanceLogs} goalIron={draft.goal_iron} />
-
             <View className="rounded-2xl border border-white/10 bg-[#0A0E0C] px-5 py-6">
               <Text className="font-body text-[10px] uppercase tracking-[0.35em] text-[#6B7568]">
                 Weekly pillar frequency

@@ -2,8 +2,6 @@
 import { fetchLibraryExercises } from '@/lib/catalog/library';
 import {
     adaptGameplan,
-    detectHighRpeVolumeLever,
-    detectReadinessVolumeLever,
     type AdaptiveStateMachineInput,
     type BiometricCheckpoint,
     type ReadinessScan,
@@ -12,7 +10,6 @@ import {
     applyNeuroMechanicalOrderingToMicrocycle,
 } from '@/lib/gameplan/engine/clinicalLaws';
 import { MESOCYCLE_DAYS, WEEKLY_VOLUME_DAYS } from '@/lib/gameplan/engine/constants';
-import { buildGenerationContext } from '@/lib/gameplan/engine/generation';
 import { buildExerciseCatalog } from '@/lib/gameplan/engine/iron/catalog/ExerciseCatalog';
 import {
     buildIronGameplanBlock,
@@ -21,15 +18,9 @@ import {
 } from '@/lib/gameplan/engine/iron/generateIronMicrocycle';
 import { applyIntensityStrategies } from '@/lib/gameplan/engine/iron/IntensityStrategyEngine';
 import {
-    injectRecoveryProtocols,
-    isInjectorDeloadActive,
-} from '@/lib/gameplan/engine/iron/recoveryInjector';
+    detectIronInjuryConstraints,
+} from '@/lib/gameplan/engine/iron/injuryConstraints';
 import { emitMotorTelemetry } from '@/lib/gameplan/engine/iron/motorTelemetry';
-import {
-    applyIronRoutineAutoregulation,
-    buildIronBlock,
-    detectIronAutoregulation,
-} from '@/lib/gameplan/engine/legacy/ironPrescriptionLegacy';
 import { generateLongevityAddon } from '@/lib/gameplan/engine/longevityMapper';
 import {
     filterIronLogsLastDays,
@@ -44,7 +35,6 @@ import {
     resolvePillarFrequencies,
     spreadPillarDayIndices,
 } from '@/lib/gameplan/engine/periodization';
-import type { PillarTimeBudget } from '@/lib/gameplan/engine/prescription';
 import { pruneIronBlocksInMicrocycle } from '@/lib/gameplan/engine/volumePruning';
 import { sanitizeMicrocycleIronVolume } from '@/lib/gameplan/microcycleValidation';
 import { enforceWeeklyAuthority } from '@/lib/gameplan/engine/iron/volumeAuthority';
@@ -56,8 +46,6 @@ import {
 } from '@/lib/gameplan/microcycleWeek';
 import {
     computeTrainingLoadSnapshot,
-    telemetrySuggestsPoorRecovery,
-    yesterdayEffectiveRpe,
 } from '@/lib/physics/loadTelemetry';
 import { computeNutritionSnapshot } from '@/lib/physics/metabolicTelemetry';
 import type { EquipmentTag, FocusPreference, UserStats } from '@/store/useSommaStore';
@@ -65,7 +53,6 @@ import type { BiologicalProfile } from '@/types/biological';
 import {
     normalizeIronProfileForGeneration,
     normalizePreferredSplit,
-    type PreferredSplit,
 } from '@/types/biological';
 import type {
     DailyGameplan,
@@ -91,6 +78,10 @@ type BiologicalWithMesocycleWeek = BiologicalProfile & {
   mesocycle_week?: number | null;
 };
 
+interface PillarTimeBudget {
+  available_time_iron: number;
+}
+
 function resolveMesocycleWeek(biological: BiologicalProfile): number | null {
   const mesocycleWeek = (biological as BiologicalWithMesocycleWeek).mesocycle_week;
   return typeof mesocycleWeek === 'number' && Number.isFinite(mesocycleWeek)
@@ -102,34 +93,11 @@ function todayDateKey(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function resolveBaseRoutineIds(
-  catalog: Awaited<ReturnType<typeof fetchLibraryExercises>>,
-  equipment: EquipmentTag[],
-): string[] {
-  const eligible = catalog.filter((row) => equipmentMatches(row, equipment));
-  const push = eligible.find((row) => row.movement_pattern === 'push');
-  const hinge = eligible.find((row) => row.movement_pattern === 'hinge');
-  const pull = eligible.find((row) => row.movement_pattern === 'pull');
-  const routine: string[] = [];
-  if (push) routine.push(push.id);
-  if (hinge) routine.push(hinge.id);
-  if (pull) routine.push(pull.id);
-  if (routine.length === 0) return eligible.slice(0, 3).map((row) => row.id);
-  return routine;
-}
-
 function countPillarBlocks(microcycle: MicrocycleDay[], pillar: 'iron'): number {
   return microcycle.reduce(
     (sum, day) => sum + day.blocks.filter((block) => block.pillar === pillar).length,
     0,
   );
-}
-
-function usesHeuristicIronEngine(frequencyIron: number, preferredSplit: PreferredSplit): boolean {
-  const split = normalizePreferredSplit(preferredSplit);
-  if (split === 'ppl_x2') return frequencyIron === 6;
-  if (split === 'abcde') return frequencyIron === 5;
-  return frequencyIron === 6;
 }
 
 function buildAbcdeRestDayBlocks(dayIndex: number): GameplanBlock[] {
@@ -294,7 +262,8 @@ function buildMinimumViableIronExercises(
       exercise_id: exercise.id,
       slug: exercise.slug,
       display_name: exercise.name,
-      target_sets: 2,
+      // Dignity floor — compound fillers get 3 working sets, isolations 2.
+      target_sets: exercise.movement_pattern === 'isolation' ? 2 : 3,
       target_reps: exercise.default_reps ?? 10,
       target_rep_range: `${Math.max(6, (exercise.default_reps ?? 10) - 2)}-${exercise.default_reps ?? 10} @ 3 RIR`,
       target_rir: 3,
@@ -313,35 +282,22 @@ function injectMinimumViableIronWorkouts(
   equipment: EquipmentTag[],
   blockedJointProfiles: readonly string[],
 ): MicrocycleDay[] {
-  const minimumExercisesForDay = (day: MicrocycleDay, hasRescueDiagnostic: boolean): number => {
-    if (hasRescueDiagnostic) return 2;
-    return day.is_rest_day ? 0 : 4;
-  };
+  const MINIMUM_EXERCISES_PER_TRAINING_DAY = 4;
 
   return microcycle.map((day) => {
     if (day.is_rest_day) return day;
     const blocks = day.blocks.map((block) => {
       const existingExercises = block.iron?.exercises ?? [];
-      const hasRescueDiagnostic = existingExercises.some((exercise) =>
-        /rescue|minimum_viable|injury_constraint/.test(exercise.diagnostic_reason ?? ''),
-      );
-      const shouldForceMinimumViable = hasRescueDiagnostic || existingExercises.length < 2;
-      const minimumExerciseCount = minimumExercisesForDay(day, shouldForceMinimumViable);
+      // Anti-collapse: rescue diagnostics on individual picks must NEVER flatten
+      // the whole day — healthy prescriptions keep their sets untouched.
       if (
         block.pillar === 'iron' &&
         existingExercises.length > 0 &&
-        (shouldForceMinimumViable || existingExercises.length < minimumExerciseCount)
+        existingExercises.length < MINIMUM_EXERCISES_PER_TRAINING_DAY
       ) {
-        const normalizedExisting = shouldForceMinimumViable
-          ? existingExercises.map((exercise) => ({
-              ...exercise,
-              target_sets: 2,
-              diagnostic_reason: exercise.diagnostic_reason ?? 'minimum_viable_path_absolute_last_resort',
-            }))
-          : existingExercises;
-        const excluded = new Set(normalizedExisting.map((exercise) => exercise.exercise_id));
+        const excluded = new Set(existingExercises.map((exercise) => exercise.exercise_id));
         const excludedConcepts = new Set(
-          normalizedExisting.map(fallbackConceptKey).filter((key): key is string => key != null),
+          existingExercises.map(fallbackConceptKey).filter((key): key is string => key != null),
         );
         const fillers = buildMinimumViableIronExercises(
           catalog,
@@ -350,13 +306,13 @@ function injectMinimumViableIronWorkouts(
           day.focus_label,
           excluded,
           excludedConcepts,
-        ).slice(0, Math.max(0, minimumExerciseCount - normalizedExisting.length));
+        ).slice(0, Math.max(0, MINIMUM_EXERCISES_PER_TRAINING_DAY - existingExercises.length));
 
         return {
           ...block,
           iron: {
             ...block.iron,
-            exercises: [...normalizedExisting, ...fillers],
+            exercises: [...existingExercises, ...fillers],
           },
         };
       }
@@ -474,19 +430,7 @@ export async function generateDeterministicGameplan(
     goalIron: biological.goal_iron,
     mesocycleWeek: resolveMesocycleWeek(biological),
   });
-  const { rpe: yesterdayMainRpe } = yesterdayEffectiveRpe(input.performanceLogs);
-
-  const autoreg = detectIronAutoregulation(
-    biological,
-    yesterdayMainRpe,
-    telemetrySuggestsPoorRecovery(loadSnapshot, biological.goal_iron),
-  );
-  const baseRoutine = applyIronRoutineAutoregulation(
-    resolveBaseRoutineIds(catalog, input.equipment),
-    catalog,
-    input.equipment,
-    autoreg,
-  );
+  const injuryConstraints = detectIronInjuryConstraints(biological);
 
   const ironDayIndices = spreadPillarDayIndices(
     pillarFreq.frequency_iron,
@@ -496,29 +440,21 @@ export async function generateDeterministicGameplan(
   const protocolDate = input.protocolDate ?? todayDateKey();
   const week_start_date = getWeekStartMonday(protocolDate);
 
-  let ironByDayIndex = new Map<number, IronDayBlock>();
-  if (usesHeuristicIronEngine(pillarFreq.frequency_iron, preferredSplit)) {
-    const ironMicrocycle = generateIronMicrocycle({
-      libraryExercises: catalog,
-      biological,
-      equipment: input.equipment,
-      logs7d: ironLogs7d,
-      logs21d: ironLogs3w,
-      ironDayIndices,
-      weekStartDate: week_start_date,
-      blockedJointProfiles: autoreg.blocked_joint_profiles,
-      goalIron: biological.goal_iron,
-      availableMinutes: pillarTime.available_time_iron,
-    });
-    ironByDayIndex = new Map(ironMicrocycle.map((day) => [day.dayIndex, day]));
-  }
+  const ironMicrocycle = generateIronMicrocycle({
+    libraryExercises: catalog,
+    biological,
+    equipment: input.equipment,
+    logs7d: ironLogs7d,
+    logs21d: ironLogs3w,
+    ironDayIndices,
+    weekStartDate: week_start_date,
+    blockedJointProfiles: injuryConstraints.blocked_joint_profiles,
+    goalIron: biological.goal_iron,
+    availableMinutes: pillarTime.available_time_iron,
+  });
+  const ironByDayIndex = new Map(ironMicrocycle.map((day) => [day.dayIndex, day]));
 
   let ironSlot = 0;
-  const { ctx: generation } = buildGenerationContext({
-    protocolDate,
-    biological,
-  });
-
   const microcycle: MicrocycleDay[] = Array.from({ length: 7 }, (_, index) => {
     const day_index = index + 1;
     const wantsIron = ironDayIndices.includes(day_index);
@@ -552,34 +488,16 @@ export async function generateDeterministicGameplan(
 
     if (wantsIron) {
       const heuristicDay = ironByDayIndex.get(day_index);
-      if (heuristicDay) {
-        ironBlockForPrereqs = buildIronGameplanBlock(
-          heuristicDay,
-          `block-d${day_index}-iron`,
-          order,
-          catalog,
-          pillarTime.available_time_iron,
-        );
-      } else {
-        ironBlockForPrereqs = buildIronBlock(
-          `block-d${day_index}-iron`,
-          focusLabel,
-          focusLabel,
-          order,
-          catalog,
-          input.equipment,
-          baseRoutine,
-          ironLogs3w,
-          ironLogs7d,
-          autoreg,
-          biological.goal_iron,
-          pillarTime,
-          biological,
-          1,
-          biological.clinical_exit_interview,
-          generation,
-        );
+      if (!heuristicDay) {
+        throw new Error(`MISSING_IRON_DAY: ${day_index}`);
       }
+      ironBlockForPrereqs = buildIronGameplanBlock(
+        heuristicDay,
+        `block-d${day_index}-iron`,
+        order,
+        catalog,
+        pillarTime.available_time_iron,
+      );
       blocks.push(ironBlockForPrereqs);
       order += 1;
     }
@@ -612,17 +530,7 @@ export async function generateDeterministicGameplan(
     orderedMicrocycle,
     catalog,
     input.equipment,
-    autoreg.blocked_joint_profiles,
-  );
-
-  orderedMicrocycle = injectRecoveryProtocols(
-    orderedMicrocycle,
-    {
-      ...loadSnapshot,
-      is_deload_week: loadSnapshot.is_deload_week === true,
-      deload_source: loadSnapshot.deload_source ?? null,
-    },
-    biological,
+    injuryConstraints.blocked_joint_profiles,
   );
 
   orderedMicrocycle = applyIntensityStrategies(
@@ -653,30 +561,19 @@ export async function generateDeterministicGameplan(
     ironLogs3w,
     biological,
   );
-  const recoverySignals = {
-    readiness: detectReadinessVolumeLever(input.readinessScan),
-    rpe: detectHighRpeVolumeLever(adaptationInput.logs7d),
-    injector: isInjectorDeloadActive(loadSnapshot, biological),
-  };
   orderedMicrocycle = enforceWeeklyAuthority(
     orderedMicrocycle,
     volumeTracker,
     exerciseCatalogForAuthority,
     {
       preferredSplit,
-      recoverySignals,
+      biological,
     },
   );
   orderedMicrocycle = injectLongevityAddons(orderedMicrocycle);
   orderedMicrocycle = appendNutritionTargets(orderedMicrocycle, biological);
 
   emitMotorTelemetry({
-    recoveryLevers: {
-      acwr: volumeTracker.isRecoveryMode,
-      readiness: recoverySignals.readiness,
-      rpe: recoverySignals.rpe,
-      injector: recoverySignals.injector,
-    },
     deloadSource: loadSnapshot.deload_source ?? null,
     microcycle: orderedMicrocycle,
   });

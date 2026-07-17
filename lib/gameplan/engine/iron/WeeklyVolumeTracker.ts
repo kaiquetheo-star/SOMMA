@@ -16,7 +16,7 @@ import {
   type VolumeCreditContext,
   type VolumeLimits,
 } from '@/lib/gameplan/engine/iron/volumeMatrix';
-import type { BiologicalProfile, PreferredSplit } from '@/types/biological';
+import type { PreferredSplit, UserBiological } from '@/types/biological';
 
 /** Minimum effective volume / muscle / week (MEV) — 2× frequency splits (PPL). */
 export const MEV = VOLUME_MATRIX.twice_per_week.mev;
@@ -54,8 +54,6 @@ export interface CanAddSetsResult {
 
 export interface WeeklyVolumeTracker {
   readonly snapshot: WeeklyVolumeSnapshot;
-  readonly acwr: number | null;
-  readonly isRecoveryMode: boolean;
   /** Slug-keyed ledger of credited sets (resilient to catalog UUID regeneration). */
   readonly weeklySlugLedger: ReadonlyMap<string, number>;
   completedSetsForMuscle(muscle: string): number;
@@ -70,6 +68,10 @@ interface MuscleCredit {
   muscle: string;
   fraction: number;
 }
+
+type TrackerBiologicalProfile = Partial<UserBiological> & {
+  hormonal_transition?: boolean | null;
+};
 
 function sanitizeSetCount(sets: number): number {
   if (!Number.isFinite(sets) || sets <= 0) return 0;
@@ -94,37 +96,6 @@ function isLogInWeek(timestamp: string, weekStartDate: string, weekEndMs: number
   if (Number.isNaN(t) || Number.isNaN(start)) return false;
   return t >= start && t < weekEndMs;
 }
-
-function logSRpe(log: EnginePerformanceRow): number {
-  const setCount = setsFromLog(log);
-  const rpe = log.rpe_score != null && Number.isFinite(log.rpe_score) ? log.rpe_score : 7;
-  const durationMinutes = Math.max(1, setCount * 3);
-  return rpe * durationMinutes;
-}
-
-function computeAcwr(
-  logs7d: readonly EnginePerformanceRow[],
-  chronicLogs: readonly EnginePerformanceRow[],
-): number | null {
-  const acuteLoad = logs7d
-    .filter((log) => log.pillar === 'iron')
-    .reduce((sum, log) => sum + logSRpe(log), 0);
-  const chronicLoad = chronicLogs
-    .filter((log) => log.pillar === 'iron')
-    .reduce((sum, log) => sum + logSRpe(log), 0);
-
-  if (acuteLoad <= 0 || chronicLoad <= 0) return null;
-
-  // Regra 2.2: ACWR = acute 7d load / chronic 21d weekly average.
-  const chronicWeeklyAverage = chronicLoad / 3;
-  if (chronicWeeklyAverage <= 0) return null;
-
-  return Math.round((acuteLoad / chronicWeeklyAverage) * 100) / 100;
-}
-
-type RecoveryBiologicalProfile = Partial<BiologicalProfile> & {
-  hormonal_transition?: boolean | null;
-};
 
 function muscleCreditsForExercise(
   exercise: CatalogExercise,
@@ -182,6 +153,20 @@ function resolveExerciseFromLog(
   return null;
 }
 
+function resolvePreferredSplit(
+  biologicalOrSplit?: TrackerBiologicalProfile | PreferredSplit | null,
+): PreferredSplit | null | undefined {
+  if (typeof biologicalOrSplit === 'string') return biologicalOrSplit;
+  return biologicalOrSplit?.preferred_split;
+}
+
+function resolveBiological(
+  biologicalOrSplit?: TrackerBiologicalProfile | PreferredSplit | null,
+): TrackerBiologicalProfile | null {
+  if (biologicalOrSplit == null || typeof biologicalOrSplit === 'string') return null;
+  return biologicalOrSplit;
+}
+
 /**
  * Rolling 7-day effective set ledger.
  * Primary 1.0×; synergists use split-adaptive fractions from `volumeMatrix`.
@@ -196,34 +181,23 @@ export function createWeeklyVolumeTracker(
   catalog: ExerciseCatalog,
   logs7d: readonly EnginePerformanceRow[],
   logs21d: readonly EnginePerformanceRow[],
-  biological?: RecoveryBiologicalProfile | null,
+  biological?: TrackerBiologicalProfile | null,
   creditContext?: VolumeCreditContext,
 ): WeeklyVolumeTracker;
 export function createWeeklyVolumeTracker(
   catalog: ExerciseCatalog,
   logs7d: readonly EnginePerformanceRow[],
   logsOrWeekStart: readonly EnginePerformanceRow[] | string,
-  biologicalOrSplit?: RecoveryBiologicalProfile | PreferredSplit | null,
+  biologicalOrSplit?: TrackerBiologicalProfile | PreferredSplit | null,
   initialCreditContext?: VolumeCreditContext,
 ): WeeklyVolumeTracker {
   const volumeByMuscle = new Map<string, number>();
   /** Slug → credited sets this week (UUID-regeneration resilient). */
   const weeklySlugLedger = new Map<string, number>();
   const legacyWeekStartDate = typeof logsOrWeekStart === 'string' ? logsOrWeekStart : null;
-  const chronicLogs = Array.isArray(logsOrWeekStart) ? logsOrWeekStart : logs7d;
-  const biological =
-    biologicalOrSplit != null &&
-    typeof biologicalOrSplit === 'object' &&
-    !Array.isArray(biologicalOrSplit)
-      ? biologicalOrSplit
-      : null;
-  const preferredSplit =
-    typeof biologicalOrSplit === 'string'
-      ? biologicalOrSplit
-      : biological?.preferred_split;
-  const volumeLimits = resolveVolumeLimitsForSplit(preferredSplit);
-  const acwr = computeAcwr(logs7d, chronicLogs);
-  const isRecoveryMode = (acwr != null && acwr > 1.5) || biological?.hormonal_transition === true;
+  const biological = resolveBiological(biologicalOrSplit);
+  const preferredSplit = resolvePreferredSplit(biologicalOrSplit);
+  const volumeLimits = resolveVolumeLimitsForSplit(preferredSplit, biological);
 
   let creditContext: VolumeCreditContext =
     initialCreditContext ?? defaultVolumeCreditContext(preferredSplit);
@@ -269,9 +243,6 @@ export function createWeeklyVolumeTracker(
   }
 
   const tracker: WeeklyVolumeTracker = {
-    acwr,
-    isRecoveryMode,
-
     get weeklySlugLedger(): ReadonlyMap<string, number> {
       return weeklySlugLedger;
     },

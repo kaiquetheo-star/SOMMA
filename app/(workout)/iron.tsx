@@ -3,17 +3,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, Text, View } from 'react-native';
 
 import { ExerciseCueCard } from '@/components/iron/ExerciseCueCard';
-import { RirSelector } from '@/components/iron/RirSelector';
-import { RestTimerOverlay } from '@/components/iron/RestTimerOverlay';
-import { CueGlassCard, TempoVisualizer } from '@/components/iron/TempoVisualizer';
-import { ValueStepper } from '@/components/iron/ValueStepper';
+import { TempoVisualizer } from '@/components/iron/TempoVisualizer';
 import { LoadingFallback } from '@/components/routing/LoadingFallback';
+import { CueCard } from '@/components/workout/CueCard';
+import { RestTimer } from '@/components/workout/RestTimer';
+import { SetLogger } from '@/components/workout/SetLogger';
 import { WorkoutShell } from '@/components/workout/WorkoutShell';
 import {
   resolveIronExercise,
   type IronExerciseTemplate,
 } from '@/constants/iron-exercises';
-import { useRequireDailyScan } from '@/hooks/useRequireDailyScan';
 import { useStoreHydrating } from '@/hooks/useStoreHydrated';
 import { useWorkoutBlockReady } from '@/hooks/useWorkoutBlockReady';
 import { useWorkoutNavigation } from '@/hooks/useWorkoutNavigation';
@@ -29,28 +28,22 @@ import {
   lastLoggedWeightFromPerformanceHistory,
 } from '@/lib/iron/lastLoggedWeight';
 import { resolveIronExerciseView } from '@/lib/iron/resolveExercise';
-import { hapticSetLogged } from '@/lib/haptics';
+import { hapticButtonTap, hapticSetLogged } from '@/lib/haptics';
 import { targetWeightFromPassport } from '@/lib/physics/rmCalculator';
 import type { IronExerciseBiomechanics } from '@/types/catalog';
 import type { IronExercisePrescription } from '@/types/gameplan';
 import type { IronSetLog } from '@/types/performance';
 import { useSommaStore } from '@/store/useSommaStore';
 
-type IronPhase = 'lifting' | 'rir_gate' | 'resting' | 'done';
-
-interface PendingSetCapture {
-  weight_kg: number;
-  reps: number;
-}
+type IronPhase = 'lifting' | 'resting' | 'done';
 
 interface ExerciseDraft {
   weight: number;
   reps: number;
+  rir: number;
   logs: IronSetLog[];
   currentSet: number;
   phase: IronPhase;
-  pendingSet: PendingSetCapture | null;
-  pendingReportedRir: number | null;
   restBeforeSet: number;
 }
 
@@ -104,7 +97,6 @@ function stubPrescriptionFromTemplate(
 
 export default function IronModeScreen() {
   const { blockId, title } = useLocalSearchParams<{ blockId?: string; title?: string }>();
-  useRequireDailyScan({ blockId, title, pillar: 'iron' });
   const { activeBlock, isReady, waitingForBlock } = useWorkoutBlockReady(blockId);
   const isHydrating = useStoreHydrating();
   const { finishBlock } = useWorkoutNavigation();
@@ -125,10 +117,9 @@ export default function IronModeScreen() {
   const [currentSet, setCurrentSet] = useState(1);
   const [weight, setWeight] = useState(localFallback.target_weight_kg);
   const [reps, setReps] = useState(localFallback.target_reps);
+  const [rir, setRir] = useState(2);
   const [logs, setLogs] = useState<IronSetLog[]>([]);
   const [phase, setPhase] = useState<IronPhase>('lifting');
-  const [pendingSet, setPendingSet] = useState<PendingSetCapture | null>(null);
-  const [pendingReportedRir, setPendingReportedRir] = useState<number | null>(null);
   const [restBeforeSet, setRestBeforeSet] = useState(0);
   const [allExerciseLogs, setAllExerciseLogs] = useState<
     { exercise_id: string; exercise_name: string; sets: IronSetLog[] }[]
@@ -240,11 +231,10 @@ export default function IronModeScreen() {
       if (saved) {
         setWeight(saved.weight);
         setReps(saved.reps);
+        setRir(saved.rir);
         setLogs(saved.logs);
         setCurrentSet(saved.currentSet);
         setPhase(saved.phase);
-        setPendingSet(saved.pendingSet);
-        setPendingReportedRir(saved.pendingReportedRir);
         setRestBeforeSet(saved.restBeforeSet);
         return;
       }
@@ -266,11 +256,10 @@ export default function IronModeScreen() {
 
       setWeight(baseline);
       setReps(exercise.target_reps);
+      setRir(exercise.target_rir);
       setCurrentSet(1);
       setLogs([]);
       setPhase('lifting');
-      setPendingSet(null);
-      setPendingReportedRir(null);
       setRestBeforeSet(0);
       return;
     }
@@ -278,11 +267,10 @@ export default function IronModeScreen() {
     exerciseDraftsRef.current[key] = {
       weight,
       reps,
+      rir,
       logs,
       currentSet,
       phase,
-      pendingSet,
-      pendingReportedRir,
       restBeforeSet,
     };
   }, [
@@ -291,15 +279,14 @@ export default function IronModeScreen() {
     exercise,
     exerciseIndex,
     logs,
-    pendingReportedRir,
     pendingSession,
-    pendingSet,
     performanceLogs,
     phase,
     prescribedTargetKg,
     reps,
     resolvedBlockId,
     restBeforeSet,
+    rir,
     weight,
   ]);
 
@@ -351,11 +338,10 @@ export default function IronModeScreen() {
       prescriptions?.[exerciseIndex]?.target_weight_kg ?? localFallback.target_weight_kg,
     );
     setReps(prescriptions?.[exerciseIndex]?.target_reps ?? localFallback.target_reps);
+    setRir(prescriptions?.[exerciseIndex]?.target_rir ?? 2);
     setCurrentSet(1);
     setLogs([]);
     setPhase('lifting');
-    setPendingSet(null);
-    setPendingReportedRir(null);
     setRestBeforeSet(0);
     skip();
   };
@@ -366,29 +352,21 @@ export default function IronModeScreen() {
     skip();
   };
 
-  const handleLogSet = () => {
+  const handleLogSet = async () => {
     if (!exercise) return;
-    setPendingSet({ weight_kg: weight, reps });
-    setPendingReportedRir(null);
-    setPhase('rir_gate');
-  };
-
-  const commitSetWithRir = async (reportedRir: number) => {
-    if (!exercise || !pendingSet) return;
+    unlockRestTimerAudio();
 
     const entry: IronSetLog = {
       set_index: currentSet,
-      weight_kg: pendingSet.weight_kg,
-      reps: pendingSet.reps,
+      weight_kg: weight,
+      reps,
       target_reps: exercise.target_reps,
       target_rir: exercise.target_rir,
-      reported_rir: reportedRir,
+      reported_rir: rir,
       rest_seconds_used: restBeforeSet,
       logged_at: new Date().toISOString(),
     };
     setRestBeforeSet(0);
-    setPendingSet(null);
-    setPendingReportedRir(null);
 
     setLogs((prev) => [...prev, entry]);
     logIronSet({
@@ -410,14 +388,9 @@ export default function IronModeScreen() {
     start(exercise.rest_seconds);
   };
 
-  const handleConfirmRir = () => {
-    if (pendingReportedRir == null) return;
-    unlockRestTimerAudio();
-    void commitSetWithRir(pendingReportedRir);
-  };
-
   const advanceToNextExercise = () => {
     if (!exercise) return;
+    void hapticButtonTap();
 
     setAllExerciseLogs((prev) => [
       ...prev,
@@ -442,6 +415,7 @@ export default function IronModeScreen() {
   const handleCompleteRitual = (
     completedExercises = allExerciseLogs,
   ) => {
+    void hapticSetLogged();
     const lastExercise = completedExercises[completedExercises.length - 1];
     const lastSet = lastExercise?.sets[lastExercise.sets.length - 1];
 
@@ -459,7 +433,6 @@ export default function IronModeScreen() {
   };
 
   const canLogSet = phase === 'lifting' && !exerciseComplete;
-  const inRirGate = phase === 'rir_gate' && pendingSet != null;
   const canCompleteExercise = exerciseComplete;
   const isLastExercise = exerciseIndex >= exerciseQueue.length - 1;
   const canCompleteRitual = canCompleteExercise && isLastExercise;
@@ -509,37 +482,7 @@ export default function IronModeScreen() {
             : `Log ${totalSets} sets to finish`
       }
       footer={
-        inRirGate ? (
-          <View className="gap-4 rounded-2xl border border-matte-gold/35 bg-[#0A0E0C]/95 px-6 py-5">
-            <RirSelector
-              value={pendingReportedRir}
-              prescribedRir={exercise?.target_rir ?? 2}
-              onChange={setPendingReportedRir}
-            />
-            <Pressable
-              onPress={handleConfirmRir}
-              disabled={pendingReportedRir == null}
-              className={`overflow-hidden rounded-2xl border px-8 py-4 active:opacity-80 ${
-                pendingReportedRir != null
-                  ? 'border-matte-gold/50 bg-matte-gold/15'
-                  : 'border-white/10 bg-white/5 opacity-50'
-              }`}
-            >
-              <Text className="text-center font-body-medium text-sm uppercase tracking-[0.35em] text-matte-gold">
-                Confirm set {currentSet}
-              </Text>
-            </Pressable>
-          </View>
-        ) : canLogSet ? (
-          <Pressable
-            onPress={handleLogSet}
-            className="overflow-hidden rounded-2xl border border-matte-gold/50 bg-matte-gold/15 px-8 py-5 active:opacity-80"
-          >
-            <Text className="text-center font-body-medium text-sm uppercase tracking-[0.35em] text-matte-gold">
-              Log Set {currentSet}
-            </Text>
-          </Pressable>
-        ) : exerciseComplete && !isActive && !canCompleteRitual ? (
+        exerciseComplete && !isActive && !canCompleteRitual ? (
           <View className="overflow-hidden rounded-2xl border border-matte-gold bg-matte-gold px-8 py-5">
             <Text className="text-center font-display-bold text-sm uppercase tracking-[0.35em] text-obsidian">
               Exercise completed
@@ -550,7 +493,7 @@ export default function IronModeScreen() {
     >
       <View className="relative flex-1">
         {isActive ? (
-          <RestTimerOverlay
+          <RestTimer
             remaining={remaining}
             total={exercise?.rest_seconds ?? DEFAULT_REST_SECONDS}
             onSkip={handleSkipRest}
@@ -629,10 +572,11 @@ export default function IronModeScreen() {
 
                 <TempoVisualizer tempo={queuedExercise.tempo} />
 
-                <CueGlassCard
+                <CueCard
                   setup={queuedExercise.cue_card?.setup}
                   vector={queuedExercise.cue_card?.vector}
-                  catchCue={queuedExercise.cue_card?.catch}
+                  catch={queuedExercise.cue_card?.catch}
+                  anti_pattern={queuedExercise.cue_card?.anti_pattern}
                 />
 
                 <ExerciseCueCard
@@ -666,27 +610,18 @@ export default function IronModeScreen() {
                       </Text>
                     ) : null}
 
-                <ValueStepper
-                  label="Load"
-                  value={weight}
-                  unit={isBodyweight ? 'BW' : 'kg'}
-                  step={isBodyweight ? 0 : 2.5}
-                  min={0}
-                  max={300}
-                  onChange={setWeight}
-                  disabled={!canLogSet || exerciseComplete}
-                  allowDirectInput
-                />
-
-                <ValueStepper
-                  label="Reps"
-                  value={reps}
-                  step={1}
-                  min={1}
-                  max={50}
-                  onChange={setReps}
-                  disabled={!canLogSet || exerciseComplete}
-                  allowDirectInput
+                <SetLogger
+                  weight={weight}
+                  reps={reps}
+                  rir={rir}
+                  targetRir={exercise?.target_rir ?? 2}
+                  isBodyweight={isBodyweight}
+                  setLabel={`Log Set ${Math.min(currentSet, totalSets)}`}
+                  disabled={!canLogSet}
+                  onWeightChange={setWeight}
+                  onRepsChange={setReps}
+                  onRirChange={setRir}
+                  onLog={() => void handleLogSet()}
                 />
 
                 {logs.length > 0 ? (

@@ -4,7 +4,7 @@ import type {
     BiometricCheckpoint,
     ReadinessScan,
 } from '@/lib/gameplan/engine/adaptiveStateMachine';
-import { isProtocolDateStale } from '@/lib/gameplan/generateStubGameplan';
+import { isProtocolDateStale } from '@/lib/gameplan/protocolFreshness';
 import {
     isDegenerateMicrocycle,
     sanitizeMicrocycleIronVolume,

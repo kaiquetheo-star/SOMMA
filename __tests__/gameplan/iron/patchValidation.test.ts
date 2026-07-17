@@ -253,11 +253,12 @@ describe('Iron patch validation: Minimum Viable Workout Fallback', () => {
       exercise: catalog.byId.get(pick.exerciseId),
     }));
 
-    // When MRV is already saturated, the correct coaching response is a deload protocol,
-    // not an empty workout screen that abandons the training day.
+    // When MRV is already saturated, the correct coaching response is a rescue path with
+    // dignity-floor sets (compounds ≤3 / isolations ≤2), never an empty workout screen.
     expect(exercises.length).toBeGreaterThanOrEqual(2);
     expect(exercises.length).toBeLessThanOrEqual(3);
-    expect(exercises.every((exercise) => exercise.target_sets <= 2)).toBe(true);
+    expect(exercises.every((exercise) => exercise.target_sets <= 3)).toBe(true);
+    expect(exercises.every((exercise) => exercise.target_sets >= 2)).toBe(true);
     expect(exercises.length).toBeGreaterThanOrEqual(2);
     // Axial squat/hinge must not dominate the injury/MVP rescue path.
     const axialCount = exercises.filter(
@@ -266,7 +267,7 @@ describe('Iron patch validation: Minimum Viable Workout Fallback', () => {
     expect(axialCount).toBeLessThan(exercises.length);
   });
 
-  it('does not turn ACWR recovery mode into a 2-set bench deload', () => {
+  it('does not shrink bench volume after heavy chronic logs', () => {
     const catalog = buildExerciseCatalog([BARBELL_BENCH_PRESS]);
     const acuteLogs = Array.from({ length: 18 }, (_, index) =>
       ironLog('ex-barbell-bench-press', `2026-06-${String(index + 1).padStart(2, '0')}T10:00:00.000Z`),
@@ -297,7 +298,6 @@ describe('Iron patch validation: Minimum Viable Workout Fallback', () => {
       tracker,
     );
 
-    expect(tracker.isRecoveryMode).toBe(true);
     expect(picks).toHaveLength(1);
     expect(picks[0]?.prescribedSets).toBe(4);
     expect(picks[0]?.diagnostic_reason).toBeUndefined();
@@ -305,7 +305,7 @@ describe('Iron patch validation: Minimum Viable Workout Fallback', () => {
 });
 
 describe('Iron patch validation: Tracker Sanitization & Anti-Poisoning', () => {
-  it('computes ACWR from a 21-day chronic window as a 3-week average', () => {
+  it('ignores chronic log window for ACWR (removed) and still credits 7d volume', () => {
     const catalog = buildExerciseCatalog([CABLE_FLY]);
     const acuteLogs = Array.from({ length: 18 }, (_, index) =>
       ironLog('ex-cable-fly', `2026-06-${String(index + 1).padStart(2, '0')}T10:00:00.000Z`),
@@ -321,8 +321,7 @@ describe('Iron patch validation: Tracker Sanitization & Anti-Poisoning', () => {
       initialBiologicalProfile,
     );
 
-    expect(tracker.acwr).toBe(1);
-    expect(tracker.isRecoveryMode).toBe(false);
+    expect(tracker.completedSetsForMuscle('chest')).toBeGreaterThan(0);
   });
 
   it('caps a 30-set anomaly at 8 sets so chronic volume does not poison the next prescription', () => {

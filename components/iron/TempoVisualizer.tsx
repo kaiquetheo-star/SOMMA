@@ -1,13 +1,35 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
+import Animated, {
+  Easing,
+  cancelAnimation,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 
 import type { ExerciseTempo } from '@/types/catalog';
 
 const PHASE_LABELS = ['Excêntrica', 'Pausa', 'Concêntrica', 'Pausa'] as const;
 
+export type TempoPhase = 'eccentric' | 'pause_bottom' | 'concentric' | 'pause_top';
+
+const PHASE_INDEX: Record<TempoPhase, number> = {
+  eccentric: 0,
+  pause_bottom: 1,
+  concentric: 2,
+  pause_top: 3,
+};
+
+const PULSE_LOOP_MS = 1500;
+
 interface TempoVisualizerProps {
   tempo?: ExerciseTempo | null;
-  /** Seconds to dwell on each phase for the light progression (dev UX). */
+  /** When provided, pins the highlighted pill to the given phase (no auto-cycle). */
+  activePhase?: TempoPhase | null;
+  /** Auto-cycle dwell per phase when no activePhase is driven externally. */
   cycleMs?: number;
 }
 
@@ -20,10 +42,50 @@ function formatPhaseValue(value: string | number): string {
   return trimmed.toUpperCase();
 }
 
+/** Deterministic 1.5s Matte Gold pulse halo rendered inside the active pill. */
+function PulseHalo() {
+  const pulse = useSharedValue(0);
+
+  useEffect(() => {
+    pulse.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: PULSE_LOOP_MS / 2, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0, { duration: PULSE_LOOP_MS / 2, easing: Easing.inOut(Easing.ease) }),
+      ),
+      -1,
+      false,
+    );
+    return () => cancelAnimation(pulse);
+  }, [pulse]);
+
+  const haloStyle = useAnimatedStyle(() => ({
+    opacity: 0.05 + pulse.value * 0.1,
+  }));
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        haloStyle,
+        {
+          position: 'absolute',
+          top: 0,
+          right: 0,
+          bottom: 0,
+          left: 0,
+          borderRadius: 16,
+          backgroundColor: '#BFA06A',
+        },
+      ]}
+    />
+  );
+}
+
 /**
  * Quiet Luxury tempo — four Matte Gold / Obsidian pills instead of raw `[3,1,X,0]`.
+ * Active phase pill carries a subtle 1.5s Reanimated pulse.
  */
-export function TempoVisualizer({ tempo, cycleMs = 1400 }: TempoVisualizerProps) {
+export function TempoVisualizer({ tempo, activePhase, cycleMs = 1500 }: TempoVisualizerProps) {
   const phases = useMemo(() => {
     if (!tempo || tempo.length < 4) return null;
     return PHASE_LABELS.map((label, index) => ({
@@ -32,17 +94,24 @@ export function TempoVisualizer({ tempo, cycleMs = 1400 }: TempoVisualizerProps)
     }));
   }, [tempo]);
 
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [cycleIndex, setCycleIndex] = useState(0);
+  const externallyDriven = activePhase !== undefined;
 
   useEffect(() => {
-    if (!phases) return;
+    if (!phases || externallyDriven) return;
     const id = setInterval(() => {
-      setActiveIndex((current) => (current + 1) % phases.length);
+      setCycleIndex((current) => (current + 1) % phases.length);
     }, cycleMs);
     return () => clearInterval(id);
-  }, [phases, cycleMs]);
+  }, [phases, cycleMs, externallyDriven]);
 
   if (!phases) return null;
+
+  const activeIndex = externallyDriven
+    ? activePhase != null
+      ? PHASE_INDEX[activePhase]
+      : -1
+    : cycleIndex;
 
   return (
     <View className="gap-2">
@@ -54,13 +123,14 @@ export function TempoVisualizer({ tempo, cycleMs = 1400 }: TempoVisualizerProps)
           const active = index === activeIndex;
           return (
             <View
-              key={phase.label}
-              className={`min-w-[72px] flex-1 rounded-2xl px-3 py-2.5 ${
+              key={`${phase.label}-${index}`}
+              className={`min-w-[72px] flex-1 overflow-hidden rounded-2xl border px-3 py-2.5 ${
                 active
-                  ? 'border border-matte-gold/50 bg-matte-gold/15'
-                  : 'border border-white/8 bg-white/[0.04]'
+                  ? 'border-matte-gold bg-matte-gold/20'
+                  : 'border-white/10 bg-white/5'
               }`}
             >
+              {active ? <PulseHalo /> : null}
               <Text
                 className={`font-body text-[9px] uppercase tracking-[0.2em] ${
                   active ? 'text-matte-gold' : 'text-[#6B7568]'
@@ -79,60 +149,6 @@ export function TempoVisualizer({ tempo, cycleMs = 1400 }: TempoVisualizerProps)
           );
         })}
       </View>
-    </View>
-  );
-}
-
-interface CueGlassCardProps {
-  setup?: string | null;
-  vector?: string | null;
-  catchCue?: string | null;
-}
-
-/**
- * Collapsible glassmorphism cue card — setup / vector / catch.
- */
-export function CueGlassCard({ setup, vector, catchCue }: CueGlassCardProps) {
-  const [expanded, setExpanded] = useState(false);
-  const entries = [
-    setup ? { key: 'setup', label: 'Setup', value: setup } : null,
-    vector ? { key: 'vector', label: 'Vector', value: vector } : null,
-    catchCue ? { key: 'catch', label: 'Catch', value: catchCue } : null,
-  ].filter((entry): entry is { key: string; label: string; value: string } => entry != null);
-
-  if (entries.length === 0) return null;
-
-  return (
-    <View className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
-      <Pressable
-        onPress={() => setExpanded((value) => !value)}
-        accessibilityRole="button"
-        accessibilityState={{ expanded }}
-        className="flex-row items-center justify-between px-4 py-3 active:opacity-80"
-      >
-        <Text className="font-body text-[10px] uppercase tracking-[0.35em] text-matte-gold/80">
-          Cue card
-        </Text>
-        <Text className="font-body text-sm text-matte-gold/70">{expanded ? '−' : '+'}</Text>
-      </Pressable>
-      {expanded ? (
-        <View className="gap-3 border-t border-white/5 px-4 pb-4 pt-3">
-          {entries.map((entry) => (
-            <View key={entry.key}>
-              <Text className="font-body text-[9px] uppercase tracking-[0.3em] text-[#6B7568]">
-                {entry.label}
-              </Text>
-              <Text className="mt-1 font-body text-sm leading-5 text-[#C8CFC4]">{entry.value}</Text>
-            </View>
-          ))}
-        </View>
-      ) : (
-        <View className="px-4 pb-3">
-          <Text className="font-body text-xs leading-5 text-[#8A9488]" numberOfLines={2}>
-            {entries[0]?.value}
-          </Text>
-        </View>
-      )}
     </View>
   );
 }

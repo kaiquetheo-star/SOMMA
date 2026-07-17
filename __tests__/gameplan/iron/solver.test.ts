@@ -172,7 +172,7 @@ describe('solveDaySlots — V8 constraint solver', () => {
     expect(catalog.bySlug.get('machine_shoulder_press')?.selection_score).toBe(1.0);
   });
 
-  it('B: in recovery mode rejects axial squats and selects low-CNS legs work', () => {
+  it('B: high systemic load does not force recovery-mode exercise blocking', () => {
     const catalog = buildExerciseCatalog([BARBELL_BACK_SQUAT, BELT_SQUAT, LEG_EXTENSION]);
     const tracker = createWeeklyVolumeTracker(catalog, [], [], {
       ...initialBiologicalProfile,
@@ -186,19 +186,19 @@ describe('solveDaySlots — V8 constraint solver', () => {
       defaultSets: 3,
     };
 
-    const state = {
-      ...createInitialSolverState(tracker),
-      isRecoveryMode: true,
-    };
-    const { picks } = solveDaySlots('legs', [legSlot], catalog, defaultConstraints(), state, tracker);
+    const { picks } = solveDaySlots(
+      'legs',
+      [legSlot],
+      catalog,
+      defaultConstraints(),
+      createInitialSolverState(tracker),
+      tracker,
+    );
 
-    expect(tracker.isRecoveryMode).toBe(true);
     expect(picks).toHaveLength(1);
     const chosen = catalog.byId.get(picks[0]!.exerciseId);
-    expect(chosen?.slug).not.toBe('barbell_back_squat');
-    expect(['belt_squat', 'leg_extension']).toContain(chosen?.slug);
-    expect(chosen?.cns_fatigue_cost).toBeLessThanOrEqual(2);
-    expect(chosen?.joint_stress_profile).toBe('low_impact');
+    expect(chosen).toBeDefined();
+    expect(picks[0]?.prescribedSets).toBe(3);
   });
 
   it('C: blocks squat and hinge patterns on legs after HIIT', () => {
@@ -295,7 +295,7 @@ describe('solveDaySlots — V8 constraint solver', () => {
     );
 
     expect(prescription.target_weight_kg).toBeCloseTo(20.5, 1);
-    expect(prescription.progression_note).toMatch(/Last logged|RPE/i);
+    expect(prescription.progression_note).toMatch(/Best working set|Hit rep top/i);
   });
 
   it('F: lastLoggedWeightFromPerformanceHistory reads committed session logs', () => {

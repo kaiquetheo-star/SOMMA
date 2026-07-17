@@ -131,7 +131,7 @@ describe('volumeAuthority — weekly MRV integrity', () => {
     expect(chestSets).toBeLessThanOrEqual(pplLimits.maxSetsSession);
   });
 
-  it('applies recoveryVolumeMultiplier 0.7× when tracker is in recovery mode', () => {
+  it('heavy prior-week logs do not shrink prescribed sets via recovery levers', () => {
     const microcycle: MicrocycleDay[] = [
       dayWithExercises(1, 'Iron: Push', [prescription('barbell_bench_press', 10)]),
     ];
@@ -139,11 +139,10 @@ describe('volumeAuthority — weekly MRV integrity', () => {
       preferred_split: 'ppl_x2',
       hormonal_transition: true,
     });
-    expect(tracker.isRecoveryMode).toBe(true);
 
     const enforced = enforceWeeklyAuthority(microcycle, tracker, catalog, 'ppl_x2');
     const sets = enforced[0]?.blocks[0]?.iron?.exercises?.[0]?.target_sets;
-    expect(sets).toBe(7);
+    expect(sets).toBe(10);
   });
 });
 
@@ -174,10 +173,9 @@ describe('loadPrescriptionMapper — Best Working Set + double progression', () 
     expect(best?.reps).toBe(10);
   });
 
-  it('holds load and asks for more reps when RPE ≤ 8 but rep top was missed', () => {
+  it('holds load and asks for more reps when rep top was missed', () => {
     const result = applyDoubleProgression({
       weightKg: 100,
-      rpe: 7,
       bestSetReps: 8,
       targetRepsTop: 10,
     });
@@ -185,10 +183,9 @@ describe('loadPrescriptionMapper — Best Working Set + double progression', () 
     expect(result.note).toMatch(/add reps/i);
   });
 
-  it('applies +2.5% only after hitting DUP rep top at easy RPE', () => {
+  it('applies +2.5% after hitting DUP rep top', () => {
     const result = applyDoubleProgression({
       weightKg: 100,
-      rpe: 7,
       bestSetReps: 10,
       targetRepsTop: 10,
     });

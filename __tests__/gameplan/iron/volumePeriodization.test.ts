@@ -65,7 +65,7 @@ describe('calculateVolumeBudget', () => {
       tactical_role: 'isolation_metabolic',
     });
 
-    const budget = calculateVolumeBudget(cableFly, biological('cutting'), isCompoundExercise(cableFly), 0);
+    const budget = calculateVolumeBudget(cableFly, biological('cutting'), isCompoundExercise(cableFly));
 
     expect(budget).toMatchObject({
       minSets: 5,
@@ -85,7 +85,7 @@ describe('calculateVolumeBudget', () => {
       cns_fatigue_cost: 4,
     });
 
-    const budget = calculateVolumeBudget(benchPress, biological('bulking'), isCompoundExercise(benchPress), 0);
+    const budget = calculateVolumeBudget(benchPress, biological('bulking'), isCompoundExercise(benchPress));
 
     expect(budget).toMatchObject({
       minSets: 4,
@@ -103,7 +103,7 @@ describe('calculateVolumeBudget', () => {
       movement_pattern: 'isolation',
     });
 
-    const budget = calculateVolumeBudget(legExtension, biological('deload'), isCompoundExercise(legExtension), 0);
+    const budget = calculateVolumeBudget(legExtension, biological('deload'), isCompoundExercise(legExtension));
 
     expect(budget).toMatchObject({
       minSets: 2,
@@ -122,7 +122,7 @@ describe('calculateVolumeBudget', () => {
       tactical_role: 'isolation_metabolic',
     });
 
-    const budget = calculateVolumeBudget(lateralRaise, biological('maintenance'), isCompoundExercise(lateralRaise), 0);
+    const budget = calculateVolumeBudget(lateralRaise, biological('maintenance'), isCompoundExercise(lateralRaise));
 
     expect(budget.minSets).toBe(3);
     expect(budget.maxSets).toBe(4);
@@ -132,19 +132,6 @@ describe('calculateVolumeBudget', () => {
   it('forces deload budgets on mesocycle weeks 4 and 6', () => {
     expect(resolveEffectiveMesocyclePhase('cutting', 4)).toBe('deload');
     expect(resolveEffectiveMesocyclePhase('bulking', 6)).toBe('deload');
-  });
-
-  it('reduces volume by 20 percent when CNS fatigue is above 7/10', () => {
-    const cableFly = catalogExercise({
-      slug: 'cable_fly',
-      name: 'Cable Fly',
-      movement_pattern: 'isolation',
-    });
-
-    const budget = calculateVolumeBudget(cableFly, biological('cutting'), isCompoundExercise(cableFly), 80);
-
-    expect(budget.minSets).toBe(4);
-    expect(budget.maxSets).toBe(6);
   });
 
   it('allows higher bulking compound volume for TRT/enhanced profiles', () => {
@@ -165,7 +152,6 @@ describe('calculateVolumeBudget', () => {
         },
       }),
       isCompoundExercise(benchPress),
-      0,
     );
 
     expect(budget).toMatchObject({
@@ -194,7 +180,6 @@ describe('calculateVolumeBudget', () => {
         },
       }),
       isCompoundExercise(cableFly),
-      0,
     );
 
     expect(budget).toMatchObject({

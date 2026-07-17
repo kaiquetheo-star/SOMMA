@@ -1,8 +1,3 @@
-import { clampCnsFatigueProfile } from '@/types/biological';
-import {
-  clampCnsFatigueScore,
-  totalCnsDeltaFromQueue,
-} from '@/lib/gameplan/engine/clinicalLaws';
 import {
   fetchDailyGameplan,
   type GameplanSource,
@@ -16,7 +11,6 @@ export interface LocalRecalibrateResult {
   processedCount: number;
   gameplan: DailyGameplan | null;
   source: GameplanSource | null;
-  cns_fatigue_score: number | null;
 }
 
 export function mergePerformanceLogsWithQueue(
@@ -98,27 +92,17 @@ export async function recalibrateFromPerformanceQueue(
   },
 ): Promise<LocalRecalibrateResult> {
   if (queue.length === 0) {
-    return { processedCount: 0, gameplan: null, source: null, cns_fatigue_score: null };
+    return { processedCount: 0, gameplan: null, source: null };
   }
-
-  const current = clampCnsFatigueProfile(context.biological.cns_fatigue_score);
-  const delta = totalCnsDeltaFromQueue(queue);
-  const cnsFatigueScore =
-    delta === 0 ? current : clampCnsFatigueScore(current + delta);
 
   if (context.recalibrate === false) {
     return {
       processedCount: queue.length,
       gameplan: null,
       source: null,
-      cns_fatigue_score: cnsFatigueScore,
     };
   }
 
-  const biologicalForRecalibrate =
-    cnsFatigueScore != null
-      ? { ...context.biological, cns_fatigue_score: cnsFatigueScore }
-      : context.biological;
   const mergedLogs = mergePerformanceLogsWithQueue(context.performanceLogs, queue);
 
   try {
@@ -126,7 +110,7 @@ export async function recalibrateFromPerformanceQueue(
       focus: context.focus,
       equipment: context.equipment,
       forceRefresh: true,
-      biological: biologicalForRecalibrate,
+      biological: context.biological,
       userStats: context.userStats,
       performanceLogs: mergedLogs,
     });
@@ -135,7 +119,6 @@ export async function recalibrateFromPerformanceQueue(
       processedCount: queue.length,
       gameplan: result.gameplan,
       source: result.source,
-      cns_fatigue_score: cnsFatigueScore,
     };
   } catch (error) {
     console.warn(
@@ -146,7 +129,6 @@ export async function recalibrateFromPerformanceQueue(
       processedCount: queue.length,
       gameplan: null,
       source: 'local',
-      cns_fatigue_score: cnsFatigueScore,
     };
   }
 }

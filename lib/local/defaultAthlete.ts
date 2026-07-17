@@ -32,7 +32,6 @@ export const DEFAULT_LOCAL_BIOLOGICAL: BiologicalProfile = {
   available_time_iron: DEFAULT_AVAILABLE_TIME_IRON,
   iron_mastery: 5,
   frequency_iron: DEFAULT_FREQUENCY_IRON,
-  cns_fatigue_score: 0,
   clinical_exit_interview: null,
   current_body_fat_estimate: null,
 };

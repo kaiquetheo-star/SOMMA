@@ -48,15 +48,14 @@ const SCORE_MASTERY_COMPLEXITY_BONUS = 60;
 const SCORE_REPEAT_COMPOUND_PENALTY = 350;
 const SCORE_CONSECUTIVE_AXIAL_PENALTY = 1000;
 const SCORE_DUP_MATCH_BONUS = 650;
-const SCORE_RECOVERY_LOW_STABILITY_BOOST = 12000;
-const SCORE_RECOVERY_MEDIUM_STABILITY_BOOST = 1500;
-const SCORE_RECOVERY_HIGH_STABILITY_PENALTY = 2500;
-const HIGH_CNS_FATIGUE_SCORE = 70;
 const MAX_DAILY_AXIAL_LOAD = 6;
 const FINISHER_MIN_REMAINING_SECONDS = 5 * 60;
 const MINIMUM_VIABLE_WORKOUT_EXERCISE_COUNT = 2;
-const MINIMUM_VIABLE_WORKOUT_SETS = 2;
+const MINIMUM_VIABLE_WORKOUT_SETS = 3;
 const MINIMUM_FULL_WORKOUT_EXERCISE_COUNT = 4;
+/** Anti-collapse dignity floors — rescue paths never prescribe token 1-2 set compounds. */
+export const MIN_RESCUE_SETS_COMPOUND = 3;
+export const MIN_RESCUE_SETS_ISOLATION = 2;
 const BODYWEIGHT_BLACKLIST = new Set([
   'pull_up',
   'chin_up',
@@ -202,7 +201,6 @@ export function createInitialSolverState(tracker: WeeklyVolumeTracker): SolverSt
     usedExerciseIds: new Set<string>(),
     weeklyVolume: tracker.snapshot,
     synergistLoad,
-    isRecoveryMode: tracker.isRecoveryMode,
     sessionCnsAccum: 0,
     sessionAxialLoad: 0,
     shoulderSets: { anterior: 0, lateral: 0, posterior: 0 },
@@ -518,25 +516,6 @@ function dupFocusBonus(
   return 0;
 }
 
-function isHighFatigueContext(
-  tracker: WeeklyVolumeTracker,
-  state: Pick<SolverState, 'isRecoveryMode'> | undefined,
-  constraints?: Pick<SolverConstraints, 'cns_fatigue_score'>,
-): boolean {
-  return (
-    tracker.isRecoveryMode ||
-    state?.isRecoveryMode === true ||
-    (constraints?.cns_fatigue_score ?? 0) >= HIGH_CNS_FATIGUE_SCORE
-  );
-}
-
-function recoveryStabilityScore(exercise: CatalogExercise): number {
-  if (exercise.stability_demand === 'low') return SCORE_RECOVERY_LOW_STABILITY_BOOST;
-  if (exercise.stability_demand === 'medium') return SCORE_RECOVERY_MEDIUM_STABILITY_BOOST;
-  if (exercise.stability_demand === 'high') return -SCORE_RECOVERY_HIGH_STABILITY_PENALTY;
-  return 0;
-}
-
 function advancedTechniqueAllowed(
   technique: IntensityTechnique | undefined,
   exercise: CatalogExercise,
@@ -580,9 +559,9 @@ export function scoreExerciseCandidate(
   tracker: WeeklyVolumeTracker,
   constraints?: Pick<
     SolverConstraints,
-    'iron_mastery' | 'dailyIronFocus' | 'cns_fatigue_score' | 'calendarDayIndex' | 'biological'
+    'iron_mastery' | 'dailyIronFocus' | 'calendarDayIndex' | 'biological'
   >,
-  state?: Pick<SolverState, 'usedExerciseIds' | 'previousDayHadAxialLoad' | 'previousDayIndex' | 'isRecoveryMode'>,
+  state?: Pick<SolverState, 'usedExerciseIds' | 'previousDayHadAxialLoad' | 'previousDayIndex'>,
   currentDayIndex?: number,
 ): number {
   let score = exercise.selection_score * SCORE_X_FRAME_WEIGHT;
@@ -608,10 +587,6 @@ export function scoreExerciseCandidate(
     ? SCORE_CNS_PENALTY * Math.min(exercise.cns_fatigue_cost, 1)
     : SCORE_CNS_PENALTY * exercise.cns_fatigue_cost;
   score += dupFocusBonus(exercise, constraints);
-
-  if (isHighFatigueContext(tracker, state, constraints)) {
-    score += recoveryStabilityScore(exercise);
-  }
 
   if (state?.usedExerciseIds.has(exercise.id)) {
     score -= SCORE_REPEAT_COMPOUND_PENALTY;
@@ -652,7 +627,7 @@ function solverTechniqueFromBudget(technique: VolumeExecutionTechnique | undefin
 
 function volumeBudgetForExercise(
   exercise: CatalogExercise,
-  constraints: Pick<SolverConstraints, 'mesocycle_phase' | 'mesocycle_week' | 'cns_fatigue_score' | 'biological'>,
+  constraints: Pick<SolverConstraints, 'mesocycle_phase' | 'mesocycle_week' | 'biological'>,
 ): { budget: VolumeBudget; phase: ReturnType<typeof resolveEffectiveMesocyclePhase> } {
   const phase = resolveEffectiveMesocyclePhase(constraints.mesocycle_phase, constraints.mesocycle_week);
   const biological = {
@@ -660,7 +635,6 @@ function volumeBudgetForExercise(
     ...constraints.biological,
     mesocycle_phase: phase,
     mesocycle_week: constraints.mesocycle_week ?? constraints.biological?.mesocycle_week ?? initialBiologicalProfile.mesocycle_week,
-    cns_fatigue_score: constraints.cns_fatigue_score ?? constraints.biological?.cns_fatigue_score ?? initialBiologicalProfile.cns_fatigue_score,
   };
 
   return {
@@ -669,7 +643,6 @@ function volumeBudgetForExercise(
       exercise,
       biological,
       isCompoundExercise(exercise),
-      constraints.cns_fatigue_score ?? 0,
     ),
   };
 }
@@ -677,7 +650,7 @@ function volumeBudgetForExercise(
 export function prescribedSetsForSlot(
   slot: SolverSlot,
   exercise: CatalogExercise,
-  constraints: Pick<SolverConstraints, 'mesocycle_phase' | 'mesocycle_week' | 'cns_fatigue_score' | 'biological'>,
+  constraints: Pick<SolverConstraints, 'mesocycle_phase' | 'mesocycle_week' | 'biological'>,
 ): { prescribedSets: number; budget: VolumeBudget; phase: ReturnType<typeof resolveEffectiveMesocyclePhase> } {
   const requestedSets = Math.max(0, slot.defaultSets);
   const { budget, phase } = volumeBudgetForExercise(exercise, constraints);
@@ -708,10 +681,8 @@ export function collectCandidates(
   tracker: WeeklyVolumeTracker,
   currentDayIndex: number | undefined,
   options: {
-    ignoreCnsBudget?: boolean;
     ignoreMastery?: boolean;
     ignoreMrv?: boolean;
-    ignoreRecoveryMode?: boolean;
     ignoreBodyweightBlacklist?: boolean;
     ignoreJointStress?: boolean;
     armsDedicatedRelaxation?: boolean;
@@ -831,35 +802,10 @@ export function collectCandidates(
       continue;
     }
 
-    // Regra 2.2/2.3: recovery mode blocks spinal stress, while scoring strongly favors stable machines/cables.
-    const relaxArmRecovery =
-      options.armsDedicatedRelaxation && isLowCnsArmIsolation(exercise);
-    if (
-      !options.ignoreRecoveryMode &&
-      !relaxArmRecovery &&
-      isHighFatigueContext(tracker, state, constraints) &&
-      ((exercise.axial_loading ?? 0) >= 3 || isLumbarShearExercise(exercise))
-    ) {
-      logCandidateRejection(slot, exercise, 'recovery/high fatigue bloqueia axial alto/lumbar shear');
-      continue;
-    }
-
     const { prescribedSets: setsToAdd } = prescribedSetsForSlot(slot, exercise, constraints);
     const volumeCheck = tracker.canAddSets(exercise, setsToAdd);
     if (!options.ignoreMrv && volumeCheck.clampedSets <= 0) {
       logCandidateRejection(slot, exercise, volumeCheck.reason ?? 'MRV_HARD atingido');
-      continue;
-    }
-
-    const skipCnsBudget =
-      options.ignoreCnsBudget ||
-      (options.armsDedicatedRelaxation && isLowCnsArmIsolation(exercise));
-    if (!skipCnsBudget && state.sessionCnsAccum + exercise.cns_fatigue_cost > constraints.maxSessionCns) {
-      logCandidateRejection(
-        slot,
-        exercise,
-        `CNS Fatigue Cost muito alto (${state.sessionCnsAccum} + ${exercise.cns_fatigue_cost} > ${constraints.maxSessionCns})`,
-      );
       continue;
     }
 
@@ -981,7 +927,7 @@ function maybeIncreaseExistingLowCnsIsolation(
   picks: SolverResult[],
   catalog: ExerciseCatalog,
   tracker: WeeklyVolumeTracker,
-  constraints: Pick<SolverConstraints, 'mesocycle_phase' | 'mesocycle_week' | 'cns_fatigue_score' | 'biological'>,
+  constraints: Pick<SolverConstraints, 'mesocycle_phase' | 'mesocycle_week' | 'biological'>,
 ): boolean {
   let selectedExercise: CatalogExercise | null = null;
   const candidate = picks.find((pick) => {
@@ -1031,8 +977,13 @@ function pushSolverPick(
     diagnosticReason === 'injury_constraint' ||
     diagnosticReason === 'minimum_viable_path_absolute_last_resort';
   const volumeGate = tracker.canAddSets(exercise, prescribedSets);
+  // Anti-collapse dignity floor: rescue picks keep a real training dose —
+  // compounds never below 3 sets, isolations never below 2 (bounded by prescription).
+  const rescueFloor = exercise.movement_pattern === 'isolation'
+    ? MIN_RESCUE_SETS_ISOLATION
+    : MIN_RESCUE_SETS_COMPOUND;
   const clampedSets = isAbsoluteRescue
-    ? Math.max(1, Math.min(prescribedSets, 2))
+    ? Math.max(1, Math.min(prescribedSets, rescueFloor))
     : Math.min(prescribedSets, volumeGate.clampedSets);
   if (clampedSets <= 0) return;
 
@@ -1213,9 +1164,7 @@ export function solveDaySlots(
     if (!selection) {
       candidates = collectCandidates(day, catalog, slot, constraints, stateForSlot, tracker, currentDayIndex, {
         ...slotCollectOptions,
-        ignoreCnsBudget: true,
         ignoreMrv: true,
-        ignoreRecoveryMode: true,
         armsDedicatedRelaxation: armsRelaxation,
       });
       selection = pickBestCandidate(candidates, tracker, constraints, stateForSlot, currentDayIndex, slot);
@@ -1224,10 +1173,8 @@ export function solveDaySlots(
     if (!selection) {
       const exhaustedCandidates = collectCandidates(day, catalog, slot, constraints, stateForSlot, tracker, currentDayIndex, {
         ...slotCollectOptions,
-        ignoreCnsBudget: true,
         ignoreMastery: true,
         ignoreMrv: true,
-        ignoreRecoveryMode: true,
         ignoreBodyweightBlacklist: true,
         ignoreJointStress: true,
         armsDedicatedRelaxation: true,
@@ -1273,7 +1220,6 @@ export function solveDaySlots(
         selectedExercises: mutableState.selectedExercises,
         sessionCnsAccum: mutableState.sessionCnsAccum,
         sessionAxialLoad: mutableState.sessionAxialLoad,
-        isRecoveryMode: false,
       };
       const candidates = collectCandidates(
         day,
@@ -1284,9 +1230,7 @@ export function solveDaySlots(
         tracker,
         currentDayIndex,
         {
-          ignoreCnsBudget: true,
           ignoreMrv: true,
-          ignoreRecoveryMode: true,
           allowSameSlotCategoryDifferentConcept: isRepeatedSlotInstance(deloadSlot),
           daySlotConfig,
         },
@@ -1328,10 +1272,8 @@ export function solveDaySlots(
         sessionAxialLoad: mutableState.sessionAxialLoad,
       };
       const candidates = collectCandidates(day, catalog, fallbackSlot, constraints, stateForSlot, tracker, currentDayIndex, {
-        ignoreCnsBudget: true,
         ignoreMastery: true,
         ignoreMrv: true,
-        ignoreRecoveryMode: true,
         ignoreBodyweightBlacklist: true,
         allowSameSlotCategoryDifferentConcept: isRepeatedSlotInstance(fallbackSlot),
         daySlotConfig,
@@ -1420,7 +1362,6 @@ export function solveDaySlots(
       shoulderSets: mutableState.shoulderSets,
       previousDayIndex: currentDayIndex ?? initialState.previousDayIndex,
       previousDayHadAxialLoad: mutableState.dayHadAxialLoad,
-      isRecoveryMode: tracker.isRecoveryMode || initialState.isRecoveryMode,
     },
   };
 }

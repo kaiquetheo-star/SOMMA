@@ -20,7 +20,6 @@ const mockBiological: UserBiological = {
   training_days_per_week: 5,
   available_time_iron: 90,
   frequency_iron: 5,
-  cns_fatigue_score: 0,
   current_body_fat_estimate: 18,
   hormonal_transition: false,
   mesocycle_phase: 'bulking',
@@ -80,7 +79,7 @@ describe('Hormonal Profile Volume Budget', () => {
     expect(benchPress).toBeDefined();
     if (!benchPress) return;
 
-    const budget = calculateVolumeBudget(benchPress, biological, true, 0);
+    const budget = calculateVolumeBudget(benchPress, biological, true);
 
     expect(budget.maxSets).toBe(6);
   });
@@ -99,7 +98,7 @@ describe('Hormonal Profile Volume Budget', () => {
     expect(benchPress).toBeDefined();
     if (!benchPress) return;
 
-    const budget = calculateVolumeBudget(benchPress, biological, true, 0);
+    const budget = calculateVolumeBudget(benchPress, biological, true);
 
     expect(budget.maxSets).toBeLessThanOrEqual(5);
   });

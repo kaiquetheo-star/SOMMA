@@ -9,10 +9,6 @@ export default function WorkoutLayout() {
         animation: 'fade_from_bottom',
       }}
     >
-      <Stack.Screen
-        name="daily_scan"
-        options={{ gestureEnabled: false, animation: 'fade' }}
-      />
       <Stack.Screen name="iron" />
       <Stack.Screen
         name="ascension"

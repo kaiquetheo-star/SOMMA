@@ -1,4 +1,4 @@
-import type { PreferredSplit } from '@/types/biological';
+import type { PreferredSplit, UserBiological } from '@/types/biological';
 import { normalizePreferredSplit } from '@/types/biological';
 
 /**
@@ -18,8 +18,6 @@ export interface VolumeMatrixRow {
   maxSetsSession: number;
   synergistFractionDefault: number;
   synergistFractionDayFocus: number;
-  /** Recovery mode scales prescribed volume (wired in Phase 4). */
-  recoveryVolumeMultiplier: number;
 }
 
 export const VOLUME_MATRIX: Record<SplitFrequencyClass, VolumeMatrixRow> = {
@@ -31,7 +29,6 @@ export const VOLUME_MATRIX: Record<SplitFrequencyClass, VolumeMatrixRow> = {
     maxSetsSession: 16,
     synergistFractionDefault: 0.5,
     synergistFractionDayFocus: 1.0,
-    recoveryVolumeMultiplier: 0.7,
   },
   twice_per_week: {
     mev: 10,
@@ -40,7 +37,6 @@ export const VOLUME_MATRIX: Record<SplitFrequencyClass, VolumeMatrixRow> = {
     maxSetsSession: 12,
     synergistFractionDefault: 0.5,
     synergistFractionDayFocus: 0.5,
-    recoveryVolumeMultiplier: 0.7,
   },
 };
 
@@ -78,14 +74,27 @@ export function resolveVolumeMatrix(
   return VOLUME_MATRIX[resolveSplitFrequencyClass(preferredSplit)];
 }
 
+function hormonalMrvBoost(
+  biological: Pick<UserBiological, 'hormonal_protocol' | 'hormonal_transition'> | null | undefined,
+): { softScale: number; hardScale: number } {
+  const trt = biological?.hormonal_protocol?.type === 'trt';
+  const transition = biological?.hormonal_transition === true;
+  if (!trt && !transition) {
+    return { softScale: 1, hardScale: 1 };
+  }
+  return { softScale: 1.2, hardScale: 1.15 };
+}
+
 export function resolveVolumeLimitsForSplit(
   preferredSplit: PreferredSplit | string | null | undefined,
+  biological?: Pick<UserBiological, 'hormonal_protocol' | 'hormonal_transition'> | null,
 ): VolumeLimits {
   const row = resolveVolumeMatrix(preferredSplit);
+  const boost = hormonalMrvBoost(biological);
   return {
     mev: row.mev,
-    mrvSoft: row.mrvSoft,
-    mrvHard: row.mrvHard,
+    mrvSoft: Math.round(row.mrvSoft * boost.softScale),
+    mrvHard: Math.round(row.mrvHard * boost.hardScale),
     maxSetsSession: row.maxSetsSession,
   };
 }
@@ -119,15 +128,4 @@ export function defaultVolumeCreditContext(
     frequencyClass: resolveSplitFrequencyClass(preferredSplit),
     dayFocusMuscles: new Set(),
   };
-}
-
-/** ACWR / hormonal recovery — −30% effective sets (RP deload band). Split-agnostic scale. */
-export function applyRecoveryVolumeMultiplier(
-  sets: number,
-  isRecoveryMode: boolean,
-  preferredSplit: PreferredSplit | string | null | undefined = null,
-): number {
-  if (!isRecoveryMode || sets <= 0) return sets;
-  const multiplier = resolveVolumeMatrix(preferredSplit).recoveryVolumeMultiplier;
-  return Math.max(1, Math.round(sets * multiplier));
 }

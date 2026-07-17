@@ -11,7 +11,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ConsistencyCalendar } from '@/components/analytics/ConsistencyCalendar';
-import { LoadTelemetryStrip } from '@/components/iron/LoadTelemetryStrip';
 import { BiologicalPassportSummary } from '@/components/analytics/BiologicalPassportSummary';
 import { BiologicalPassportForm } from '@/components/foundation/BiologicalPassportForm';
 import { DamageControlToggle } from '@/components/sanctuary/DamageControlToggle';
@@ -113,12 +112,6 @@ export default function AnalyticsScreen() {
             <ConsistencyCalendar
               performanceLogs={performanceLogs}
               weeklyMicrocycle={weeklyMicrocycle}
-            />
-
-            <LoadTelemetryStrip
-              performanceLogs={performanceLogs}
-              goalIron={draft.goal_iron ?? storedBiological.goal_iron}
-              variant="detail"
             />
 
             <DamageControlToggle

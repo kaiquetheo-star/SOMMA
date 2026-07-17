@@ -72,7 +72,6 @@ function biological(overrides: Partial<BiologicalProfile> = {}): BiologicalProfi
     available_time_iron: 90,
     experience_level: 'ADVANCED',
     iron_mastery: 5,
-    cns_fatigue_score: 0,
     hormonal_transition: false,
     ...overrides,
   };
@@ -218,7 +217,7 @@ describe('real user journey simulation', () => {
     }
   });
 
-  it('Scenario B: O Usuário Fatigado deloads sets without deleting the Legs day', async () => {
+  it('Scenario B: heavy prior logs do not auto-deload the next prescription', async () => {
     const baseline = await generate();
     const logs = highFatigueLogs(
       baseline.microcycle.filter((day) => day.day_index === 1 || day.day_index === 2),
@@ -227,21 +226,17 @@ describe('real user journey simulation', () => {
     const catalog = buildExerciseCatalog(await fetchLibraryExercises());
     const flatLogs = flattenPerformanceLogs(logs);
     const tracker = createWeeklyVolumeTracker(catalog, flatLogs, flatLogs, biological());
-    expect(tracker.isRecoveryMode).toBe(true);
 
     const fatigued = await generate({
       performanceLogs: logs,
-      profile: { baseline_stress_level: 8, cns_fatigue_score: 85 },
+      profile: { baseline_stress_level: 8 },
     });
     const legs = fatigued.microcycle.find((day) => day.day_index === 2);
     const legsExercises = ironExercises(legs);
-    const longevity = legs?.blocks.find((block) => block.pillar === 'longevity');
 
+    expect(tracker.snapshot.mrvHard).toBeGreaterThan(0);
     expect(legsExercises.length).toBeGreaterThanOrEqual(3);
-    expect(legsExercises.some((exercise) => exercise.target_sets <= 3)).toBe(true);
-    expect(
-      `${longevity?.longevity?.mobility_focus ?? ''} ${longevity?.longevity?.cardio_prescription ?? ''}`,
-    ).toMatch(/Mobilidade|Zona 2|Caminhada/i);
+    expect(legsExercises.every((exercise) => exercise.target_sets >= 2)).toBe(true);
   });
 
   it('Scenario C: Consistência e Estado completes workouts and feeds progression logs', async () => {

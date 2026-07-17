@@ -38,7 +38,6 @@ const biologicalProfile: BiologicalProfile = {
   available_time_iron: 90,
   experience_level: 'advanced',
   iron_mastery: 5,
-  cns_fatigue_score: 0,
   hormonal_transition: false,
 };
 

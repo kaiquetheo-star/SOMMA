@@ -19,3 +19,18 @@ export async function hapticPhaseChange(): Promise<void> {
 export async function hapticRoundEnd(): Promise<void> {
   await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
 }
+
+/** Subtle tap for every stepper / secondary button press. */
+export async function hapticButtonTap(): Promise<void> {
+  await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+}
+
+/** Rest period begins — medium impact grounds the transition. */
+export async function hapticRestStart(): Promise<void> {
+  await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+}
+
+/** 10 seconds remaining — light nudge back toward the bar. */
+export async function hapticRestWarning(): Promise<void> {
+  await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+}

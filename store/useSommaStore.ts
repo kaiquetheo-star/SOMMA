@@ -13,7 +13,7 @@ import {
 import { applyReadinessAutoregulationToMicrocycle } from '@/lib/gameplan/engine/clinicalLaws';
 import { fetchDailyGameplan } from '@/lib/gameplan/fetchDailyGameplan';
 import { isGameplanFetchError } from '@/lib/gameplan/gameplanErrors';
-import { isProtocolDateStale } from '@/lib/gameplan/generateStubGameplan';
+import { isProtocolDateStale } from '@/lib/gameplan/protocolFreshness';
 import {
     isDegenerateMicrocycle,
     sanitizeMicrocycleIronVolume,
@@ -349,21 +349,18 @@ interface SommaState {
   protocolGeneratedAt: string | null;
   /** Active day in the strip (1 = Monday … 7 = Sunday) */
   selectedDayIndex: number;
-  /** Daily readiness scan (Clinical Law II) — calendar date when last completed */
+  /** Legacy optional readiness journal data; never gates or changes prescriptions. */
   readinessScanDate: string | null;
   subjectiveReadiness: number | null;
   readinessScan: ReadinessScan | null;
   biometricCheckpoints: BiometricCheckpoint[];
-  showReadinessModal: boolean;
   adaptationLogs: AdaptationLogEntry[];
   damageControlActiveDates: string[];
   setSelectedDayIndex: (dayIndex: number) => void;
   toggleDamageControlDate: (date: string) => void;
-  needsDailyReadinessScan: () => boolean;
   applySubjectiveReadiness: (score: number) => void;
   submitReadinessScan: (scan: ReadinessScan) => void;
   submitBiometricCheckpoint: (checkpoint: BiometricCheckpoint) => void;
-  setShowReadinessModal: (show: boolean) => void;
   performance_logs: PerformanceLogEntry[];
   performanceQueue: PerformanceQueueItem[];
   pendingSession: IronSessionLog | null;
@@ -435,7 +432,6 @@ export const useSommaStore = create<SommaState>()(
       subjectiveReadiness: null,
       readinessScan: null,
       biometricCheckpoints: [],
-      showReadinessModal: false,
       adaptationLogs: [],
       damageControlActiveDates: [],
       performance_logs: [],
@@ -482,12 +478,6 @@ export const useSommaStore = create<SommaState>()(
           };
         }),
 
-      needsDailyReadinessScan: () => {
-        const state = get();
-        const today = new Date().toISOString().slice(0, 10);
-        return state.readinessScanDate !== today;
-      },
-
       applySubjectiveReadiness: (score) => {
         const clamped = Math.min(10, Math.max(1, Math.round(score)));
         const today = new Date().toISOString().slice(0, 10);
@@ -514,7 +504,6 @@ export const useSommaStore = create<SommaState>()(
           readinessScan: scan,
           subjectiveReadiness: computeReadinessScore(scan),
           readinessScanDate: today,
-          showReadinessModal: false,
         }));
       },
 
@@ -525,8 +514,6 @@ export const useSommaStore = create<SommaState>()(
           ),
         }));
       },
-
-      setShowReadinessModal: (show) => set({ showReadinessModal: show }),
 
       clearGameplanError: () => set({ gameplan_error: null }),
 
@@ -686,13 +673,6 @@ export const useSommaStore = create<SommaState>()(
             const previousMicrocycle = get().weeklyMicrocycle;
             const patch: Partial<SommaState> = { performanceQueue: [] };
 
-            if (result.cns_fatigue_score != null) {
-              patch.user_biological = {
-                ...get().user_biological,
-                cns_fatigue_score: result.cns_fatigue_score,
-              };
-            }
-
             if (result.gameplan) {
               const mergedMicrocycle = mergeBlockStatuses(
                 result.gameplan.microcycle,
@@ -790,12 +770,6 @@ export const useSommaStore = create<SommaState>()(
                 ),
                 performanceQueue: get().performanceQueue.filter((item) => !processedQueueIds.has(item.id)),
               };
-              if (result.cns_fatigue_score != null) {
-                patch.user_biological = {
-                  ...get().user_biological,
-                  cns_fatigue_score: result.cns_fatigue_score,
-                };
-              }
               set(patch);
               return;
             }
@@ -804,12 +778,6 @@ export const useSommaStore = create<SommaState>()(
               const patch: Partial<SommaState> = {
                 performanceQueue: get().performanceQueue.filter((item) => !processedQueueIds.has(item.id)),
               };
-              if (result.cns_fatigue_score != null) {
-                patch.user_biological = {
-                  ...get().user_biological,
-                  cns_fatigue_score: result.cns_fatigue_score,
-                };
-              }
               set(patch);
             }
           }
@@ -881,7 +849,6 @@ export const useSommaStore = create<SommaState>()(
           subjectiveReadiness: null,
           readinessScan: null,
           biometricCheckpoints: [],
-          showReadinessModal: false,
           adaptationLogs: [],
           damageControlActiveDates: [],
           performance_logs: [],
@@ -947,7 +914,6 @@ export const useSommaStore = create<SommaState>()(
         subjectiveReadiness: state.subjectiveReadiness,
         readinessScan: state.readinessScan,
         biometricCheckpoints: state.biometricCheckpoints,
-        showReadinessModal: state.showReadinessModal,
         adaptationLogs: state.adaptationLogs,
         damageControlActiveDates: state.damageControlActiveDates,
         performance_logs: state.performance_logs,
@@ -966,6 +932,9 @@ export const useSommaStore = create<SommaState>()(
         if (!state.user_biological) {
           state.user_biological = withFixedBiologicalProfile(initialBiologicalProfile);
         } else {
+          // Migration: cns_fatigue_score was removed from the schema (linear motor,
+          // no fatigue punishment) — strip it from states persisted by older builds.
+          delete (state.user_biological as unknown as Record<string, unknown>).cns_fatigue_score;
           state.user_biological = withFixedBiologicalProfile({
             ...state.user_biological,
             ...normalizeBodyFatFields({

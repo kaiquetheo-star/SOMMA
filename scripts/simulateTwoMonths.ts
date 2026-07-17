@@ -55,7 +55,6 @@ const mockBiological: SimulationBiological = {
   goal_iron: 'Hypertrophy',
   nutrition_goal: 'Hypertrophy support',
   iron_mastery: 5,
-  cns_fatigue_score: 0,
   clinical_exit_interview: null,
   hormonal_transition: false,
 };
@@ -143,7 +142,6 @@ function biologicalForWeek(week: number): BiologicalProfile {
   return {
     ...biological,
     baseline_stress_level: fatigueWeek ? 8 : week === 6 ? 6 : 3,
-    cns_fatigue_score: fatigueWeek ? 82 : week === 6 ? 45 : 0,
   };
 }
 

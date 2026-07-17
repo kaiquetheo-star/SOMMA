@@ -126,70 +126,29 @@ export function findBestWorkingSet(
   return null;
 }
 
-function lastReportedRpe(
-  logs: readonly EnginePerformanceRow[],
-  exerciseId: string,
-  exerciseSlug: string,
-  bestSet: BestWorkingSet | null,
-): number | null {
-  if (bestSet?.reportedRpe != null) return bestSet.reportedRpe;
-
-  const lastLog = findLastLogForExercise(logs, exerciseId, exerciseSlug);
-  if (!lastLog) return null;
-
-  if (lastLog.rpe_score != null && Number.isFinite(lastLog.rpe_score)) {
-    return lastLog.rpe_score;
-  }
-
-  const sets = lastLog.payload?.iron?.sets;
-  if (!sets?.length) return null;
-
-  for (let i = sets.length - 1; i >= 0; i -= 1) {
-    const set = sets[i];
-    const rpe = set ? effectiveRpeFromSet(set) : null;
-    if (rpe != null && Number.isFinite(rpe)) return rpe;
-  }
-
-  return null;
-}
-
 /**
- * Double progression + RPE gate.
- * RPE ≥ 9 → −5% load.
- * RPE ≤ 8 → +2.5% load ONLY if reps hit DUP top; otherwise hold load and add reps.
+ * Double progression — hit rep top → +2.5% load; otherwise hold load and chase reps.
  */
 export function applyDoubleProgression(input: {
   weightKg: number;
-  rpe: number | null;
   bestSetReps: number;
   targetRepsTop: number;
 }): { weight: number; targetReps: number; note: string } {
-  const { weightKg, rpe, bestSetReps, targetRepsTop } = input;
+  const { weightKg, bestSetReps, targetRepsTop } = input;
 
-  if (rpe != null && rpe >= 9) {
+  if (bestSetReps >= targetRepsTop) {
     return {
-      weight: Math.round(weightKg * 0.95 * 10) / 10,
+      weight: Math.round(weightKg * 1.025 * 10) / 10,
       targetReps: targetRepsTop,
-      note: 'RPE ≥9 — −5% load (deload)',
+      note: 'Hit rep top — +2.5% load',
     };
   }
 
-  if (rpe != null && rpe <= 8) {
-    if (bestSetReps >= targetRepsTop) {
-      return {
-        weight: Math.round(weightKg * 1.025 * 10) / 10,
-        targetReps: targetRepsTop,
-        note: 'RPE ≤8 and hit rep top — +2.5% load',
-      };
-    }
-    return {
-      weight: weightKg,
-      targetReps: targetRepsTop,
-      note: `RPE ≤8 but reps ${bestSetReps}/${targetRepsTop} — add reps before load`,
-    };
-  }
-
-  return { weight: weightKg, targetReps: targetRepsTop, note: '' };
+  return {
+    weight: weightKg,
+    targetReps: targetRepsTop,
+    note: `Reps ${bestSetReps}/${targetRepsTop} — add reps before load`,
+  };
 }
 
 function repRangeForExercise(exercise: CatalogExercise, _prescribedSets: number): {
@@ -281,10 +240,8 @@ export function mapToIronPrescription(
     targetWeight = Math.round(bestSet.weightKg * 10) / 10;
     notes.push(`Best working set ${targetWeight} kg × ${bestSet.reps} — calibrate @ ${targetRir} RIR`);
 
-    const lastRpe = lastReportedRpe(recentLogs, exercise.id, exercise.slug, bestSet);
     const progressed = applyDoubleProgression({
       weightKg: targetWeight,
-      rpe: lastRpe,
       bestSetReps: bestSet.reps,
       targetRepsTop: hi,
     });

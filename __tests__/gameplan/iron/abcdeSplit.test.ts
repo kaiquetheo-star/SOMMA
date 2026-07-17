@@ -23,7 +23,6 @@ const userBiological: UserBiological = {
   available_time_iron: 90,
   iron_mastery: 5,
   frequency_iron: 5,
-  cns_fatigue_score: 0,
   preferred_split: 'abcde',
   clinical_exit_interview: null,
   current_body_fat_estimate: 18,

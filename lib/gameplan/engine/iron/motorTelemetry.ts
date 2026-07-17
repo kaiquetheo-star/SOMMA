@@ -2,7 +2,6 @@
  * Dev-only motor telemetry — never fires in production builds.
  */
 import type { DeloadSource } from '@/lib/gameplan/engine/iron/volumePeriodization';
-import type { RecoveryLeverId } from '@/lib/gameplan/engine/iron/recoveryComposition';
 import type { AdaptationLogEntry } from '@/lib/gameplan/engine/adaptiveStateMachine';
 import type { IronDayBlock } from '@/lib/gameplan/engine/iron/generateIronMicrocycle';
 import type { MicrocycleDay } from '@/types/gameplan';
@@ -11,7 +10,6 @@ const isMotorTelemetryEnabled =
   (typeof __DEV__ !== 'undefined' && __DEV__) || process.env.NODE_ENV !== 'production';
 
 export interface MotorTelemetrySnapshot {
-  recovery_levers_fired: readonly RecoveryLeverId[];
   deload_source: DeloadSource | 'none';
   mvp_fallbacks_triggered: boolean;
   mvp_fallback_count: number;
@@ -19,26 +17,11 @@ export interface MotorTelemetrySnapshot {
 }
 
 export interface MotorTelemetryInput {
-  recoveryLevers?: {
-    acwr?: boolean;
-    readiness?: boolean;
-    rpe?: boolean;
-    mapper?: boolean;
-    injector?: boolean;
-  };
   deloadSource?: DeloadSource | null;
   microcycle?: readonly MicrocycleDay[];
   ironDayBlocks?: readonly IronDayBlock[];
   adaptationLogs?: readonly AdaptationLogEntry[];
 }
-
-const LEVER_ORDER: readonly RecoveryLeverId[] = [
-  'acwr',
-  'readiness',
-  'rpe',
-  'mapper',
-  'injector',
-];
 
 function collectMvpFallbackCount(
   microcycle: readonly MicrocycleDay[] | undefined,
@@ -85,12 +68,9 @@ function collectCoherenceFailures(ironDayBlocks: readonly IronDayBlock[] | undef
 }
 
 export function collectMotorTelemetry(input: MotorTelemetryInput): MotorTelemetrySnapshot {
-  const levers = input.recoveryLevers ?? {};
-  const recovery_levers_fired = LEVER_ORDER.filter((lever) => levers[lever] === true);
   const mvp_fallback_count = collectMvpFallbackCount(input.microcycle, input.ironDayBlocks);
 
   return {
-    recovery_levers_fired,
     deload_source: input.deloadSource ?? 'none',
     mvp_fallbacks_triggered: mvp_fallback_count > 0,
     mvp_fallback_count,
@@ -98,16 +78,10 @@ export function collectMotorTelemetry(input: MotorTelemetryInput): MotorTelemetr
   };
 }
 
-function formatLevers(levers: readonly RecoveryLeverId[]): string {
-  if (levers.length === 0) return 'none';
-  return levers.map((lever) => lever.toUpperCase()).join(', ');
-}
-
 /** Elegant console summary — no-op outside __DEV__. */
 export function logMotorTelemetry(snapshot: MotorTelemetrySnapshot): void {
   if (!isMotorTelemetryEnabled) return;
 
-  const levers = formatLevers(snapshot.recovery_levers_fired);
   const deload = snapshot.deload_source === null ? 'none' : snapshot.deload_source;
   const mvp = snapshot.mvp_fallbacks_triggered
     ? `true (${snapshot.mvp_fallback_count})`
@@ -117,7 +91,7 @@ export function logMotorTelemetry(snapshot: MotorTelemetrySnapshot): void {
 
   // eslint-disable-next-line no-console
   console.log(
-    `[SOMMA MOTOR] 🧠 Prescrição gerada | Levers: ${levers} | Deload: ${deload} | MVP: ${mvp}${coherence}`,
+    `[SOMMA MOTOR] 🧠 Prescrição gerada | Deload: ${deload} | MVP: ${mvp}${coherence}`,
   );
 }
 

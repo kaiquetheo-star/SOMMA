@@ -1,4 +1,3 @@
-import { effectiveRpeFromSet } from '@/lib/physics/loadTelemetry';
 import type { BiologicalProfile } from '@/types/biological';
 import type { IronExercisePrescription, MicrocycleDay } from '@/types/gameplan';
 import type { PerformanceLogEntry } from '@/types/performance';
@@ -75,20 +74,6 @@ function hasStagnantStrength(logs21d: PerformanceLogEntry[]): boolean {
   const priorWorkload = prior14d.reduce((sum, session) => sum + computeWorkoutWorkload(session), 0);
 
   return recentWorkload > 0 && recentWorkload <= priorWorkload;
-}
-
-function hasHighRpeSpike(logs7d: PerformanceLogEntry[]): boolean {
-  for (const entry of logs7d) {
-    for (const exercise of ironExercisesFromPerformanceLog(entry)) {
-      for (const set of exercise.sets) {
-        const rpe = effectiveRpeFromSet(set);
-        if (rpe !== null && rpe > 9) {
-          return true;
-        }
-      }
-    }
-  }
-  return false;
 }
 
 function deriveReadinessScore(scan: ReadinessScan): number {
@@ -214,51 +199,6 @@ function applyCyclePhaseVolumeMultiplier(
   return updated;
 }
 
-function applyHighRpeVolumeReduction(
-  microcycle: MicrocycleDay[],
-  logs7d: PerformanceLogEntry[],
-  logs: AdaptationLogEntry[],
-): MicrocycleDay[] {
-  if (!hasHighRpeSpike(logs7d)) return microcycle;
-
-  // Volume cut deferred to recoveryComposition (additive policy) via detectHighRpeVolumeLever.
-  logs.push({
-    timestamp: new Date().toISOString(),
-    rule_triggered: 'rpe_over_9',
-    action_taken: 'defer_volume_to_recovery_composition',
-    details: {
-      sessions_reviewed: logs7d.length,
-      volume_penalty: 0.2,
-    },
-  });
-
-  return microcycle;
-}
-
-function applyReadinessScanAdaptation(
-  microcycle: MicrocycleDay[],
-  readinessScan: ReadinessScan | undefined,
-  logs: AdaptationLogEntry[],
-): MicrocycleDay[] {
-  if (!readinessScan) return microcycle;
-
-  const score = deriveReadinessScore(readinessScan);
-  if (score >= 2.5) return microcycle;
-
-  // Volume cut deferred to recoveryComposition (additive policy) via detectReadinessVolumeLever.
-  logs.push({
-    timestamp: new Date().toISOString(),
-    rule_triggered: 'low_readiness',
-    action_taken: 'defer_volume_to_recovery_composition',
-    details: {
-      readiness_score: Number(score.toFixed(2)),
-      volume_penalty: 0.3,
-    },
-  });
-
-  return microcycle;
-}
-
 function applyBiometricNutritionAdaptation(
   microcycle: MicrocycleDay[],
   biometricCheckpoints: BiometricCheckpoint[] | undefined,
@@ -353,8 +293,6 @@ export async function adaptGameplan(
   let adapted = microcycle;
 
   adapted = applyCyclePhaseVolumeMultiplier(adapted, input.biological, adaptationLogs);
-  adapted = applyReadinessScanAdaptation(adapted, input.readinessScan, adaptationLogs);
-  adapted = applyHighRpeVolumeReduction(adapted, input.logs7d, adaptationLogs);
   adapted = applyExerciseRotation(adapted, input.logs21d, adaptationLogs);
   adapted = applyBiometricNutritionAdaptation(adapted, input.biometricCheckpoints, adaptationLogs);
   adapted = applyBlacklistSafeGuards(adapted, adaptationLogs);
@@ -364,17 +302,6 @@ export async function adaptGameplan(
 
 export function computeReadinessScore(scan: ReadinessScan): number {
   return deriveReadinessScore(scan);
-}
-
-/** True when ASM readiness lever should cut volume (−30% in composition). */
-export function detectReadinessVolumeLever(readinessScan: ReadinessScan | undefined): boolean {
-  if (!readinessScan) return false;
-  return deriveReadinessScore(readinessScan) < 2.5;
-}
-
-/** True when ASM high-RPE lever should cut volume (−20% in composition). */
-export function detectHighRpeVolumeLever(logs7d: PerformanceLogEntry[]): boolean {
-  return hasHighRpeSpike(logs7d);
 }
 
 export { isWeightStable };

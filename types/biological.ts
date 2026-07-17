@@ -45,8 +45,6 @@ export interface BiologicalProfile {
   iron_mastery: 1 | 2 | 3 | 4 | 5 | null;
   /** Iron blocks per 7-day microcycle (0–7) */
   frequency_iron: number | null;
-  /** Rolling CNS fatigue 0–100 from performance sync */
-  cns_fatigue_score: number | null;
   /** Annual macro phase for Iron volume periodization. */
   mesocycle_phase?: MesocyclePhase | null;
   /** Current mesocycle week (1–6). Weeks 4/6 force deload volume. */
@@ -105,7 +103,6 @@ export const initialBiologicalProfile: BiologicalProfile = {
   available_time_iron: DEFAULT_AVAILABLE_TIME_IRON,
   iron_mastery: 5,
   frequency_iron: DEFAULT_FREQUENCY_IRON,
-  cns_fatigue_score: 0,
   mesocycle_phase: 'maintenance',
   mesocycle_week: 1,
   mesocycle_goal: 'hypertrophy',
@@ -175,7 +172,6 @@ export function withFixedBiologicalProfile(
     frequency_iron: profile?.frequency_iron ?? trainingDays,
     experience_level: profile?.experience_level ?? initialBiologicalProfile.experience_level,
     iron_mastery: profile?.iron_mastery ?? initialBiologicalProfile.iron_mastery,
-    cns_fatigue_score: profile?.cns_fatigue_score ?? initialBiologicalProfile.cns_fatigue_score,
     mesocycle_phase: profile?.mesocycle_phase ?? initialBiologicalProfile.mesocycle_phase,
     mesocycle_week: profile?.mesocycle_week ?? initialBiologicalProfile.mesocycle_week,
     mesocycle_goal: profile?.mesocycle_goal ?? initialBiologicalProfile.mesocycle_goal,
@@ -212,11 +208,6 @@ export function normalizeBodyFatFields(
     body_fat_percentage: unified,
     current_body_fat_estimate: unified,
   };
-}
-
-export function clampCnsFatigueProfile(value: number | null | undefined): number {
-  if (value == null || !Number.isFinite(value)) return 0;
-  return Math.min(100, Math.max(0, Math.round(value * 10) / 10));
 }
 
 export function clampPillarTimeMinutes(

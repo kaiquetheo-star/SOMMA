@@ -5,7 +5,7 @@ import { generateDeterministicGameplan } from '@/lib/gameplan/engine/generateDet
 import { buildExerciseCatalog } from '@/lib/gameplan/engine/iron/catalog/ExerciseCatalog';
 import { mapToIronPrescription } from '@/lib/gameplan/engine/iron/loadPrescriptionMapper';
 import {
-  applyRecoveryVolumeMultiplier,
+  resolveVolumeLimitsForSplit,
   resolveVolumeMatrix,
   VOLUME_MATRIX,
 } from '@/lib/gameplan/engine/iron/volumeMatrix';
@@ -33,7 +33,6 @@ const abcdeBiological: UserBiological = {
   available_time_iron: 90,
   iron_mastery: 5,
   frequency_iron: 5,
-  cns_fatigue_score: 0,
   mesocycle_phase: 'bulking',
   mesocycle_week: 1,
   preferred_split: 'abcde',
@@ -154,17 +153,20 @@ describe('Physiological validation — Iron engine', () => {
 
       const pushChestSets = pushWeeklyChestSets(gameplan.microcycle);
       expect(pushChestSets).toBeGreaterThanOrEqual(4);
-      expect(pushChestSets).toBeLessThanOrEqual(VOLUME_MATRIX.twice_per_week.mrvSoft);
+      // Authority only prunes past MRV_HARD; soft is a scoring zone. Dignity floors
+      // (compound ≥3 / isolation ≥2) may leave volume between soft and hard.
+      expect(pushChestSets).toBeLessThanOrEqual(VOLUME_MATRIX.twice_per_week.mrvHard);
     });
   });
 
-  describe('Recovery volume multiplier (Phase 4 matrix)', () => {
-    it('reduz volume em 30% independente do split', () => {
-      expect(resolveVolumeMatrix('abcde').recoveryVolumeMultiplier).toBe(0.7);
-      expect(resolveVolumeMatrix('ppl_x2').recoveryVolumeMultiplier).toBe(0.7);
-      expect(applyRecoveryVolumeMultiplier(10, true, 'abcde')).toBe(7);
-      expect(applyRecoveryVolumeMultiplier(10, true, 'ppl_x2')).toBe(7);
-      expect(applyRecoveryVolumeMultiplier(10, false, 'abcde')).toBe(10);
+  describe('Hormonal MRV boost (TRT / transition)', () => {
+    it('raises MRV_SOFT and MRV_HARD for TRT without cutting volume', () => {
+      const natural = resolveVolumeLimitsForSplit('abcde');
+      const trt = resolveVolumeLimitsForSplit('abcde', {
+        hormonal_protocol: { type: 'trt', weekly_dose_mg: 200, recovery_multiplier: 1.5 },
+      });
+      expect(trt.mrvSoft).toBe(Math.round(natural.mrvSoft * 1.2));
+      expect(trt.mrvHard).toBe(Math.round(natural.mrvHard * 1.15));
     });
   });
 

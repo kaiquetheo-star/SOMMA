@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildExerciseCatalog } from '@/lib/gameplan/engine/iron/catalog/ExerciseCatalog';
 import {
   resolveDayFocusMuscles,
+  resolveVolumeLimitsForSplit,
   resolveVolumeMatrix,
   VOLUME_MATRIX,
 } from '@/lib/gameplan/engine/iron/volumeMatrix';
@@ -74,6 +75,14 @@ function trackerWithContext(ctx: VolumeCreditContext) {
 }
 
 describe('resolveVolumeMatrix', () => {
+  it('TRT biological profile raises resolved limits', () => {
+    const limits = resolveVolumeLimitsForSplit('abcde', {
+      hormonal_protocol: { type: 'trt', weekly_dose_mg: 150, recovery_multiplier: 1.5 },
+    });
+    expect(limits.mrvSoft).toBe(26);
+    expect(limits.mrvHard).toBe(30);
+  });
+
   it('ABCDE → MEV 14, MRV_SOFT 22, maxSetsSession 16', () => {
     const row = resolveVolumeMatrix('abcde');
     expect(row.mev).toBe(14);
