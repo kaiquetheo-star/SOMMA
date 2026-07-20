@@ -110,7 +110,7 @@ describe('resolveDayFocusMuscles', () => {
     const focus = resolveDayFocusMuscles('abcde', 1);
     expect(focus.has('chest')).toBe(true);
     expect(focus.has('triceps')).toBe(true);
-    expect(focus.has('front_delts')).toBe(true);
+    expect(focus.has('upper_chest')).toBe(true);
   });
 
   it('maps ABCDE day 6 arms focus', () => {
@@ -121,35 +121,35 @@ describe('resolveDayFocusMuscles', () => {
 });
 
 describe('creditVolume synergist fractions', () => {
-  it('1× split + synergist on day focus → 1.0× credit', () => {
+  it('1× split + sinergista no day focus → 0.33× credit (não rouba MEV de isolamentos)', () => {
     const tracker = trackerWithContext({
       frequencyClass: 'once_per_week',
       dayFocusMuscles: new Set(['chest', 'triceps', 'front_delts']),
     });
     tracker.creditVolume(benchPress, 4);
     expect(tracker.completedSetsForMuscle('chest')).toBe(4);
-    expect(tracker.completedSetsForMuscle('triceps')).toBe(4);
-    expect(tracker.completedSetsForMuscle('front_delts')).toBe(4);
+    expect(tracker.completedSetsForMuscle('triceps')).toBeCloseTo(1.32, 5);
+    expect(tracker.completedSetsForMuscle('front_delts')).toBeCloseTo(1.32, 5);
   });
 
-  it('2× split → synergists receive 0.5× credit', () => {
+  it('2× split → sinergistas recebem 0.33× credit', () => {
     const tracker = trackerWithContext({
       frequencyClass: 'twice_per_week',
       dayFocusMuscles: new Set(['chest', 'triceps']),
     });
     tracker.creditVolume(benchPress, 4);
-    expect(tracker.completedSetsForMuscle('triceps')).toBe(2);
-    expect(tracker.completedSetsForMuscle('front_delts')).toBe(2);
+    expect(tracker.completedSetsForMuscle('triceps')).toBeCloseTo(1.32, 5);
+    expect(tracker.completedSetsForMuscle('front_delts')).toBeCloseTo(1.32, 5);
   });
 
-  it('1× split + synergist outside day focus → 0.5× credit', () => {
+  it('1× split + sinergista fora do day focus → 0.33× credit', () => {
     const tracker = trackerWithContext({
       frequencyClass: 'once_per_week',
       dayFocusMuscles: new Set(['quads']),
     });
     tracker.creditVolume(benchPress, 4);
-    expect(tracker.completedSetsForMuscle('triceps')).toBe(2);
-    expect(tracker.completedSetsForMuscle('front_delts')).toBe(2);
+    expect(tracker.completedSetsForMuscle('triceps')).toBeCloseTo(1.32, 5);
+    expect(tracker.completedSetsForMuscle('front_delts')).toBeCloseTo(1.32, 5);
   });
 
   it('primary muscle always receives 1.0× credit', () => {
@@ -228,13 +228,13 @@ describe('setVolumeCreditContext', () => {
       dayFocusMuscles: new Set(['quads']),
     });
     tracker.creditVolume(benchPress, 4);
-    expect(tracker.completedSetsForMuscle('triceps')).toBe(2);
+    expect(tracker.completedSetsForMuscle('triceps')).toBeCloseTo(1.32, 5);
 
     tracker.setVolumeCreditContext({
       frequencyClass: 'once_per_week',
       dayFocusMuscles: resolveDayFocusMuscles('abcde', 1),
     });
     tracker.creditVolume(benchPress, 4);
-    expect(tracker.completedSetsForMuscle('triceps')).toBe(6);
+    expect(tracker.completedSetsForMuscle('triceps')).toBeCloseTo(2.64, 5);
   });
 });

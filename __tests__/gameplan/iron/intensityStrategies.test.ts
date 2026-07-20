@@ -35,7 +35,7 @@ function exercise(
     target_rir: 2,
     target_weight_kg: null,
     rest_seconds: 75,
-    progression_note: 'Calibrate first set @ prescribed RIR',
+    progression_note: 'Calibre a primeira série @ RIR prescrito',
     execution_technique: 'Standard',
     ...overrides,
   };
@@ -83,8 +83,8 @@ describe('IntensityStrategyEngine', () => {
     );
 
     const legExtension = ironExercises(result).find((row) => row.slug === 'leg_extension');
-    expect(legExtension?.execution_technique).toBe('DROP_SET');
-    expect(legExtension?.progression_note).toContain('Drop-Set');
+    expect(legExtension?.execution_technique).toBe('Séries drop');
+    expect(legExtension?.progression_note).toMatch(/Drop-set|Drop-Set|Séries drop/i);
     expect(legExtension?.target_sets).toBeLessThanOrEqual(4);
   });
 

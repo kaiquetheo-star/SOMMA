@@ -564,15 +564,23 @@ export function generateIronMicrocycle(input: GenerateIronMicrocycleInput): Iron
   const dayBlocks: IronDayBlock[] = [];
 
   for (let ironSlot = 0; ironSlot < input.ironDayIndices.length; ironSlot += 1) {
+    const usePplEliteTemplate = !useSplitTemplate && preferredSplit === 'ppl_x2' && frequencyIron === 6;
+    const pplElite = usePplEliteTemplate ? resolvePplDayTemplate(ironSlot) : null;
     const template = useAbcdeSplit
       ? resolveAbcdeDayTemplate(ironSlot)
       : useAbcdefSplit
         ? resolveAbcdefDayTemplate(ironSlot)
-        : {
-            splitDay: rotation[ironSlot % rotation.length] ?? 'push',
-            focusLabel: PPL_FOCUS_LABELS[rotation[ironSlot % rotation.length] ?? 'push'],
-            slots: PPL_DAY_SLOTS[rotation[ironSlot % rotation.length] ?? 'push'],
-          };
+        : pplElite
+          ? {
+              splitDay: pplElite.splitDay,
+              focusLabel: pplElite.focusLabel,
+              slots: pplElite.slots,
+            }
+          : {
+              splitDay: rotation[ironSlot % rotation.length] ?? 'push',
+              focusLabel: PPL_FOCUS_LABELS[rotation[ironSlot % rotation.length] ?? 'push'],
+              slots: PPL_DAY_SLOTS[rotation[ironSlot % rotation.length] ?? 'push'],
+            };
     const splitDay = template.splitDay;
     const minExercises = 'minExercises' in template ? template.minExercises : 2;
     const daySlots = useSplitTemplate

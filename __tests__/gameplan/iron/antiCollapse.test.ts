@@ -134,6 +134,6 @@ describe('Anti-Collapse Guards', () => {
 
     expect(limits.mrvSoft).toBeGreaterThan(base.mrvSoft);
     expect(limits.mrvHard).toBeGreaterThan(base.mrvHard);
-    expect(limits.mev).toBe(base.mev);
+    expect(limits.mev).toBeGreaterThan(base.mev);
   });
 });

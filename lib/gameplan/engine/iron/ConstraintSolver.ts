@@ -753,7 +753,13 @@ export function prescribedSetsForSlot(
 ): { prescribedSets: number; budget: VolumeBudget; phase: ReturnType<typeof resolveEffectiveMesocyclePhase> } {
   const requestedSets = Math.max(0, slot.defaultSets);
   const { budget, phase } = volumeBudgetForExercise(exercise, constraints);
-  const prescribedSets = Math.min(Math.max(budget.minSets, requestedSets), budget.maxSets);
+  const protocol = constraints.biological?.hormonal_protocol?.type;
+  const chaseRaisedMev = protocol === 'trt' || protocol === 'enhanced_cycle';
+  // TRT raises weekly MEV via resolveVolumeLimitsForSplit — prescribe toward the enhanced ceiling.
+  const target = chaseRaisedMev
+    ? Math.max(requestedSets, budget.minSets, budget.maxSets)
+    : Math.max(budget.minSets, requestedSets);
+  const prescribedSets = Math.min(target, budget.maxSets);
   return { prescribedSets, budget, phase };
 }
 

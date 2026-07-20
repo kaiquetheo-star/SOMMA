@@ -129,9 +129,9 @@ describe('DUP and Text-Only Elite cues', () => {
     expect(exercise).toBeDefined();
     const cueCard = mapToExerciseCueCard(exercise!, 'metabolic_hypertrophy');
 
-    expect(cueCard.setup).toContain('scapulae');
-    expect(cueCard.setup).toContain('45 degrees');
+    expect(cueCard.setup).toMatch(/scapulae|escápulas/i);
+    expect(cueCard.setup).toMatch(/45 degrees|45°/);
     expect(cueCard.failure_type).toBe('technical');
-    expect(cueCard.anti_pattern).toContain('scapular retraction');
+    expect(cueCard.anti_pattern).toMatch(/scapular retraction|retração escapular/i);
   });
 });

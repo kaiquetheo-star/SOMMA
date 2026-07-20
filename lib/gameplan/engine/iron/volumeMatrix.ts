@@ -27,26 +27,27 @@ export const VOLUME_MATRIX: Record<SplitFrequencyClass, VolumeMatrixRow> = {
     mrvSoft: 22,
     mrvHard: 26,
     maxSetsSession: 16,
-    synergistFractionDefault: 0.5,
-    synergistFractionDayFocus: 1.0,
+    // 0.33 — compounds must not starve direct isolation MEV on day-focus muscles.
+    synergistFractionDefault: 0.33,
+    synergistFractionDayFocus: 0.33,
   },
   twice_per_week: {
     mev: 10,
     mrvSoft: 18,
     mrvHard: 22,
     maxSetsSession: 12,
-    synergistFractionDefault: 0.5,
-    synergistFractionDayFocus: 0.5,
+    synergistFractionDefault: 0.33,
+    synergistFractionDayFocus: 0.33,
   },
 };
 
 /** Catalog-normalized day-focus muscles for ABCDE calendar days. */
 const ABCDE_DAY_FOCUS: Readonly<Record<number, readonly string[]>> = {
-  1: ['chest', 'upper_chest', 'front_delts', 'triceps'],
+  1: ['chest', 'upper_chest', 'triceps'],
   2: ['quads', 'calves', 'glutes'],
   4: ['back', 'rear_delts', 'biceps', 'traps'],
-  5: ['hamstrings', 'glutes', 'calves', 'erectors'],
-  6: ['biceps', 'triceps', 'side_delts', 'forearms', 'core'],
+  5: ['hamstrings', 'glutes', 'calves', 'erectors', 'core'],
+  6: ['side_delts', 'front_delts', 'rear_delts', 'biceps', 'triceps', 'traps', 'core'],
 };
 
 export interface VolumeLimits {
@@ -74,15 +75,16 @@ export function resolveVolumeMatrix(
   return VOLUME_MATRIX[resolveSplitFrequencyClass(preferredSplit)];
 }
 
-function hormonalMrvBoost(
+function hormonalVolumeBoost(
   biological: Pick<UserBiological, 'hormonal_protocol' | 'hormonal_transition'> | null | undefined,
-): { softScale: number; hardScale: number } {
+): { mevScale: number; softScale: number; hardScale: number } {
   const trt = biological?.hormonal_protocol?.type === 'trt';
   const transition = biological?.hormonal_transition === true;
   if (!trt && !transition) {
-    return { softScale: 1, hardScale: 1 };
+    return { mevScale: 1, softScale: 1, hardScale: 1 };
   }
-  return { softScale: 1.2, hardScale: 1.15 };
+  // TRT raises the weekly TARGET (MEV), not only the ceiling (MRV).
+  return { mevScale: 1.15, softScale: 1.2, hardScale: 1.15 };
 }
 
 export function resolveVolumeLimitsForSplit(
@@ -90,9 +92,9 @@ export function resolveVolumeLimitsForSplit(
   biological?: Pick<UserBiological, 'hormonal_protocol' | 'hormonal_transition'> | null,
 ): VolumeLimits {
   const row = resolveVolumeMatrix(preferredSplit);
-  const boost = hormonalMrvBoost(biological);
+  const boost = hormonalVolumeBoost(biological);
   return {
-    mev: row.mev,
+    mev: Math.round(row.mev * boost.mevScale),
     mrvSoft: Math.round(row.mrvSoft * boost.softScale),
     mrvHard: Math.round(row.mrvHard * boost.hardScale),
     maxSetsSession: row.maxSetsSession,

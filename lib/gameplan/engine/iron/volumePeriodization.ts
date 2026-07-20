@@ -186,11 +186,22 @@ export function calculateVolumeBudget(
             executionTechnique: 'Standard',
           };
     } else {
-      budget = {
-        ...budget,
-        minSets: Math.max(budget.minSets, isCompound ? 4 : 3),
-        maxSets: Math.max(budget.maxSets, isCompound ? 5 : 4),
-      };
+      // TRT / enhanced: raise per-exercise ceiling so the boosted weekly MEV can be realized.
+      budget = isCompound
+        ? {
+            minSets: 5,
+            maxSets: 6,
+            targetRepRange: '6-10',
+            targetRIR: 1,
+            executionTechnique: 'Standard',
+          }
+        : {
+            minSets: 4,
+            maxSets: 5,
+            targetRepRange: '10-15',
+            targetRIR: 2,
+            executionTechnique: 'Standard',
+          };
     }
   }
 

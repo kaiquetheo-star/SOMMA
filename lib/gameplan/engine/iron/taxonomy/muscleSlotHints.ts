@@ -50,5 +50,26 @@ export function matchesMuscleSlotHint(exercise: CatalogExercise, hint: string | 
     );
   }
 
+  if (hint === 'quads') {
+    return (
+      exercise.primary_muscle === 'quads' ||
+      exercise.primary_muscle === 'quadriceps' ||
+      exercise.synergist_muscles.includes('quads') ||
+      exercise.synergist_muscles.includes('quadriceps')
+    );
+  }
+
+  if (hint === 'glutes') {
+    return (
+      exercise.primary_muscle === 'glutes' ||
+      exercise.primary_muscle === 'gluteus_maximus' ||
+      exercise.synergist_muscles.includes('glutes')
+    );
+  }
+
+  if (hint === 'calves') {
+    return exercise.primary_muscle === 'calves' || exercise.primary_muscle === 'calf';
+  }
+
   return exercise.primary_muscle === hint;
 }
