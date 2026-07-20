@@ -878,6 +878,7 @@ export function expandStarvationAliases(
     const base = bySlug.get(seed.baseSlug);
     if (!base) continue;
 
+    const cues = aliasCueCard(seed);
     const alias: CatalogExercise = {
       ...base,
       id: `alias:${seed.slug}`,
@@ -887,7 +888,15 @@ export function expandStarvationAliases(
       primary_muscle: seed.primary_muscle,
       synergist_muscles: [...(seed.synergist_muscles ?? base.synergist_muscles)],
       equipment_required: [...seed.equipment_required],
-      cue_card: aliasCueCard(seed) ?? fallbackCue(seed.name),
+      // Own cues — never inherit Elite base cue_card or biomechanical_instructions.
+      cue_card: cues,
+      biomechanical_instructions: {
+        setup: cues.setup,
+        concentric: cues.vector,
+        eccentric: cues.catch,
+        safety: cues.anti_pattern,
+        failure_type: cues.failure_type,
+      },
       slot_category: aliasSlotCategory(seed),
       // Deprioritize vs Elite anchors — aliases exist for coverage, not preference.
       selection_score: 0.05,

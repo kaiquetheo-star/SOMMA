@@ -14,7 +14,7 @@ vi.mock('@/lib/catalog/library', () => ({
 }));
 
 describe('alias integrity', () => {
-  const catalog = buildExerciseCatalog(ELITE_EXERCISES, { includeStarvationAliases: true });
+  const catalog = buildExerciseCatalog([...ELITE_EXERCISES], { includeStarvationAliases: true });
   const aliases = catalog.exercises.filter((exercise) => exercise.id.startsWith('alias:'));
 
   it('Cenário A: no alias shares cue_card.setup with a different-slug exercise', () => {
