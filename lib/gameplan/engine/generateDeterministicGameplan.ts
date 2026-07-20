@@ -237,6 +237,11 @@ function fallbackConceptKey(exercise: { slug?: string; display_name?: string; na
 }
 
 function stubFillerPick(exercise: CatalogExercise, prescribedSets: number): EnrichedIronPick {
+  const slotCategory =
+    exercise.slot_category && exercise.slot_category.length > 0
+      ? exercise.slot_category
+      : `mvp_${exercise.movement_pattern}`;
+  const exerciseWithSlot = { ...exercise, slot_category: slotCategory };
   const solverResult: SolverResult = {
     slotId: `mvp_filler_${exercise.id}`,
     exerciseId: exercise.id,
@@ -246,7 +251,7 @@ function stubFillerPick(exercise: CatalogExercise, prescribedSets: number): Enri
   };
   return {
     ...solverResult,
-    exercise,
+    exercise: exerciseWithSlot,
     prescription: {
       exercise_id: exercise.id,
       slug: exercise.slug,
@@ -258,7 +263,7 @@ function stubFillerPick(exercise: CatalogExercise, prescribedSets: number): Enri
       target_weight_kg: null,
       rest_seconds: restSecondsFromCns(exercise.cns_fatigue_cost),
       diagnostic_reason: 'minimum_viable_path_absolute_last_resort',
-      slot_category: exercise.slot_category,
+      slot_category: slotCategory,
       tactical_role: exercise.tactical_role,
     },
   };

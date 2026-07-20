@@ -471,8 +471,8 @@ function validateIronDayBlockVolume(
       }
       fallbackPicks.push({
         ...solverResult,
-        exercise,
-        prescription: stubIronPrescription(solverResult, exercise),
+        exercise: selectedExercise,
+        prescription: stubIronPrescription(solverResult, selectedExercise),
       });
     }
 

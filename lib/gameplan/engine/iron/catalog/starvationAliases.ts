@@ -5,10 +5,13 @@
  */
 import type { CatalogExercise } from '@/lib/gameplan/engine/iron/types';
 import type { IronMovementPattern } from '@/lib/gameplan/engine/iron/taxonomy/movementPatterns';
+import type { MuscleSubGroup } from '@/lib/gameplan/engine/iron/anatomicalDivision';
+import { inferSlotCategory } from '@/lib/catalog/inferSlotCategory';
+import type { LibraryExercise } from '@/types/catalog';
 import type { EquipmentTag } from '@/store/useSommaStore';
 
 interface AliasSeed {
-  /** Base slug must exist in Elite (or mapped catalog) for cue/tempo inheritance. */
+  /** Base slug must exist in Elite (or mapped catalog) for tempo/equipment scaffolding. */
   baseSlug: string;
   slug: string;
   name: string;
@@ -17,6 +20,46 @@ interface AliasSeed {
   synergist_muscles?: readonly string[];
   equipment_required: readonly EquipmentTag[];
   isolationBoost?: boolean;
+}
+
+function anatomicalPrimaryForAlias(primaryMuscle: string): MuscleSubGroup | null {
+  switch (primaryMuscle) {
+    case 'core':
+      return 'rectus_abdominis';
+    case 'adductors':
+      return 'adductors';
+    case 'side_delts':
+      return 'shoulder_lateral';
+    case 'rear_delts':
+      return 'shoulder_posterior';
+    case 'front_delts':
+      return 'shoulder_anterior';
+    case 'biceps':
+      return 'biceps_long_head';
+    case 'triceps':
+      return 'triceps_lateral_head';
+    case 'calves':
+      return 'calves_gastrocnemius';
+    case 'forearms':
+      return 'forearm_flexors';
+    case 'traps':
+      return 'trapezius_upper';
+    case 'quads':
+      return 'quadriceps_vastus_lat';
+    case 'hamstrings':
+      return 'hamstrings_biceps_fem';
+    case 'glutes':
+      return 'gluteus_maximus';
+    case 'chest':
+      return 'chest_horizontal';
+    default:
+      return null;
+  }
+}
+
+function anatomicalSubGroupsForAlias(primaryMuscle: string): readonly MuscleSubGroup[] {
+  const primary = anatomicalPrimaryForAlias(primaryMuscle);
+  return primary ? [primary] : [];
 }
 
 /**
@@ -789,6 +832,37 @@ function fallbackCue(name: string): CatalogExercise['cue_card'] {
   };
 }
 
+/** Alias-owned cue card — never copy the Elite base movement cues. */
+function aliasCueCard(seed: AliasSeed): NonNullable<CatalogExercise['cue_card']> {
+  const baseLabel = seed.baseSlug.replace(/_/g, ' ');
+  return {
+    setup: `${seed.name}: organize a stable start for ${seed.primary_muscle}; brace before the first rep.`,
+    vector: `Drive ${seed.name} on a clean ${seed.movement_pattern} path targeting ${seed.primary_muscle}.`,
+    catch: `Finish ${seed.name} with owned end-range tension on ${seed.primary_muscle}.`,
+    anti_pattern: `Do not import ${baseLabel} mechanics into ${seed.name}.`,
+    failure_type: 'technical',
+  };
+}
+
+function aliasSlotCategory(seed: AliasSeed): string {
+  const synthetic = {
+    id: `alias:${seed.slug}`,
+    slug: seed.slug,
+    name: seed.name,
+    biomechanical_instructions: {},
+    equipment_required: [...seed.equipment_required],
+    default_sets: 3,
+    default_reps: 12,
+    movement_pattern: seed.movement_pattern,
+    primary_muscle: seed.primary_muscle,
+    synergist_muscles: [...(seed.synergist_muscles ?? [])],
+    cns_fatigue_cost: 2,
+    joint_stress_profile: 'low_impact',
+    stretch_mediated_hypertrophy: false,
+  } as LibraryExercise;
+  return inferSlotCategory(synthetic);
+}
+
 /**
  * Expand Elite catalog with deterministic starvation aliases.
  * Skips seeds whose base is missing and skips slugs already present.
@@ -813,12 +887,16 @@ export function expandStarvationAliases(
       primary_muscle: seed.primary_muscle,
       synergist_muscles: [...(seed.synergist_muscles ?? base.synergist_muscles)],
       equipment_required: [...seed.equipment_required],
-      cue_card: base.cue_card ?? fallbackCue(seed.name),
-      slot_category: undefined,
+      cue_card: aliasCueCard(seed) ?? fallbackCue(seed.name),
+      slot_category: aliasSlotCategory(seed),
       // Deprioritize vs Elite anchors — aliases exist for coverage, not preference.
       selection_score: 0.05,
       cns_fatigue_cost: Math.min(Math.max(base.cns_fatigue_cost, 2), 4),
       complexity_level: 2,
+      // Clear inherited anatomical mapping — aliases target different muscles.
+      muscle_sub_groups: anatomicalSubGroupsForAlias(seed.primary_muscle),
+      primary_sub_group: anatomicalPrimaryForAlias(seed.primary_muscle),
+      synergist_sub_groups: [],
     };
     aliases.push(alias);
     bySlug.set(alias.slug, alias);
