@@ -527,6 +527,7 @@ export async function generateDeterministicGameplan(
     logs21d: filterPerformanceEntriesLastDays(input.performanceLogs, MESOCYCLE_DAYS),
     readinessScan: input.readinessScan,
     biometricCheckpoints: input.biometricCheckpoints,
+    catalog: buildExerciseCatalog(catalog, { includeStarvationAliases: true }),
   };
   const adaptationResult = await adaptGameplan(orderedMicrocycle, adaptationInput);
   orderedMicrocycle = adaptationResult.microcycle;

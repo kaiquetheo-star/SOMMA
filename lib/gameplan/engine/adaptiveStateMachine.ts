@@ -2,6 +2,14 @@ import type { BiologicalProfile } from '@/types/biological';
 import type { IronExercisePrescription, MicrocycleDay } from '@/types/gameplan';
 import type { PerformanceLogEntry } from '@/types/performance';
 import { ironExercisesFromPerformanceLog } from '@/types/performance';
+import { mapToIronPrescription } from '@/lib/gameplan/engine/iron/loadPrescriptionMapper';
+import type { ExerciseCatalog, SolverResult } from '@/lib/gameplan/engine/iron/types';
+import {
+  filterIronLogsLastDays,
+  flattenPerformanceLogs,
+  type EnginePerformanceRow,
+} from '@/lib/gameplan/engine/performanceLogs';
+import { MESOCYCLE_DAYS } from '@/lib/gameplan/engine/constants';
 
 export interface ReadinessScan {
   sleep_quality: 1 | 2 | 3 | 4 | 5;
@@ -33,6 +41,8 @@ export interface AdaptiveStateMachineInput {
   logs21d: PerformanceLogEntry[];
   readinessScan?: ReadinessScan;
   biometricCheckpoints?: BiometricCheckpoint[];
+  /** When provided, rotation remaps weight/cues via mapToIronPrescription. */
+  catalog?: ExerciseCatalog;
 }
 
 const BLACKLISTED_EXERCISE_IDS = new Set<string>();
@@ -124,6 +134,9 @@ function applyExerciseRotation(
   microcycle: MicrocycleDay[],
   logs21d: PerformanceLogEntry[],
   logs: AdaptationLogEntry[],
+  catalog: ExerciseCatalog | undefined,
+  goalIron: string | null,
+  engineLogs21d: readonly EnginePerformanceRow[],
 ): MicrocycleDay[] {
   if (!hasStagnantStrength(logs21d)) return microcycle;
 
@@ -138,6 +151,35 @@ function applyExerciseRotation(
     exercisesRotated.push(exercise.exercise_id);
     newExercises.push(altId);
 
+    const altExercise = catalog?.byId.get(altId) ?? catalog?.bySlug.get(altId);
+    if (altExercise) {
+      const solverResult: SolverResult = {
+        slotId: exercise.slot_category ?? 'adaptive_rotation',
+        exerciseId: altExercise.id,
+        prescribedSets: exercise.target_sets,
+        score: 0,
+        diagnostic_reason: 'adaptive_rotation_stagnant_strength',
+        targetRepRange: exercise.target_rep_range?.replace(/\s*@.*$/, '').trim(),
+        targetRIR: exercise.target_rir,
+      };
+      const remapped = mapToIronPrescription(
+        solverResult,
+        altExercise,
+        null,
+        engineLogs21d,
+        goalIron,
+        null,
+      );
+      return {
+        ...remapped,
+        diagnostic_reason: 'adaptive_rotation_stagnant_strength',
+        progression_note:
+          'Strength plateau detected — rotated to a mechanically similar alternative.',
+        alternative_exercise_id: null,
+      };
+    }
+
+    // Catalog miss — keep structural swap (weight/cues may be stale until next map).
     return {
       ...exercise,
       exercise_id: altId,
@@ -145,6 +187,7 @@ function applyExerciseRotation(
       display_name: exercise.display_name?.replace(/bench press/i, '').trim() || altId,
       diagnostic_reason: 'adaptive_rotation_stagnant_strength',
       progression_note: 'Strength plateau detected — rotated to a mechanically similar alternative.',
+      alternative_exercise_id: null,
     };
   });
 
@@ -292,8 +335,20 @@ export async function adaptGameplan(
   const adaptationLogs: AdaptationLogEntry[] = [];
   let adapted = microcycle;
 
+  const engineLogs21d =
+    input.catalog != null
+      ? filterIronLogsLastDays(flattenPerformanceLogs(input.logs21d), MESOCYCLE_DAYS)
+      : [];
+
   adapted = applyCyclePhaseVolumeMultiplier(adapted, input.biological, adaptationLogs);
-  adapted = applyExerciseRotation(adapted, input.logs21d, adaptationLogs);
+  adapted = applyExerciseRotation(
+    adapted,
+    input.logs21d,
+    adaptationLogs,
+    input.catalog,
+    input.biological.goal_iron ?? null,
+    engineLogs21d,
+  );
   adapted = applyBiometricNutritionAdaptation(adapted, input.biometricCheckpoints, adaptationLogs);
   adapted = applyBlacklistSafeGuards(adapted, adaptationLogs);
 
