@@ -5,6 +5,8 @@ import { TrainingFrequencySelect } from '@/components/foundation/TrainingFrequen
 import { ValueStepper } from '@/components/iron/ValueStepper';
 import {
   ageFromDateOfBirth,
+  DEFAULT_HORMONAL_PROTOCOL,
+  ensureHormonalProtocol,
   FIXED_GOAL_IRON,
   FIXED_HEIGHT_CM,
   FIXED_NUTRITION_GOAL,
@@ -75,7 +77,7 @@ const HORMONAL_PROTOCOL_OPTIONS: Array<{
     id: 'natural',
     label: 'Natural',
     subtitle: 'Baseline recovery and standard volume tolerance.',
-    protocol: { type: 'natural', recovery_multiplier: 1.0 },
+    protocol: { ...DEFAULT_HORMONAL_PROTOCOL },
   },
   {
     id: 'trt_low',
@@ -97,8 +99,8 @@ const HORMONAL_PROTOCOL_OPTIONS: Array<{
   },
 ];
 
-function resolveHormonalProtocolOptionId(protocol: HormonalProtocol | undefined): HormonalProtocolOptionId {
-  if (!protocol || protocol.type === 'natural') return 'natural';
+function resolveHormonalProtocolOptionId(protocol: HormonalProtocol): HormonalProtocolOptionId {
+  if (protocol.type === 'natural') return 'natural';
   if (protocol.type === 'enhanced_cycle') return 'enhanced';
   return protocol.weekly_dose_mg != null && protocol.weekly_dose_mg > 200 ? 'trt_high' : 'trt_low';
 }
@@ -107,7 +109,8 @@ export function BiologicalPassportForm({ value, onChange }: BiologicalPassportFo
   const age = ageFromDateOfBirth(value.date_of_birth);
   const selectedMesocyclePhase = value.mesocycle_phase ?? 'maintenance';
   const selectedPreferredSplit = value.preferred_split ?? 'abcde';
-  const selectedHormonalProtocol = resolveHormonalProtocolOptionId(value.hormonal_protocol);
+  const hormonalProtocol = ensureHormonalProtocol(value.hormonal_protocol);
+  const selectedHormonalProtocol = resolveHormonalProtocolOptionId(hormonalProtocol);
 
   return (
     <View className="gap-6">

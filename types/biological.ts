@@ -59,7 +59,12 @@ export interface BiologicalProfile {
   current_body_fat_estimate: number | null;
   /** Regra 2/3: hormonal transition phase increases recovery and hydration caution. */
   hormonal_transition?: boolean | null;
-  /** Explicit hormonal protocol for recovery-aware Iron periodization. */
+  /**
+   * Explicit hormonal protocol for recovery-aware Iron periodization.
+   * After `withFixedBiologicalProfile` / rehydrate this is always an object
+   * (`DEFAULT_HORMONAL_PROTOCOL` when missing) — never leave as `undefined`
+   * (JSON.stringify would drop the key and create a "ghost natural" wipe).
+   */
   hormonal_protocol?: HormonalProtocol;
 }
 
@@ -89,6 +94,25 @@ export const TRAINING_DAYS_MIN = 1;
 export const TRAINING_DAYS_MAX = 7;
 export const DEFAULT_TRAINING_DAYS_PER_WEEK = 5;
 
+/** Canonical natural baseline — always persistable (never `undefined`). */
+export const DEFAULT_HORMONAL_PROTOCOL: HormonalProtocol = {
+  type: 'natural',
+  weekly_dose_mg: 0,
+  recovery_multiplier: 1.0,
+};
+
+/** Coerce missing / legacy-absent protocol to the natural default. */
+export function ensureHormonalProtocol(
+  protocol: HormonalProtocol | null | undefined,
+): HormonalProtocol {
+  if (protocol == null) return { ...DEFAULT_HORMONAL_PROTOCOL };
+  return {
+    type: protocol.type,
+    weekly_dose_mg: protocol.weekly_dose_mg ?? (protocol.type === 'natural' ? 0 : undefined),
+    recovery_multiplier: protocol.recovery_multiplier,
+  };
+}
+
 export const initialBiologicalProfile: BiologicalProfile = {
   date_of_birth: FIXED_DATE_OF_BIRTH,
   weight_kg: null,
@@ -110,7 +134,7 @@ export const initialBiologicalProfile: BiologicalProfile = {
   clinical_exit_interview: null,
   current_body_fat_estimate: null,
   hormonal_transition: false,
-  hormonal_protocol: undefined,
+  hormonal_protocol: { ...DEFAULT_HORMONAL_PROTOCOL },
 };
 
 export function normalizePreferredSplit(
@@ -181,7 +205,7 @@ export function withFixedBiologicalProfile(
     current_body_fat_estimate:
       profile?.current_body_fat_estimate ?? initialBiologicalProfile.current_body_fat_estimate,
     hormonal_transition: profile?.hormonal_transition ?? initialBiologicalProfile.hormonal_transition,
-    hormonal_protocol: profile?.hormonal_protocol ?? initialBiologicalProfile.hormonal_protocol,
+    hormonal_protocol: ensureHormonalProtocol(profile?.hormonal_protocol),
   };
 }
 

@@ -16,6 +16,7 @@ import { BiologicalPassportForm } from '@/components/foundation/BiologicalPasspo
 import { DamageControlToggle } from '@/components/sanctuary/DamageControlToggle';
 import { useSommaStore } from '@/store/useSommaStore';
 import {
+  ensureHormonalProtocol,
   initialBiologicalProfile,
   isBiologicalProfileComplete,
   normalizeBodyFatFields,
@@ -60,6 +61,7 @@ export default function AnalyticsScreen() {
         ...draft,
         current_injuries: draft.current_injuries?.trim() || null,
         ...normalizeBodyFatFields(draft),
+        hormonal_protocol: ensureHormonalProtocol(draft.hormonal_protocol),
       };
       setUserBiological(normalized);
 

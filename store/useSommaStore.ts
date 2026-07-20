@@ -33,6 +33,7 @@ import { buildWorkoutSessionSummary } from '@/lib/workout/buildSessionSummary';
 import type { BiologicalProfile } from '@/types/biological';
 import {
     DEFAULT_TRAINING_DAYS_PER_WEEK,
+    ensureHormonalProtocol,
     initialBiologicalProfile,
     isBiologicalProfileComplete,
     normalizeBodyFatFields,
@@ -129,7 +130,7 @@ function applyDamageControlToMicrocycle(
           ...block.nutrition,
           note: target.note
             ? `${target.note} · Water ${target.water_ml}ml`
-            : `Peri-workout carbs: ${Math.round(target.carbs_g * target.peri_workout_carb_ratio)}g · Water ${target.water_ml}ml`,
+            : `Carboidratos peri-treino: ${Math.round(target.carbs_g * target.peri_workout_carb_ratio)}g · Água ${target.water_ml}ml`,
           nutrition_target: target,
         },
       };
@@ -943,6 +944,8 @@ export const useSommaStore = create<SommaState>()(
             }),
             training_days_per_week:
               state.user_biological.training_days_per_week ?? DEFAULT_TRAINING_DAYS_PER_WEEK,
+            // Never leave hormonal_protocol undefined — JSON.stringify drops it on persist.
+            hormonal_protocol: ensureHormonalProtocol(state.user_biological.hormonal_protocol),
           });
         }
         const legacy = state as SommaState & {
