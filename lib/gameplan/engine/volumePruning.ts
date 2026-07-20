@@ -29,8 +29,19 @@ function isCompoundPhase(phase: number): boolean {
   return phase <= 3;
 }
 
+function isDisposableFinisher(exercise: IronExercisePrescription): boolean {
+  const category = exercise.slot_category ?? '';
+  return (
+    category.length === 0 ||
+    category.includes('finisher') ||
+    category.includes('shoulder_3d') ||
+    category.includes('_extra')
+  );
+}
+
 /**
  * Drop isolation / finisher slots first — compounds retained when `compoundsOnly`.
+ * Template slots (chest/triceps/biceps/…) are protected over coherence finishers.
  */
 export function pruneIronExercisesForTimeBudget(
   exercises: IronExercisePrescription[],
@@ -55,7 +66,17 @@ export function pruneIronExercisesForTimeBudget(
     return sortIronExercises(exercises, catalog, prerequisiteSlugs).slice(0, cap);
   }
 
-  return ordered.slice(0, cap);
+  if (ordered.length <= cap) return ordered;
+
+  const templateSlots = ordered.filter((exercise) => !isDisposableFinisher(exercise));
+  const finishers = ordered.filter((exercise) => isDisposableFinisher(exercise));
+
+  if (templateSlots.length >= cap) {
+    return templateSlots.slice(0, cap);
+  }
+
+  const remaining = cap - templateSlots.length;
+  return [...templateSlots, ...finishers.slice(0, remaining)];
 }
 
 export function pruneIronBlocksInMicrocycle(
@@ -85,6 +106,39 @@ export function pruneIronBlocksInMicrocycle(
         subtitle: names || block.subtitle,
         iron: { ...block.iron, exercises },
       };
+    });
+  }
+}
+
+/**
+ * Time-budget prune on Iron day picks (pre-map). Same scissors as
+ * `pruneIronExercisesForTimeBudget`, applied before `mapToIronPrescription`.
+ */
+export function pruneIronDayBlockPicks<
+  TPick extends { exerciseId: string; prescription: IronExercisePrescription },
+>(
+  dayBlocks: Array<{ picks: TPick[] }>,
+  catalog: LibraryExercise[],
+  availableMinutes: number,
+  prerequisiteSlugs: string[] = [],
+): void {
+  for (const block of dayBlocks) {
+    if (block.picks.length === 0) continue;
+
+    const prescriptions = block.picks.map((pick) => pick.prescription);
+    const pruned = pruneIronExercisesForTimeBudget(
+      prescriptions,
+      catalog,
+      prerequisiteSlugs,
+      availableMinutes,
+    );
+
+    const remaining = [...block.picks];
+    block.picks = pruned.flatMap((exercise) => {
+      const index = remaining.findIndex((pick) => pick.exerciseId === exercise.exercise_id);
+      if (index < 0) return [];
+      const [pick] = remaining.splice(index, 1);
+      return pick ? [pick] : [];
     });
   }
 }

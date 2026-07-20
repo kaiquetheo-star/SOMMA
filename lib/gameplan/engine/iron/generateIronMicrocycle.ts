@@ -78,6 +78,11 @@ export interface GenerateIronMicrocycleInput {
   blockedJointProfiles: readonly string[];
   goalIron: string | null;
   availableMinutes: number;
+  /**
+   * When true, skips the final `mapToIronPrescription` pass so the caller can
+   * run prune / MVP on picks first, then call `finalizeIronDayBlockPrescriptions`.
+   */
+  deferPrescriptionMapping?: boolean;
 }
 
 const PPL_FOCUS_LABELS: Record<SplitDayKey, string> = {
@@ -138,12 +143,58 @@ function buildConstraints(
   };
 }
 
+/** Pre-map stub — structural fields only; weight/cues come from finalize. */
+function stubIronPrescription(
+  pick: SolverResult,
+  exercise: CatalogExercise,
+): IronExercisePrescription {
+  return {
+    exercise_id: exercise.id,
+    slug: exercise.slug,
+    display_name: exercise.name,
+    target_sets: pick.prescribedSets,
+    target_reps: 10,
+    target_rep_range: pick.targetRepRange ?? '8-10 @ 3 RIR',
+    target_rir: pick.targetRIR ?? 3,
+    target_weight_kg: null,
+    rest_seconds: 90,
+    diagnostic_reason: pick.diagnostic_reason,
+    slot_category: exercise.slot_category,
+    tactical_role: exercise.tactical_role,
+  };
+}
+
+/**
+ * Single authoritative `mapToIronPrescription` pass for a microcycle.
+ * Call after prune / MVP so fillers and survivors share one dose source.
+ */
+export function finalizeIronDayBlockPrescriptions(
+  dayBlocks: IronDayBlock[],
+  logs21d: readonly EnginePerformanceRow[],
+  goalIron: string | null,
+  preferredSplit?: ReturnType<typeof normalizePreferredSplit>,
+): void {
+  for (const block of dayBlocks) {
+    const dailyFocus = getDailyIronFocus(block.dayIndex, block.splitDay, {
+      preferredSplit,
+      calendarDayIndex: block.dayIndex,
+    });
+    for (const pick of block.picks) {
+      pick.prescription = mapToIronPrescription(
+        pick,
+        pick.exercise,
+        null,
+        logs21d,
+        goalIron,
+        dailyFocus,
+      );
+    }
+  }
+}
+
 function picksFromSolver(
   solverPicks: readonly SolverResult[],
   catalog: ExerciseCatalog,
-  logs21d: readonly EnginePerformanceRow[],
-  goalIron: string | null,
-  dailyFocus: DailyIronFocus,
   slots: readonly SolverSlot[] = [],
 ): EnrichedIronPick[] {
   return solverPicks.flatMap((pick) => {
@@ -155,8 +206,7 @@ function picksFromSolver(
       {
         ...pick,
         exercise: exerciseForSlot,
-        // History-backed loads (UUID + slug) take priority over passport cold-start in mapper.
-        prescription: mapToIronPrescription(pick, exerciseForSlot, null, logs21d, goalIron, dailyFocus),
+        prescription: stubIronPrescription(pick, exerciseForSlot),
       },
     ];
   });
@@ -166,9 +216,7 @@ function applyDraftToDayBlocks(
   dayBlocks: IronDayBlock[],
   draft: readonly MicrocycleDayPlan[],
   catalog: ExerciseCatalog,
-  logs21d: readonly EnginePerformanceRow[],
-  goalIron: string | null,
-  preferredSplit?: ReturnType<typeof normalizePreferredSplit>,
+  _preferredSplit?: ReturnType<typeof normalizePreferredSplit>,
 ): void {
   for (let i = 0; i < dayBlocks.length && i < draft.length; i += 1) {
     const planDay = draft[i]!;
@@ -187,15 +235,11 @@ function applyDraftToDayBlocks(
         targetRepRange: pick.targetRepRange,
         targetRIR: pick.targetRIR,
       };
-      const dailyFocus = getDailyIronFocus(block.dayIndex, block.splitDay, {
-        preferredSplit,
-        calendarDayIndex: block.dayIndex,
-      });
       return [
         {
           ...solverResult,
           exercise,
-          prescription: mapToIronPrescription(solverResult, exercise, null, logs21d, goalIron, dailyFocus),
+          prescription: stubIronPrescription(solverResult, exercise),
         },
       ];
     });
@@ -429,7 +473,7 @@ function validateIronDayBlockVolume(
       fallbackPicks.push({
         ...solverResult,
         exercise,
-        prescription: mapToIronPrescription(solverResult, exercise, null, input.logs21d, input.goalIron, dailyFocus),
+        prescription: stubIronPrescription(solverResult, exercise),
       });
     }
 
@@ -490,7 +534,9 @@ function validateNoFallbacks(dayBlocks: readonly IronDayBlock[]): void {
  */
 export function generateIronMicrocycle(input: GenerateIronMicrocycleInput): IronDayBlock[] {
   const normalizedBiological = normalizeIronProfileForGeneration(input.biological);
-  const catalog = buildExerciseCatalog([...input.libraryExercises]);
+  const catalog = buildExerciseCatalog([...input.libraryExercises], {
+    includeStarvationAliases: true,
+  });
   if (catalog.exercises.length === 0) {
     throw new Error('INSUFFICIENT_IRON_CATALOG: no valid hypertrophy rows.');
   }
@@ -595,7 +641,7 @@ export function generateIronMicrocycle(input: GenerateIronMicrocycleInput): Iron
       splitDay,
       focusLabel: template.focusLabel ?? PPL_FOCUS_LABELS[splitDay],
       ironSlotIndex: ironSlot,
-      picks: picksFromSolver(picks, catalog, input.logs21d, input.goalIron, dailyIronFocus, daySlots),
+      picks: picksFromSolver(picks, catalog, daySlots),
       coherenceValidated: false,
     });
 
@@ -605,7 +651,7 @@ export function generateIronMicrocycle(input: GenerateIronMicrocycleInput): Iron
       const report = validateMicrocycleCoherence(draftClone, catalog, constraints, tracker);
       if (!report.ok) {
         autoCorrectMicrocycle(draftClone, catalog, constraints, tracker);
-        applyDraftToDayBlocks(dayBlocks, draftClone, catalog, input.logs21d, input.goalIron, preferredSplit);
+        applyDraftToDayBlocks(dayBlocks, draftClone, catalog, preferredSplit);
         for (let i = 0; i < draft.length; i += 1) {
           draft[i] = draftClone[i]!;
         }
@@ -632,7 +678,7 @@ export function generateIronMicrocycle(input: GenerateIronMicrocycleInput): Iron
       }
     }
 
-    applyDraftToDayBlocks(dayBlocks, finalDraft, catalog, input.logs21d, input.goalIron, preferredSplit);
+    applyDraftToDayBlocks(dayBlocks, finalDraft, catalog, preferredSplit);
 
     for (const block of dayBlocks) {
       (block as { coherenceValidated: boolean }).coherenceValidated = coherenceOk;
@@ -648,6 +694,16 @@ export function generateIronMicrocycle(input: GenerateIronMicrocycleInput): Iron
     : dayBlocks;
 
   validateNoFallbacks(finalBlocks);
+
+  // Single map pass (unless caller defers for prune → MVP → map ordering).
+  if (!input.deferPrescriptionMapping) {
+    finalizeIronDayBlockPrescriptions(
+      finalBlocks,
+      input.logs21d,
+      input.goalIron,
+      preferredSplit,
+    );
+  }
 
   return finalBlocks;
 }

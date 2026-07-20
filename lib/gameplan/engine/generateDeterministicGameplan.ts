@@ -13,7 +13,9 @@ import { MESOCYCLE_DAYS, WEEKLY_VOLUME_DAYS } from '@/lib/gameplan/engine/consta
 import { buildExerciseCatalog } from '@/lib/gameplan/engine/iron/catalog/ExerciseCatalog';
 import {
     buildIronGameplanBlock,
+    finalizeIronDayBlockPrescriptions,
     generateIronMicrocycle,
+    type EnrichedIronPick,
     type IronDayBlock,
 } from '@/lib/gameplan/engine/iron/generateIronMicrocycle';
 import { applyIntensityStrategies } from '@/lib/gameplan/engine/iron/IntensityStrategyEngine';
@@ -35,10 +37,14 @@ import {
     resolvePillarFrequencies,
     spreadPillarDayIndices,
 } from '@/lib/gameplan/engine/periodization';
-import { pruneIronBlocksInMicrocycle } from '@/lib/gameplan/engine/volumePruning';
+import {
+    pruneIronDayBlockPicks,
+} from '@/lib/gameplan/engine/volumePruning';
 import { sanitizeMicrocycleIronVolume } from '@/lib/gameplan/microcycleValidation';
 import { enforceWeeklyAuthority } from '@/lib/gameplan/engine/iron/volumeAuthority';
 import { createWeeklyVolumeTracker } from '@/lib/gameplan/engine/iron/WeeklyVolumeTracker';
+import type { CatalogExercise } from '@/lib/gameplan/engine/iron/types';
+import type { SolverResult } from '@/lib/gameplan/engine/iron/types';
 import {
     dateForDayIndex,
     getDayIndexForDate,
@@ -57,7 +63,6 @@ import {
 import type {
     DailyGameplan,
     GameplanBlock,
-    IronExercisePrescription,
     MicrocycleDay,
 } from '@/types/gameplan';
 import type { PerformanceLogEntry } from '@/types/performance';
@@ -106,8 +111,8 @@ function buildAbcdeRestDayBlocks(dayIndex: number): GameplanBlock[] {
       {
         id: `block-d${dayIndex}-spirit-healer`,
         pillar: 'spirit',
-        title: 'Healer Zone',
-        subtitle: '4-7-8 breathwork · mid-week CNS downshift',
+        title: 'Zona de Cura',
+        subtitle: 'Respiração 4-7-8 · redução de CNS mid-week',
         duration_minutes: 12,
         order: 0,
         status: 'pending',
@@ -115,7 +120,7 @@ function buildAbcdeRestDayBlocks(dayIndex: number): GameplanBlock[] {
           mode: 'breathwork',
           tempo_id: 'tempo_478',
           duration_minutes: 12,
-          prescribed_reason: 'Mid-week recovery · Healer Zone & mobility reset.',
+          prescribed_reason: 'Recuperação mid-week · Zona de Cura e reset de mobilidade.',
         },
       },
     ];
@@ -126,8 +131,8 @@ function buildAbcdeRestDayBlocks(dayIndex: number): GameplanBlock[] {
       {
         id: `block-d${dayIndex}-spirit-reset`,
         pillar: 'spirit',
-        title: 'Spirit Reset',
-        subtitle: 'Parasympathetic recovery · weekly close',
+        title: 'Reset Espiritual',
+        subtitle: 'Recuperação parassimpática · fechamento semanal',
         duration_minutes: 15,
         order: 0,
         status: 'pending',
@@ -135,7 +140,7 @@ function buildAbcdeRestDayBlocks(dayIndex: number): GameplanBlock[] {
           mode: 'breathwork',
           tempo_id: 'tempo_478',
           duration_minutes: 15,
-          prescribed_reason: 'Sunday spirit reset · nutrition and nervous system recovery.',
+          prescribed_reason: 'Reset espiritual de domingo · recuperação nutricional e nervosa.',
         },
       },
     ];
@@ -230,141 +235,107 @@ function fallbackConceptKey(exercise: { slug?: string; display_name?: string; na
   return null;
 }
 
-function buildMinimumViableIronExercises(
+function stubFillerPick(exercise: CatalogExercise, prescribedSets: number): EnrichedIronPick {
+  const solverResult: SolverResult = {
+    slotId: `mvp_filler_${exercise.id}`,
+    exerciseId: exercise.id,
+    prescribedSets,
+    score: 0,
+    diagnostic_reason: 'minimum_viable_path_absolute_last_resort',
+  };
+  return {
+    ...solverResult,
+    exercise,
+    prescription: {
+      exercise_id: exercise.id,
+      slug: exercise.slug,
+      display_name: exercise.name,
+      target_sets: prescribedSets,
+      target_reps: exercise.default_reps ?? 10,
+      target_rep_range: `${Math.max(6, (exercise.default_reps ?? 10) - 2)}-${exercise.default_reps ?? 10} @ 3 RIR`,
+      target_rir: 3,
+      target_weight_kg: null,
+      rest_seconds: restSecondsFromCns(exercise.cns_fatigue_cost),
+      diagnostic_reason: 'minimum_viable_path_absolute_last_resort',
+      slot_category: exercise.slot_category,
+      tactical_role: exercise.tactical_role,
+    },
+  };
+}
+
+/**
+ * Pick-level MVP fillers (exerciseId + sets only).
+ * `finalizeIronDayBlockPrescriptions` / mapToIronPrescription adds weight, cues, notes.
+ */
+function createFillerPicks(
   catalog: Awaited<ReturnType<typeof fetchLibraryExercises>>,
   equipment: EquipmentTag[],
   blockedJointProfiles: readonly string[],
   focusLabel: string,
   excludedExerciseIds: ReadonlySet<string> = new Set(),
   excludedConceptKeys: ReadonlySet<string> = new Set(),
-): IronExercisePrescription[] {
+  count: number,
+): EnrichedIronPick[] {
+  if (count <= 0) return [];
+
+  const exerciseCatalog = buildExerciseCatalog(catalog, { includeStarvationAliases: true });
   const usedConceptKeys = new Set(excludedConceptKeys);
-  const selected: Awaited<ReturnType<typeof fetchLibraryExercises>> = [];
+  const selected: CatalogExercise[] = [];
 
   for (const exercise of catalog
-    .filter((exercise) =>
-      !excludedExerciseIds.has(exercise.id) &&
-      isMinimumViableCandidate(exercise, equipment, blockedJointProfiles),
+    .filter(
+      (row) =>
+        !excludedExerciseIds.has(row.id) &&
+        isMinimumViableCandidate(row, equipment, blockedJointProfiles),
     )
     .sort((a, b) => {
       const scoreDelta = candidateScoreForFocus(b, focusLabel) - candidateScoreForFocus(a, focusLabel);
       if (scoreDelta !== 0) return scoreDelta;
       return a.slug.localeCompare(b.slug);
     })) {
-    const conceptKey = fallbackConceptKey(exercise);
+    const catalogExercise = exerciseCatalog.byId.get(exercise.id);
+    if (!catalogExercise) continue;
+    const conceptKey = fallbackConceptKey(catalogExercise);
     if (conceptKey && usedConceptKeys.has(conceptKey)) continue;
     if (conceptKey) usedConceptKeys.add(conceptKey);
-    selected.push(exercise);
-    if (selected.length >= 2) break;
+    selected.push(catalogExercise);
+    if (selected.length >= count) break;
   }
 
-  return selected.map((exercise) => ({
-      exercise_id: exercise.id,
-      slug: exercise.slug,
-      display_name: exercise.name,
-      // Dignity floor — compound fillers get 3 working sets, isolations 2.
-      target_sets: exercise.movement_pattern === 'isolation' ? 2 : 3,
-      target_reps: exercise.default_reps ?? 10,
-      target_rep_range: `${Math.max(6, (exercise.default_reps ?? 10) - 2)}-${exercise.default_reps ?? 10} @ 3 RIR`,
-      target_rir: 3,
-      target_weight_kg: null,
-      rest_seconds: restSecondsFromCns(exercise.cns_fatigue_cost),
-      alternative_exercise_id: null,
-      diagnostic_reason: 'minimum_viable_path_absolute_last_resort',
-      progression_note: 'Minimum viable deload fallback: MRV/CNS relaxed to avoid an empty training day.',
-      execution_technique: 'Standard',
-    }));
+  return selected.map((exercise) => {
+    const prescribedSets = exercise.movement_pattern === 'isolation' ? 2 : 3;
+    return stubFillerPick(exercise, prescribedSets);
+  });
 }
 
-function injectMinimumViableIronWorkouts(
-  microcycle: MicrocycleDay[],
+function injectMinimumViableIronPicks(
+  dayBlocks: IronDayBlock[],
   catalog: Awaited<ReturnType<typeof fetchLibraryExercises>>,
   equipment: EquipmentTag[],
   blockedJointProfiles: readonly string[],
-): MicrocycleDay[] {
+): void {
   const MINIMUM_EXERCISES_PER_TRAINING_DAY = 4;
 
-  return microcycle.map((day) => {
-    if (day.is_rest_day) return day;
-    const blocks = day.blocks.map((block) => {
-      const existingExercises = block.iron?.exercises ?? [];
-      // Anti-collapse: rescue diagnostics on individual picks must NEVER flatten
-      // the whole day — healthy prescriptions keep their sets untouched.
-      if (
-        block.pillar === 'iron' &&
-        existingExercises.length > 0 &&
-        existingExercises.length < MINIMUM_EXERCISES_PER_TRAINING_DAY
-      ) {
-        const excluded = new Set(existingExercises.map((exercise) => exercise.exercise_id));
-        const excludedConcepts = new Set(
-          existingExercises.map(fallbackConceptKey).filter((key): key is string => key != null),
-        );
-        const fillers = buildMinimumViableIronExercises(
-          catalog,
-          equipment,
-          blockedJointProfiles,
-          day.focus_label,
-          excluded,
-          excludedConcepts,
-        ).slice(0, Math.max(0, MINIMUM_EXERCISES_PER_TRAINING_DAY - existingExercises.length));
+  for (const day of dayBlocks) {
+    if (day.picks.length >= MINIMUM_EXERCISES_PER_TRAINING_DAY) continue;
 
-        return {
-          ...block,
-          iron: {
-            ...block.iron,
-            exercises: [...existingExercises, ...fillers],
-          },
-        };
-      }
-
-      if (block.pillar !== 'iron' || (block.iron?.exercises?.length ?? 0) >= 2) return block;
-
-      const exercises = buildMinimumViableIronExercises(
-        catalog,
-        equipment,
-        blockedJointProfiles,
-        day.focus_label,
-      );
-      if (exercises.length === 0) return block;
-
-      return {
-        ...block,
-        subtitle: exercises.map((exercise) => exercise.display_name).filter(Boolean).join(' · '),
-        iron: {
-          routine_id: block.iron?.routine_id ?? `iron_${block.id}`,
-          exercises,
-        },
-      };
-    });
-
-    const hasIron = blocks.some((block) => block.pillar === 'iron');
-    if (hasIron) return { ...day, blocks };
-
-    const exercises = buildMinimumViableIronExercises(
+    const excluded = new Set(day.picks.map((pick) => pick.exerciseId));
+    const excludedConcepts = new Set(
+      day.picks
+        .map((pick) => fallbackConceptKey(pick.exercise))
+        .filter((key): key is string => key != null),
+    );
+    const fillers = createFillerPicks(
       catalog,
       equipment,
       blockedJointProfiles,
-      day.focus_label,
+      day.focusLabel,
+      excluded,
+      excludedConcepts,
+      Math.max(0, MINIMUM_EXERCISES_PER_TRAINING_DAY - day.picks.length),
     );
-    if (exercises.length === 0) return { ...day, blocks };
-
-    return {
-      ...day,
-      blocks: [
-        {
-          id: `block-d${day.day_index}-iron`,
-          pillar: 'iron',
-          title: day.focus_label,
-          subtitle: exercises.map((exercise) => exercise.display_name).filter(Boolean).join(' · '),
-          duration_minutes: 20,
-          order: 0,
-          status: 'pending',
-          iron: { routine_id: `iron_block-d${day.day_index}-iron`, exercises },
-        },
-        ...blocks,
-      ],
-    };
-  });
+    day.picks.push(...fillers);
+  }
 }
 
 function appendNutritionTargets(
@@ -381,14 +352,14 @@ function appendNutritionTargets(
     const nutritionBlock: GameplanBlock = {
       id: `block-d${day.day_index}-nutrition`,
       pillar: 'nutrition',
-      title: 'Biological Fueling',
+      title: 'Nutrição Biológica',
       subtitle: `${target.total_calories} kcal · ${target.carbs_g}g C · ${target.protein_g}g P · ${target.fat_g}g F`,
       duration_minutes: 0,
       order,
       status: 'pending',
       nutrition: {
         goal: biological.nutrition_goal,
-        note: `Peri-workout carbs: ${Math.round(target.carbs_g * target.peri_workout_carb_ratio)}g · Water ${target.water_ml}ml`,
+        note: `Carboidratos peri-treino: ${Math.round(target.carbs_g * target.peri_workout_carb_ratio)}g · Água ${target.water_ml}ml`,
         nutrition_target: target,
       },
     };
@@ -451,7 +422,29 @@ export async function generateDeterministicGameplan(
     blockedJointProfiles: injuryConstraints.blocked_joint_profiles,
     goalIron: biological.goal_iron,
     availableMinutes: pillarTime.available_time_iron,
+    // Defer map so prune → MVP → mapToIronPrescription run in linear order.
+    deferPrescriptionMapping: true,
   });
+
+  // Pipeline (linear): Solver+Coherence (above) → prune → MVP → map → intensity → adaptive → sanitize → authority
+  pruneIronDayBlockPicks(
+    ironMicrocycle,
+    catalog,
+    pillarTime.available_time_iron,
+  );
+  injectMinimumViableIronPicks(
+    ironMicrocycle,
+    catalog,
+    input.equipment,
+    injuryConstraints.blocked_joint_profiles,
+  );
+  finalizeIronDayBlockPrescriptions(
+    ironMicrocycle,
+    ironLogs3w,
+    biological.goal_iron,
+    preferredSplit,
+  );
+
   const ironByDayIndex = new Map(ironMicrocycle.map((day) => [day.dayIndex, day]));
 
   let ironSlot = 0;
@@ -520,19 +513,6 @@ export async function generateDeterministicGameplan(
 
   let orderedMicrocycle = applyNeuroMechanicalOrderingToMicrocycle(microcycle, catalog);
 
-  pruneIronBlocksInMicrocycle(
-    orderedMicrocycle,
-    catalog,
-    pillarTime.available_time_iron,
-  );
-
-  orderedMicrocycle = injectMinimumViableIronWorkouts(
-    orderedMicrocycle,
-    catalog,
-    input.equipment,
-    injuryConstraints.blocked_joint_profiles,
-  );
-
   orderedMicrocycle = applyIntensityStrategies(
     orderedMicrocycle,
     biological,
@@ -550,7 +530,9 @@ export async function generateDeterministicGameplan(
   const adaptationResult = await adaptGameplan(orderedMicrocycle, adaptationInput);
   orderedMicrocycle = adaptationResult.microcycle;
 
-  const exerciseCatalogForAuthority = buildExerciseCatalog(catalog);
+  const exerciseCatalogForAuthority = buildExerciseCatalog(catalog, {
+    includeStarvationAliases: true,
+  });
   orderedMicrocycle = sanitizeMicrocycleIronVolume(orderedMicrocycle, {
     biological,
     catalog: exerciseCatalogForAuthority,
