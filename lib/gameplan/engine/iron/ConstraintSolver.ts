@@ -371,7 +371,12 @@ export function matchesSlotCategory(exercise: CatalogExercise, category: string 
     case 'chest_decline_press':
       return exercise.movement_pattern === 'push' && /decline|dip/.test(text);
     case 'chest_fly':
-      return exercise.movement_pattern === 'isolation' && /fly|pec_deck|crossover/.test(text);
+      // Flat / mid-pec fly only — incline flies belong to chest_incline press day volume.
+      return (
+        exercise.movement_pattern === 'isolation' &&
+        /fly|pec_deck|crossover/.test(text) &&
+        !/incline/.test(text)
+      );
     case 'triceps_compound':
       return (exercise.movement_pattern === 'push' || exercise.movement_pattern === 'isolation') && /dip|close_grip|closegrip|diamond|bench/.test(text);
     case 'triceps_overhead':
@@ -414,7 +419,12 @@ export function matchesSlotCategory(exercise: CatalogExercise, category: string 
           (exercise.movement_pattern === 'lunge' || /split_squat|bulgarian/.test(text)))
       );
     case 'calf_raise':
-      return exercise.primary_muscle === 'calves' && /calf|raise/.test(text);
+      // Standing / gastroc — exclude seated soleus variants.
+      return (
+        exercise.primary_muscle === 'calves' &&
+        /calf|raise/.test(text) &&
+        !/seated|hackenschmitt/.test(text)
+      );
     case 'calf_raise_seated':
       return exercise.primary_muscle === 'calves' && /seated|hackenschmitt|hack_squat/.test(text);
     case 'shoulder_overhead_press':

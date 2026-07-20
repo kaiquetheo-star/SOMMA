@@ -1,4 +1,5 @@
 import type { IronMovementPattern } from '@/lib/gameplan/engine/iron/taxonomy/movementPatterns';
+import type { MuscleSubGroup } from '@/lib/gameplan/engine/iron/anatomicalDivision';
 import type {
   ExerciseCueCard,
   ExerciseTempo,
@@ -66,6 +67,12 @@ export interface CatalogExercise {
   specific_cues?: SpecificExerciseCues;
   /** ABCDEF specialization slot used to prevent conceptual duplicates. */
   slot_category?: string;
+  /** Anatomical sub-groups hit by this exercise (primary + secondary heads). */
+  muscle_sub_groups?: readonly MuscleSubGroup[];
+  /** Dominant anatomical sub-group for MEV / day-min tracking. */
+  primary_sub_group?: MuscleSubGroup | null;
+  /** Synergist heads — credited at SUB_GROUP_SYNERGIST_FRACTION. */
+  synergist_sub_groups?: readonly MuscleSubGroup[];
 }
 
 export interface ExerciseCatalog {

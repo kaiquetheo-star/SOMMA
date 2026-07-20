@@ -22,7 +22,10 @@ interface AliasSeed {
   isolationBoost?: boolean;
 }
 
-function anatomicalPrimaryForAlias(primaryMuscle: string): MuscleSubGroup | null {
+function anatomicalPrimaryForAlias(primaryMuscle: string, slug?: string): MuscleSubGroup | null {
+  if (primaryMuscle === 'calves' && slug && /seated/.test(slug)) {
+    return 'calves_soleus';
+  }
   switch (primaryMuscle) {
     case 'core':
       return 'rectus_abdominis';
@@ -57,8 +60,8 @@ function anatomicalPrimaryForAlias(primaryMuscle: string): MuscleSubGroup | null
   }
 }
 
-function anatomicalSubGroupsForAlias(primaryMuscle: string): readonly MuscleSubGroup[] {
-  const primary = anatomicalPrimaryForAlias(primaryMuscle);
+function anatomicalSubGroupsForAlias(primaryMuscle: string, slug?: string): readonly MuscleSubGroup[] {
+  const primary = anatomicalPrimaryForAlias(primaryMuscle, slug);
   return primary ? [primary] : [];
 }
 
@@ -975,8 +978,8 @@ export function expandStarvationAliases(
       cns_fatigue_cost: Math.min(Math.max(base.cns_fatigue_cost, 2), 4),
       complexity_level: 2,
       // Clear inherited anatomical mapping — aliases target different muscles.
-      muscle_sub_groups: anatomicalSubGroupsForAlias(seed.primary_muscle),
-      primary_sub_group: anatomicalPrimaryForAlias(seed.primary_muscle),
+      muscle_sub_groups: anatomicalSubGroupsForAlias(seed.primary_muscle, seed.slug),
+      primary_sub_group: anatomicalPrimaryForAlias(seed.primary_muscle, seed.slug),
       synergist_sub_groups: [],
     };
     aliases.push(alias);

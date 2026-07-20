@@ -16,6 +16,12 @@ import {
   type VolumeCreditContext,
   type VolumeLimits,
 } from '@/lib/gameplan/engine/iron/volumeMatrix';
+import {
+  emptySubGroupLedger,
+  MUSCLE_GROUPS,
+  SUB_GROUP_SYNERGIST_FRACTION,
+  type MuscleSubGroup,
+} from '@/lib/gameplan/engine/iron/anatomicalDivision';
 import type { PreferredSplit, UserBiological } from '@/types/biological';
 
 /** Minimum effective volume / muscle / week (MEV) — 2× frequency splits (PPL). */
@@ -52,6 +58,13 @@ export interface CanAddSetsResult {
   reason?: string;
 }
 
+export interface SubGroupVolumeCheck {
+  met: boolean;
+  deficit: number;
+  current: number;
+  mev: number;
+}
+
 export interface WeeklyVolumeTracker {
   readonly snapshot: WeeklyVolumeSnapshot;
   /** Slug-keyed ledger of credited sets (resilient to catalog UUID regeneration). */
@@ -62,6 +75,10 @@ export interface WeeklyVolumeTracker {
   debitVolume(exercise: CatalogExercise, sets: number): void;
   canAddSets(exercise: CatalogExercise, sets: number): CanAddSetsResult;
   projectSets(exercise: CatalogExercise, sets: number): ReadonlyMap<string, number>;
+  getSubGroupVolume(subGroup: MuscleSubGroup): number;
+  checkMinVolume(subGroup: MuscleSubGroup): SubGroupVolumeCheck;
+  /** Snapshot of anatomical sub-group ledger (primary 1.0 + synergist 0.33). */
+  readonly subGroupLedger: Readonly<Record<MuscleSubGroup, number>>;
 }
 
 interface MuscleCredit {
@@ -194,6 +211,7 @@ export function createWeeklyVolumeTracker(
   const volumeByMuscle = new Map<string, number>();
   /** Slug → credited sets this week (UUID-regeneration resilient). */
   const weeklySlugLedger = new Map<string, number>();
+  const subGroupLedger = emptySubGroupLedger();
   const legacyWeekStartDate = typeof logsOrWeekStart === 'string' ? logsOrWeekStart : null;
   const biological = resolveBiological(biologicalOrSplit);
   const preferredSplit = resolvePreferredSplit(biologicalOrSplit);
@@ -215,6 +233,33 @@ export function createWeeklyVolumeTracker(
 
   const removeCredit = (muscle: string, sets: number, fraction: number): void => {
     applyDelta(muscle, sets, fraction, -1);
+  };
+
+  const applySubGroupDelta = (
+    exercise: CatalogExercise,
+    sets: number,
+    sign: 1 | -1,
+  ): void => {
+    const safeSets = sanitizeSetCount(sets);
+    if (safeSets <= 0) return;
+
+    const primary = exercise.primary_sub_group;
+    if (primary) {
+      subGroupLedger[primary] = (subGroupLedger[primary] ?? 0) + safeSets * sign;
+    }
+
+    // Secondary heads listed on the exercise (e.g. vastus medialis on squat) get 0.5×.
+    for (const subGroup of exercise.muscle_sub_groups ?? []) {
+      if (subGroup === primary) continue;
+      subGroupLedger[subGroup] = (subGroupLedger[subGroup] ?? 0) + safeSets * 0.5 * sign;
+    }
+
+    for (const synergist of exercise.synergist_sub_groups ?? []) {
+      if (synergist === primary) continue;
+      if ((exercise.muscle_sub_groups ?? []).includes(synergist)) continue;
+      subGroupLedger[synergist] =
+        (subGroupLedger[synergist] ?? 0) + safeSets * SUB_GROUP_SYNERGIST_FRACTION * sign;
+    }
   };
 
   const recordSlugLedger = (slug: string, sets: number, sign: 1 | -1): void => {
@@ -240,11 +285,16 @@ export function createWeeklyVolumeTracker(
     for (const { muscle, fraction } of muscleCreditsForExercise(exercise, logCreditContext)) {
       addCredit(muscle, setCount, fraction);
     }
+    applySubGroupDelta(exercise, setCount, 1);
   }
 
   const tracker: WeeklyVolumeTracker = {
     get weeklySlugLedger(): ReadonlyMap<string, number> {
       return weeklySlugLedger;
+    },
+
+    get subGroupLedger(): Readonly<Record<MuscleSubGroup, number>> {
+      return subGroupLedger;
     },
 
     get snapshot(): WeeklyVolumeSnapshot {
@@ -253,6 +303,17 @@ export function createWeeklyVolumeTracker(
 
     completedSetsForMuscle(muscle: string): number {
       return volumeByMuscle.get(muscle) ?? 0;
+    },
+
+    getSubGroupVolume(subGroup: MuscleSubGroup): number {
+      return subGroupLedger[subGroup] ?? 0;
+    },
+
+    checkMinVolume(subGroup: MuscleSubGroup): SubGroupVolumeCheck {
+      const current = tracker.getSubGroupVolume(subGroup);
+      const mev = MUSCLE_GROUPS[subGroup].mevPerWeek;
+      const deficit = Math.max(0, mev - current);
+      return { met: deficit === 0, deficit, current, mev };
     },
 
     setVolumeCreditContext(context: VolumeCreditContext): void {
@@ -269,6 +330,7 @@ export function createWeeklyVolumeTracker(
       for (const { muscle, fraction } of muscleCreditsForExercise(resolved, creditContext)) {
         addCredit(muscle, safeSets, fraction);
       }
+      applySubGroupDelta(resolved, safeSets, 1);
     },
 
     debitVolume(exercise: CatalogExercise, sets: number): void {
@@ -278,6 +340,7 @@ export function createWeeklyVolumeTracker(
       for (const { muscle, fraction } of muscleCreditsForExercise(resolved, creditContext)) {
         removeCredit(muscle, safeSets, fraction);
       }
+      applySubGroupDelta(resolved, safeSets, -1);
     },
 
     projectSets(exercise: CatalogExercise, sets: number): ReadonlyMap<string, number> {
@@ -304,8 +367,23 @@ export function createWeeklyVolumeTracker(
         };
       }
 
+      // Anatomical hard caps — clamp before coarse muscle MRV when mapped.
+      let anatomicalClamp = safeSets;
+      for (const subGroup of resolved.muscle_sub_groups ?? []) {
+        const definition = MUSCLE_GROUPS[subGroup];
+        const current = subGroupLedger[subGroup] ?? 0;
+        const remaining = Math.max(0, definition.mrvHardPerWeek - current);
+        anatomicalClamp = Math.min(anatomicalClamp, Math.floor(remaining));
+      }
+      if (resolved.primary_sub_group) {
+        const definition = MUSCLE_GROUPS[resolved.primary_sub_group];
+        const current = subGroupLedger[resolved.primary_sub_group] ?? 0;
+        const remaining = Math.max(0, definition.mrvHardPerWeek - current);
+        anatomicalClamp = Math.min(anatomicalClamp, Math.floor(remaining));
+      }
+
       const limit = volumeLimits.mrvHard;
-      let candidateSets = safeSets;
+      let candidateSets = Math.min(safeSets, anatomicalClamp);
 
       while (candidateSets > 0) {
         const projected = tracker.projectSets(resolved, candidateSets);
@@ -329,7 +407,9 @@ export function createWeeklyVolumeTracker(
             clampedSets: candidateSets,
             reason: fullyFits
               ? undefined
-              : `${resolved.primary_muscle} clamped to ${candidateSets} sets to respect MRV_HARD ${limit}`,
+              : anatomicalClamp < safeSets
+                ? `sub_group_mrv_hard_cap:${resolved.primary_sub_group ?? 'unknown'}`
+                : `${resolved.primary_muscle} clamped to ${candidateSets} sets to respect MRV_HARD ${limit}`,
           };
         }
 
@@ -342,7 +422,10 @@ export function createWeeklyVolumeTracker(
         projected,
         projectedVolume: tracker.completedSetsForMuscle(resolved.primary_muscle),
         clampedSets: 0,
-        reason: `${resolved.primary_muscle} already at or above MRV_HARD ${limit}`,
+        reason:
+          anatomicalClamp <= 0 && (resolved.muscle_sub_groups?.length ?? 0) > 0
+            ? `sub_group_mrv_hard_cap:${resolved.primary_sub_group ?? 'unknown'}`
+            : `${resolved.primary_muscle} already at or above MRV_HARD ${limit}`,
       };
     },
   };

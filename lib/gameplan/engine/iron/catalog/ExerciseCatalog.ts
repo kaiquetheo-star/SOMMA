@@ -5,9 +5,11 @@ import {
 } from '@/lib/gameplan/engine/iron/taxonomy/movementPatterns';
 import { expandStarvationAliases } from '@/lib/gameplan/engine/iron/catalog/starvationAliases';
 import { enrichExerciseWithCues } from '@/lib/catalog/biomechanicalMapper';
+import { resolveEliteAnatomicalMapping } from '@/lib/catalog/eliteAnatomicalMap';
 import { inferSlotCategory } from '@/lib/catalog/inferSlotCategory';
 import type { IronMovementPattern } from '@/lib/gameplan/engine/iron/taxonomy/movementPatterns';
 import type { LibraryExercise } from '@/types/catalog';
+import type { MuscleSubGroup } from '@/lib/gameplan/engine/iron/anatomicalDivision';
 
 type ComplexityLevel = 1 | 2 | 3 | 4 | 5;
 
@@ -184,6 +186,11 @@ function toCatalogExercise(row: LibraryExercise): CatalogExercise | null {
   const cns = row.cns_fatigue_cost;
   if (cns == null || cns < 1 || cns > 5) return null;
 
+  const anatomical = resolveEliteAnatomicalMapping(row.slug);
+  const muscle_sub_groups: readonly MuscleSubGroup[] = anatomical?.muscle_sub_groups ?? [];
+  const primary_sub_group: MuscleSubGroup | null = anatomical?.primary_sub_group ?? null;
+  const synergist_sub_groups: readonly MuscleSubGroup[] = anatomical?.synergist_sub_groups ?? [];
+
   return {
     id: row.id,
     slug: row.slug,
@@ -210,6 +217,9 @@ function toCatalogExercise(row: LibraryExercise): CatalogExercise | null {
     resistance_profile: enriched.resistance_profile,
     specific_cues: enriched.specific_cues,
     slot_category: row.slot_category ?? inferSlotCategory(row),
+    muscle_sub_groups,
+    primary_sub_group,
+    synergist_sub_groups,
   };
 }
 

@@ -1,6 +1,9 @@
 /**
  * Elite Hypertrophy offline catalog — generated from supabase/seed_hypertrophy.sql
  * Do not edit by hand. Regenerate with: npx tsx scripts/extractEliteCatalog.ts
+ *
+ * Anatomical sub-group mapping lives in `lib/catalog/eliteAnatomicalMap.ts`
+ * and is applied by `buildExerciseCatalog` (survives seed regeneration).
  */
 import type { LibraryExercise } from '@/types/catalog';
 
