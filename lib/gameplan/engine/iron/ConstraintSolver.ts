@@ -154,17 +154,45 @@ const AXIAL_LOAD_SLUGS = new Set([
   'barbell_back_squat',
   'conventional_deadlift',
   'rack_pull',
-  'barbell_romanian_deadlift',
+  // RDL is hip-hinge / lumbar_shear — not max spinal axial like conventional DL.
+  // Keeping it out of this set avoids double-counting with tactical enrichment.
 ]);
 
-const POSTERIOR_HINGE_PRIORITY = [
-  'romanian_deadlift',
+const HAMSTRING_STRETCH_HINGE_PRIORITY = [
+  'barbell_romanian_deadlift',
   'stiff_leg_deadlift',
-  'stiff_legged_deadlifts',
-  'dumbbell_stiff_leg_deadlift',
-  'good_morning',
-  'barbell_hip_thrust',
+  'dumbbell_romanian_deadlift',
+  'barbell_hip_hinge_good_morning',
 ] as const;
+
+const GLUTE_HINGE_PRIORITY = ['hip_thrust_barbell'] as const;
+
+/** Elite-real hinge order: hamstring stretch first, glute hinge complementary. */
+const POSTERIOR_HINGE_PRIORITY = [
+  ...HAMSTRING_STRETCH_HINGE_PRIORITY,
+  ...GLUTE_HINGE_PRIORITY,
+] as const;
+
+const SCORE_POSTERIOR_HAMSTRING_STRETCH_BOOST = 1800;
+
+function isHamstringStretchHinge(exercise: CatalogExercise): boolean {
+  if ((HAMSTRING_STRETCH_HINGE_PRIORITY as readonly string[]).includes(exercise.slug)) return true;
+  return (
+    exercise.movement_pattern === 'hinge' &&
+    exercise.primary_muscle === 'hamstrings' &&
+    exercise.stretch_mediated_hypertrophy === true
+  );
+}
+
+function isGluteHinge(exercise: CatalogExercise): boolean {
+  return (GLUTE_HINGE_PRIORITY as readonly string[]).includes(exercise.slug);
+}
+
+function dayAlreadyHasHamstringStretchHinge(state: SolverState): boolean {
+  const selected = (state as SolverStateWithSelection).selectedExercises;
+  if (selected?.some((exercise) => isHamstringStretchHinge(exercise))) return true;
+  return false;
+}
 
 function resolveFinisherHints(day: SplitDayKey, slots: readonly SolverSlot[]): readonly string[] {
   if (day === 'push') {
@@ -643,6 +671,16 @@ export function scoreExerciseCandidate(
     score -= SCORE_CONSECUTIVE_AXIAL_PENALTY;
   }
 
+  // Day 5 (posterior): prefer stretch-mediated hamstring hinges over glute-primary hip thrust
+  // for the first hinge_compound so RDL does not lose on CNS alone.
+  if (
+    constraints?.calendarDayIndex === 5 &&
+    isHamstringStretchHinge(exercise) &&
+    exercise.primary_sub_group === 'hamstrings_biceps_fem'
+  ) {
+    score += SCORE_POSTERIOR_HAMSTRING_STRETCH_BOOST;
+  }
+
   return score;
 }
 
@@ -833,8 +871,17 @@ export function collectCandidates(
     }
 
     if (createsConsecutiveAxialLoad(exercise, state, currentDayIndex)) {
-      logCandidateRejection(slot, exercise, 'carga axial em dias consecutivos');
-      continue;
+      // ABCDE Day 4 (pull) → Day 5 (posterior) are consecutive calendar days.
+      // Stretch-mediated hamstring hinges (RDL/stiff-leg) are required on Day 5 and
+      // must not lose the hinge_compound slot to non-axial glute hinges.
+      const allowPosteriorHamstringHinge =
+        slot.category === 'hinge_compound' &&
+        constraints.calendarDayIndex === 5 &&
+        isHamstringStretchHinge(exercise);
+      if (!allowPosteriorHamstringHinge) {
+        logCandidateRejection(slot, exercise, 'carga axial em dias consecutivos');
+        continue;
+      }
     }
 
     // Regra 1.3: deterministic waist-protection blacklist.
@@ -893,7 +940,12 @@ export function pickBestCandidate(
   }
 
   if (slot?.category === 'hinge_compound') {
-    const prioritizedHinge = POSTERIOR_HINGE_PRIORITY
+    // Day 5 posterior chain: 1st hinge = hamstring stretch (RDL/stiff-leg);
+    // complementary hinge = glute (hip thrust) once hamstring stretch is locked.
+    const priorityList = dayAlreadyHasHamstringStretchHinge(state)
+      ? GLUTE_HINGE_PRIORITY
+      : HAMSTRING_STRETCH_HINGE_PRIORITY;
+    const prioritizedHinge = priorityList
       .map((slug) => candidates.find((candidate) => candidate.slug === slug))
       .find((candidate): candidate is CatalogExercise => candidate != null);
 
