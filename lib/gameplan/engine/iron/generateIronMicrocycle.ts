@@ -645,19 +645,6 @@ export function generateIronMicrocycle(input: GenerateIronMicrocycleInput): Iron
       picks: picksFromSolver(picks, catalog, daySlots),
       coherenceValidated: false,
     });
-
-    const shouldAudit = !useSplitTemplate && draft.length === input.ironDayIndices.length;
-    if (shouldAudit && draft.length > 0) {
-      const draftClone = cloneMicrocycle(draft);
-      const report = validateMicrocycleCoherence(draftClone, catalog, constraints, tracker);
-      if (!report.ok) {
-        autoCorrectMicrocycle(draftClone, catalog, constraints, tracker);
-        applyDraftToDayBlocks(dayBlocks, draftClone, catalog, preferredSplit);
-        for (let i = 0; i < draft.length; i += 1) {
-          draft[i] = draftClone[i]!;
-        }
-      }
-    }
   }
 
   if (!useSplitTemplate) {
@@ -679,6 +666,7 @@ export function generateIronMicrocycle(input: GenerateIronMicrocycleInput): Iron
       }
     }
 
+    // Single draft→dayBlocks sync after all coherence corrections.
     applyDraftToDayBlocks(dayBlocks, finalDraft, catalog, preferredSplit);
 
     for (const block of dayBlocks) {
