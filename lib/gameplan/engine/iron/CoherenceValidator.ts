@@ -32,7 +32,6 @@ const FLEXIBLE_RATIO_SLOT_IDS = new Set(['chest_iso', 'chest_compound_b', 'trice
 const SHOULDER_FIX_PRIMARY_MUSCLES = new Set(['side_delts', 'rear_delts']);
 
 const VIOLATION_FIX_ORDER: CoherenceViolation['code'][] = [
-  'WEEKLY_MRV_EXCEEDED',
   'SHOULDER_IMBALANCE',
   'PUSH_PULL_RATIO',
   'MISSING_PATTERN',
@@ -263,31 +262,16 @@ function checkPushPullRatio(
   };
 }
 
-function checkWeeklyMrv(tracker: WeeklyVolumeTracker): CoherenceViolation[] {
-  const violations: CoherenceViolation[] = [];
-  const mrvHard = tracker.snapshot.mrvHard;
-
-  for (const [muscle, volume] of tracker.snapshot.byMuscle) {
-    if (volume > mrvHard) {
-      violations.push({
-        code: 'WEEKLY_MRV_EXCEEDED',
-        severity: 'error',
-        detail: `${muscle} at ${volume.toFixed(1)} effective weekly sets (MRV hard ${mrvHard})`,
-      });
-    }
-  }
-
-  return violations.sort((a, b) => a.detail.localeCompare(b.detail));
-}
 
 /**
  * Post-generation audit — gold laws for PPL microcycles.
+ * MRV overshoot is NOT checked here — `enforceWeeklyAuthority` is the sole MRV trim.
  */
 export function validateMicrocycleCoherence(
   microcycle: readonly MicrocycleDayPlan[],
   catalog: ExerciseCatalog,
   _constraints: SolverConstraints,
-  tracker: WeeklyVolumeTracker,
+  _tracker: WeeklyVolumeTracker,
 ): CoherenceReport {
   const violations: CoherenceViolation[] = [
     ...checkMissingPatterns(microcycle, catalog),
@@ -298,8 +282,6 @@ export function validateMicrocycleCoherence(
 
   const ratioViolation = checkPushPullRatio(microcycle, catalog);
   if (ratioViolation) violations.push(ratioViolation);
-
-  violations.push(...checkWeeklyMrv(tracker));
 
   return {
     ok: violations.length === 0,
@@ -667,58 +649,6 @@ function fixMissingPattern(
   return true;
 }
 
-function fixWeeklyMrv(
-  microcycle: MicrocycleDayPlan[],
-  catalog: ExerciseCatalog,
-  constraints: SolverConstraints,
-  tracker: WeeklyVolumeTracker,
-  swaps: { fromExerciseId: string; toExerciseId: string; reason: string }[],
-): boolean {
-  for (const dayPlan of microcycle) {
-    for (let index = dayPlan.picks.length - 1; index >= 0; index -= 1) {
-      const pick = dayPlan.picks[index]!;
-      const exercise = catalog.byId.get(pick.exerciseId);
-      if (pick.slotId.includes('finisher_extra') || pick.slotId.includes('shoulder_3d_extra')) {
-        continue;
-      }
-      if (!exercise || pick.prescribedSets <= 2) continue;
-
-      const mrvHard = tracker.snapshot.mrvHard;
-      const overloaded = [...tracker.snapshot.byMuscle.entries()].some(
-        ([muscle, volume]) =>
-          volume > mrvHard &&
-          (muscle === exercise.primary_muscle ||
-            exercise.synergist_muscles.includes(muscle)),
-      );
-
-      if (!overloaded) continue;
-
-      const before = validateMicrocycleCoherence(microcycle, catalog, constraints, tracker);
-      tracker.debitVolume(exercise, 1);
-      pick.prescribedSets -= 1;
-
-      const after = validateMicrocycleCoherence(microcycle, catalog, constraints, tracker);
-      if (
-        after.violations.some((v) => v.code === 'WEEKLY_MRV_EXCEEDED') &&
-        !before.violations.some((v) => v.code === 'WEEKLY_MRV_EXCEEDED')
-      ) {
-        pick.prescribedSets += 1;
-        tracker.creditVolume(exercise, 1);
-        continue;
-      }
-
-      swaps.push({
-        fromExerciseId: exercise.id,
-        toExerciseId: exercise.id,
-        reason: 'WEEKLY_MRV_EXCEEDED',
-      });
-      return true;
-    }
-  }
-
-  return false;
-}
-
 function fixViolation(
   microcycle: MicrocycleDayPlan[],
   violation: CoherenceViolation,
@@ -735,7 +665,8 @@ function fixViolation(
     case 'MISSING_PATTERN':
       return fixMissingPattern(microcycle, catalog, constraints, tracker, swaps, violation);
     case 'WEEKLY_MRV_EXCEEDED':
-      return fixWeeklyMrv(microcycle, catalog, constraints, tracker, swaps);
+      // Sole MRV trim: enforceWeeklyAuthority (post-pipeline).
+      return false;
     default:
       return false;
   }

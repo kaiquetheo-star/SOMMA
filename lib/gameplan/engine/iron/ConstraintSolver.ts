@@ -976,29 +976,24 @@ function pushSolverPick(
   const isAbsoluteRescue =
     diagnosticReason === 'injury_constraint' ||
     diagnosticReason === 'minimum_viable_path_absolute_last_resort';
-  const volumeGate = tracker.canAddSets(exercise, prescribedSets);
-  // Anti-collapse dignity floor: rescue picks keep a real training dose —
-  // compounds never below 3 sets, isolations never below 2 (bounded by prescription).
+  // No MRV clamp here — `enforceWeeklyAuthority` is the sole weekly MRV trim.
+  // Rescue picks still keep a dignity floor (compounds ≥3 / isolations ≥2 until setFloors).
   const rescueFloor = exercise.movement_pattern === 'isolation'
     ? MIN_RESCUE_SETS_ISOLATION
     : MIN_RESCUE_SETS_COMPOUND;
-  const clampedSets = isAbsoluteRescue
+  const finalSets = isAbsoluteRescue
     ? Math.max(1, Math.min(prescribedSets, rescueFloor))
-    : Math.min(prescribedSets, volumeGate.clampedSets);
-  if (clampedSets <= 0) return;
+    : prescribedSets;
+  if (finalSets <= 0) return;
 
-  const resolvedDiagnostic =
-    diagnosticReason ??
-    (clampedSets < prescribedSets ? 'volume_authority_mrv_soft_cap' : undefined);
-
-  tracker.creditVolume(exercise, clampedSets);
+  tracker.creditVolume(exercise, finalSets);
   state.usedExerciseIds.add(exercise.id);
   const conceptKey = conceptKeyForSlot(exercise, slot);
   if (conceptKey) state.usedConceptKeys.add(conceptKey);
   state.selectedExercises.push(exerciseWithSlotCategory(exercise, slot));
   state.sessionCnsAccum += exercise.cns_fatigue_cost;
   state.sessionAxialLoad += exercise.axial_loading ?? (isAxialLoadExercise(exercise) ? 3 : 0);
-  state.shoulderSets = applyShoulderLedger(state.shoulderSets, exercise, clampedSets);
+  state.shoulderSets = applyShoulderLedger(state.shoulderSets, exercise, finalSets);
   state.dayHadAxialLoad ||= isAxialLoadExercise(exercise);
 
   const slotTechnique = advancedTechniqueAllowed(slot.intensity_technique, exercise)
@@ -1011,21 +1006,21 @@ function pushSolverPick(
   picks.push({
     slotId: slot.slotId,
     exerciseId: exercise.id,
-    prescribedSets: clampedSets,
+    prescribedSets: finalSets,
     score,
     diagnostic_reason: diagnosticReasonForPrescribedSets(
       slot,
       exercise,
-      clampedSets,
+      finalSets,
       phase ?? 'maintenance',
       budget ?? {
-        minSets: clampedSets,
-        maxSets: clampedSets,
+        minSets: finalSets,
+        maxSets: finalSets,
         targetRepRange: `${exercise.default_reps}-${exercise.default_reps}`,
         targetRIR: 2,
         executionTechnique: 'Standard',
       },
-      resolvedDiagnostic,
+      diagnosticReason,
     ),
     intensity_technique: slotTechnique ?? budgetTechnique,
     technique_params: slotTechnique ? slot.technique_params : undefined,
