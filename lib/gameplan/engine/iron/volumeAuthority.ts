@@ -11,18 +11,17 @@ import {
 import type { IronExercisePrescription, MicrocycleDay } from '@/types/gameplan';
 import type { PreferredSplit, UserBiological } from '@/types/biological';
 import { normalizePreferredSplit } from '@/types/biological';
+import { setFloorForExercise } from '@/lib/gameplan/engine/iron/setFloors';
 
-/** Dignity floor — authority pass never trims below this set count per exercise. */
-export const MIN_SETS_PER_EXERCISE = 2;
-/** Compounds never leave the authority pass below 3 working sets. */
-export const MIN_SETS_COMPOUND = 3;
-/** Isolations never leave the authority pass below 2 working sets. */
-export const MIN_SETS_ISOLATION = 2;
+/** @deprecated Use setFloorForExercise — kept for test imports. */
+export const MIN_SETS_PER_EXERCISE = 1;
+/** @deprecated Constitution compound floor is 2 via setFloors. */
+export const MIN_SETS_COMPOUND = 2;
+/** @deprecated Constitution isolation floor is 1 via setFloors. */
+export const MIN_SETS_ISOLATION = 1;
 
 function minSetsForExercise(catalogExercise: CatalogExercise): number {
-  return catalogExercise.movement_pattern === 'isolation'
-    ? MIN_SETS_ISOLATION
-    : MIN_SETS_COMPOUND;
+  return setFloorForExercise(catalogExercise);
 }
 
 interface MutableExerciseRef {

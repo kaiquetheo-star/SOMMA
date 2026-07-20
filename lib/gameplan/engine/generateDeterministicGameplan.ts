@@ -45,6 +45,7 @@ import { enforceWeeklyAuthority } from '@/lib/gameplan/engine/iron/volumeAuthori
 import { createWeeklyVolumeTracker } from '@/lib/gameplan/engine/iron/WeeklyVolumeTracker';
 import type { CatalogExercise } from '@/lib/gameplan/engine/iron/types';
 import type { SolverResult } from '@/lib/gameplan/engine/iron/types';
+import { setFloorForExercise } from '@/lib/gameplan/engine/iron/setFloors';
 import {
     dateForDayIndex,
     getDayIndexForDate,
@@ -303,7 +304,7 @@ function createFillerPicks(
   }
 
   return selected.map((exercise) => {
-    const prescribedSets = exercise.movement_pattern === 'isolation' ? 2 : 3;
+    const prescribedSets = setFloorForExercise(exercise);
     return stubFillerPick(exercise, prescribedSets);
   });
 }

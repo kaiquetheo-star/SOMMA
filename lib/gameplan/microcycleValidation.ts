@@ -6,6 +6,7 @@ import {
   isCompoundExercise,
   resolveEffectiveMesocyclePhase,
 } from '@/lib/gameplan/engine/iron/volumePeriodization';
+import { applySetFloors } from '@/lib/gameplan/engine/iron/setFloors';
 import { initialBiologicalProfile } from '@/types/biological';
 
 export { enforceWeeklyAuthority } from '@/lib/gameplan/engine/iron/volumeAuthority';
@@ -127,11 +128,15 @@ function sanitizeTargetSetsWithBudget(
     };
   }
 
-  if (safe < budget.minSets && mesocyclePhase !== 'deload' && !isForcedLowVolume) {
+  const constitutionFloor = applySetFloors(
+    safe,
+    catalogExercise.tactical_role ?? exercise.tactical_role,
+  );
+  if (safe < constitutionFloor && mesocyclePhase !== 'deload' && !isForcedLowVolume) {
     return {
       ...exercise,
-      target_sets: budget.minSets,
-      diagnostic_reason: `Adjusted to minimum: ${budget.minSets} sets for ${mesocyclePhase} phase`,
+      target_sets: constitutionFloor,
+      diagnostic_reason: `Adjusted to Constitution floor: ${constitutionFloor} sets`,
     };
   }
 

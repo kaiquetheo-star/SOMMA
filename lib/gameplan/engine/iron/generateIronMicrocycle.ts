@@ -20,6 +20,7 @@ import {
 } from '@/lib/gameplan/engine/iron/ConstraintSolver';
 import { mapToIronPrescription } from '@/lib/gameplan/engine/iron/loadPrescriptionMapper';
 import { getVolumeBudgetForHormonalProfile } from '@/lib/gameplan/engine/iron/hormonalProfile';
+import { applySetFloors, setFloorForExercise } from '@/lib/gameplan/engine/iron/setFloors';
 import { PPL_DAY_SLOTS, PPL_ROTATION, resolvePplDayTemplate } from '@/lib/gameplan/engine/iron/splits/pplSplit';
 import { resolveAbcdefDayTemplate } from '@/lib/gameplan/engine/iron/splits/abcdefSplit';
 import { resolveAbcdeDayTemplate, type AbcdeDayTemplate } from '@/lib/gameplan/engine/iron/splits/abcdeSplit';
@@ -436,11 +437,11 @@ function validateIronDayBlockVolume(
       const { exercise, score, usedLastResort } = selection;
       const isMinimumViableVolumeFloor = block.picks.length < 2 && usedLastResort;
       const { prescribedSets, budget } = prescribedSetsForSlot(slot, exercise, constraints);
-      // Anti-collapse dignity floor: even last-resort fills keep a real dose.
-      const dignityFloor = exercise.movement_pattern === 'isolation' ? 2 : 3;
+      // Constitution floors: compound ≥2, isolation ≥1.
+      const dignityFloor = setFloorForExercise(exercise);
       const requestedFallbackSets = isMinimumViableVolumeFloor
-        ? Math.min(dignityFloor, prescribedSets)
-        : Math.max(dignityFloor, prescribedSets);
+        ? Math.min(dignityFloor, applySetFloors(prescribedSets, exercise.tactical_role))
+        : applySetFloors(prescribedSets, exercise.tactical_role);
       const volumeGate = tracker.canAddSets(exercise, requestedFallbackSets);
       const fallbackSets = Math.min(requestedFallbackSets, volumeGate.clampedSets);
       if (fallbackSets <= 0) continue;

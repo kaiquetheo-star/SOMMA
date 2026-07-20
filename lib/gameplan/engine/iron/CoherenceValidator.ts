@@ -17,6 +17,7 @@ import type {
   SplitDayKey,
 } from '@/lib/gameplan/engine/iron/types';
 import type { EquipmentTag } from '@/store/useSommaStore';
+import { applySetFloors } from '@/lib/gameplan/engine/iron/setFloors';
 
 /** Gold rule — lateral + posterior shoulder volume vs anterior (weekly sets). */
 export const SHOULDER_BALANCE_RATIO = 0.6;
@@ -262,7 +263,6 @@ function checkPushPullRatio(
   };
 }
 
-
 /**
  * Post-generation audit — gold laws for PPL microcycles.
  * MRV overshoot is NOT checked here — `enforceWeeklyAuthority` is the sole MRV trim.
@@ -404,7 +404,20 @@ function fixShoulderImbalance(
   tracker: WeeklyVolumeTracker,
   swaps: { fromExerciseId: string; toExerciseId: string; reason: string }[],
 ): boolean {
-  const pushDay = microcycle.find((row) => row.day === 'push');
+  const pushDays = microcycle.filter((row) => row.day === 'push');
+  // Prefer dedicated shoulder / X-Frame day so chest+triceps Day 1 is not displaced by 3D extras.
+  const pushDay =
+    pushDays.find((row) =>
+      row.picks.some(
+        (pick) =>
+          pick.slotId.includes('shoulder_') ||
+          pick.slotId.includes('trap_') ||
+          pick.slotId.includes('biceps_') ||
+          pick.slotId.includes('triceps_extension'),
+      ),
+    ) ??
+    pushDays[pushDays.length - 1] ??
+    pushDays[0];
   if (!pushDay) return false;
 
   const shoulderTotals = sumShoulderRegions(microcycle, catalog);
@@ -417,7 +430,10 @@ function fixShoulderImbalance(
   if (lateralPosteriorDeficit <= 0) return false;
 
   const exclude = usedExerciseIds(microcycle);
-  const sets = Math.min(MAX_ISOLATION_SETS_PER_PICK, Math.max(3, lateralPosteriorDeficit));
+  const sets = Math.min(
+    MAX_ISOLATION_SETS_PER_PICK,
+    applySetFloors(Math.max(1, lateralPosteriorDeficit), 'isolation_metabolic'),
+  );
   const availableSeconds = Math.max(0, constraints.available_time_minutes) * 60;
 
   const candidates = catalog.exercises
@@ -463,7 +479,7 @@ function fixShoulderImbalance(
         miniSets: 3,
         miniSetReps: 5,
         intraSetRestSeconds: 20,
-        note: 'Shoulder 3D correction by addition; compounds preserved.',
+        note: 'Correção 3D de ombros por adição; compostos preservados.',
       },
     });
     swaps.push({
@@ -498,7 +514,7 @@ function fixShoulderImbalance(
           miniSets: 3,
           miniSetReps: 5,
           intraSetRestSeconds: 20,
-          note: 'Shoulder 3D correction by added volume; compounds preserved.',
+          note: 'Correção 3D de ombros por volume adicional; compostos preservados.',
         };
       }
       swaps.push({
@@ -637,7 +653,7 @@ function fixMissingPattern(
 
   if (alreadyPresent) return false;
 
-  const sets = Math.max(3, replacement.default_sets);
+  const sets = applySetFloors(replacement.default_sets, replacement.tactical_role);
   if (!tracker.canAddSets(replacement, sets).allowed) return false;
   tracker.creditVolume(replacement, sets);
   dayPlan.picks.push({

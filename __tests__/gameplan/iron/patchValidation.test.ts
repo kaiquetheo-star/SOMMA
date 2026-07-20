@@ -255,10 +255,12 @@ describe('Iron patch validation: Minimum Viable Workout Fallback', () => {
 
     // When MRV is already saturated, the correct coaching response is a rescue path with
     // dignity-floor sets (compounds ≤3 / isolations ≤2), never an empty workout screen.
+    // When MRV is already saturated, the correct coaching response is a rescue path with
+    // Constitution floor sets (compounds ≥2 / isolations ≥1), never an empty workout screen.
     expect(exercises.length).toBeGreaterThanOrEqual(2);
     expect(exercises.length).toBeLessThanOrEqual(3);
     expect(exercises.every((exercise) => exercise.target_sets <= 3)).toBe(true);
-    expect(exercises.every((exercise) => exercise.target_sets >= 2)).toBe(true);
+    expect(exercises.every((exercise) => exercise.target_sets >= 1)).toBe(true);
     expect(exercises.length).toBeGreaterThanOrEqual(2);
     // Axial squat/hinge must not dominate the injury/MVP rescue path.
     const axialCount = exercises.filter(

@@ -17,6 +17,9 @@ import {
   mandatoryCompoundGroupsForDay,
 } from '@/lib/gameplan/engine/iron/mandatoryCompounds';
 import type { IronMovementPattern } from '@/lib/gameplan/engine/iron/taxonomy/movementPatterns';
+import { MUSCLE_GROUPS } from '@/lib/gameplan/engine/iron/anatomicalDivision';
+import { getAbcdeTrainingDayByCalendarIndex } from '@/lib/gameplan/engine/iron/splits/abcdeSplit';
+import { setFloorForExercise } from '@/lib/gameplan/engine/iron/setFloors';
 import type {
   CatalogExercise,
   ExerciseCatalog,
@@ -48,14 +51,16 @@ const SCORE_MASTERY_COMPLEXITY_BONUS = 60;
 const SCORE_REPEAT_COMPOUND_PENALTY = 350;
 const SCORE_CONSECUTIVE_AXIAL_PENALTY = 1000;
 const SCORE_DUP_MATCH_BONUS = 650;
+const SCORE_SUB_GROUP_MEV_BOOST = 1500;
+const SCORE_DAY_MIN_SETS_BOOST = 1200;
 const MAX_DAILY_AXIAL_LOAD = 6;
 const FINISHER_MIN_REMAINING_SECONDS = 5 * 60;
 const MINIMUM_VIABLE_WORKOUT_EXERCISE_COUNT = 2;
 const MINIMUM_VIABLE_WORKOUT_SETS = 3;
 const MINIMUM_FULL_WORKOUT_EXERCISE_COUNT = 4;
-/** Anti-collapse dignity floors — rescue paths never prescribe token 1-2 set compounds. */
-export const MIN_RESCUE_SETS_COMPOUND = 3;
-export const MIN_RESCUE_SETS_ISOLATION = 2;
+/** @deprecated Constitution floors live in setFloors.ts (compound 2 / isolation 1). */
+export const MIN_RESCUE_SETS_COMPOUND = 2;
+export const MIN_RESCUE_SETS_ISOLATION = 1;
 const BODYWEIGHT_BLACKLIST = new Set([
   'pull_up',
   'chin_up',
@@ -188,7 +193,7 @@ const FINISHER_TECHNIQUE: {
     miniSets: 3,
     miniSetReps: 5,
     intraSetRestSeconds: 20,
-    note: 'Low-CNS finisher to spend remaining time budget without axial fatigue.',
+    note: 'Finalizador de baixo CNS para consumir o tempo restante sem fadiga axial.',
   },
 };
 
@@ -264,6 +269,21 @@ export function isRedundant(
       if (!slotCategoryAllowsMultiple(candidate.slot_category, daySlotConfig)) return true;
     }
 
+    // Distinct ABCDE arm/shoulder specialization slots may share primary muscle + pattern.
+    if (
+      candidate.slot_category &&
+      selected.slot_category &&
+      candidate.slot_category !== selected.slot_category &&
+      (ARM_ISOLATION_SLOT_CATEGORIES.has(candidate.slot_category) ||
+        candidate.slot_category.startsWith('shoulder_') ||
+        candidate.slot_category.startsWith('triceps_') ||
+        candidate.slot_category.startsWith('biceps_') ||
+        candidate.slot_category.startsWith('chest_') ||
+        candidate.slot_category.startsWith('core_'))
+    ) {
+      return false;
+    }
+
     if (
       candidate.primary_muscle === selected.primary_muscle &&
       candidate.movement_pattern === selected.movement_pattern &&
@@ -333,11 +353,17 @@ export function matchesSlotCategory(exercise: CatalogExercise, category: string 
     case 'back_horizontal_row':
       return exercise.movement_pattern === 'pull' && /row|(^|_)t_bar|pendlay|gorilla/.test(text);
     case 'biceps_curl_long_head':
-      return exercise.primary_muscle === 'biceps' && /incline|bayesian|drag|curl/.test(text);
+      return (
+        exercise.primary_muscle === 'biceps' &&
+        (/bayesian|drag/.test(text) || (/incline/.test(text) && /curl/.test(text) && !/hammer|preacher|spider/.test(text)))
+      );
     case 'biceps_curl_short_head':
-      return exercise.primary_muscle === 'biceps' && /preacher|spider|concentration|curl/.test(text);
+      return exercise.primary_muscle === 'biceps' && /preacher|spider|concentration/.test(text);
     case 'biceps_hammer':
-      return exercise.primary_muscle === 'biceps' && /hammer/.test(text);
+      return (
+        (exercise.primary_muscle === 'biceps' || exercise.primary_muscle === 'brachialis') &&
+        /hammer/.test(text)
+      );
     case 'biceps_curl':
       return exercise.primary_muscle === 'biceps' && /curl/.test(text);
     case 'quad_compound':
@@ -372,7 +398,10 @@ export function matchesSlotCategory(exercise: CatalogExercise, category: string 
     case 'forearm_isolation':
       return exercise.primary_muscle === 'forearms' || /forearm|wrist|reverse_curl/.test(text);
     case 'core_anti_extension':
-      return exercise.primary_muscle === 'core' && /crunch|ab|plank|rollout|stabilization|hanging_knee/.test(text);
+      return (
+        exercise.primary_muscle === 'core' &&
+        /crunch|plank|rollout|stabilization|hanging_knee|hollow|ab_crunch/.test(text)
+      );
     case 'core_rotation':
       return exercise.primary_muscle === 'core' && /rotation|twist|russian|woodchop|pallof/.test(text);
     case 'hinge_compound':
@@ -553,6 +582,7 @@ function tacticalOrderRank(exercise: CatalogExercise): number {
  * - Regra 1.1/2: muscles below MEV get a deterministic rescue boost (+2000).
  * - Regra 2.2: redundant synergist fatigue is penalized (−500 × accumulated effective sets).
  * - Regra 2.2: high CNS cost is penalized (−100 × cost).
+ * - Anatomical: sub-group below MEV / day minSets gets rescue boost.
  */
 export function scoreExerciseCandidate(
   exercise: CatalogExercise,
@@ -575,6 +605,23 @@ export function scoreExerciseCandidate(
     }
   } else if (primaryVolume > mrvSoft && primaryVolume <= mrvHard) {
     score -= SCORE_MRV_SOFT_PENALTY;
+  }
+
+  const primarySub = exercise.primary_sub_group;
+  if (primarySub && constraints?.calendarDayIndex != null) {
+    const subVolume = tracker.getSubGroupVolume(primarySub);
+    const definition = MUSCLE_GROUPS[primarySub];
+    if (subVolume < definition.mevPerWeek) {
+      score += SCORE_SUB_GROUP_MEV_BOOST + SCORE_MEV_BOOST * (definition.priority === 'high' ? 1 : 0.5);
+    } else if (subVolume > definition.mrvSoftPerWeek) {
+      score -= SCORE_MRV_SOFT_PENALTY;
+    }
+
+    const dayTemplate = getAbcdeTrainingDayByCalendarIndex(constraints.calendarDayIndex);
+    const dayMin = dayTemplate?.minSets[primarySub] ?? 0;
+    if (dayMin > 0 && subVolume < dayMin) {
+      score += SCORE_DAY_MIN_SETS_BOOST;
+    }
   }
 
   const overlap = synergistOverlapLoad(exercise, tracker);
@@ -977,12 +1024,9 @@ function pushSolverPick(
     diagnosticReason === 'injury_constraint' ||
     diagnosticReason === 'minimum_viable_path_absolute_last_resort';
   // No MRV clamp here — `enforceWeeklyAuthority` is the sole weekly MRV trim.
-  // Rescue picks still keep a dignity floor (compounds ≥3 / isolations ≥2 until setFloors).
-  const rescueFloor = exercise.movement_pattern === 'isolation'
-    ? MIN_RESCUE_SETS_ISOLATION
-    : MIN_RESCUE_SETS_COMPOUND;
+  // Absolute rescue uses Constitution floor dose (compound 2 / isolation 1).
   const finalSets = isAbsoluteRescue
-    ? Math.max(1, Math.min(prescribedSets, rescueFloor))
+    ? setFloorForExercise(exercise)
     : prescribedSets;
   if (finalSets <= 0) return;
 
@@ -1300,12 +1344,20 @@ export function solveDaySlots(
   const targetSeconds = Math.max(0, constraints.available_time_minutes) * 60;
   let finisherIndex = 0;
   const finisherHints = resolveFinisherHints(day, slots);
+  const templateFilled = slots.every((slot) => filledSlotIds.has(slot.slotId));
 
   while (targetSeconds - estimatedSeconds > FINISHER_MIN_REMAINING_SECONDS && finisherIndex < 48) {
-    if (picks.length >= 7 && maybeIncreaseExistingLowCnsIsolation(picks, catalog, tracker, constraints)) {
+    // Prefer densifying existing low-CNS isolation over inventing extra movements.
+    if (maybeIncreaseExistingLowCnsIsolation(picks, catalog, tracker, constraints)) {
       estimatedSeconds = estimateSessionSeconds(picks, catalog);
       finisherIndex += 1;
       continue;
+    }
+
+    // When all template slots are filled, do not inject finisher spam that later
+    // displaces prescribed triceps/biceps under the time-budget prune.
+    if (templateFilled || picks.length >= Math.max(slots.length, 7)) {
+      break;
     }
 
     const stateForFinisher: SolverStateWithSelection = {
@@ -1336,9 +1388,7 @@ export function solveDaySlots(
       continue;
     }
 
-    if (!maybeIncreaseExistingLowCnsIsolation(picks, catalog, tracker, constraints)) break;
-    estimatedSeconds = estimateSessionSeconds(picks, catalog);
-    finisherIndex += 1;
+    break;
   }
 
   const weeklyVolume = cloneWeeklySnapshot(tracker);
