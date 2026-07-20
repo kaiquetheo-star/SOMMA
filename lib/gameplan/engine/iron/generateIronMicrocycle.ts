@@ -442,8 +442,8 @@ function validateIronDayBlockVolume(
       const requestedFallbackSets = isMinimumViableVolumeFloor
         ? Math.min(dignityFloor, applySetFloors(prescribedSets, exercise.tactical_role))
         : applySetFloors(prescribedSets, exercise.tactical_role);
-      const volumeGate = tracker.canAddSets(exercise, requestedFallbackSets);
-      const fallbackSets = Math.min(requestedFallbackSets, volumeGate.clampedSets);
+      // No MRV clamp — enforceWeeklyAuthority is the sole weekly MRV trim.
+      const fallbackSets = requestedFallbackSets;
       if (fallbackSets <= 0) continue;
 
       const solverResult: SolverResult = {
@@ -453,9 +453,7 @@ function validateIronDayBlockVolume(
         score,
         diagnostic_reason: isMinimumViableVolumeFloor
           ? 'minimum_viable_path_absolute_last_resort'
-          : fallbackSets < requestedFallbackSets
-            ? 'volume_floor_fallback_mrv_clamped'
-            : 'volume_floor_fallback',
+          : 'volume_floor_fallback',
         intensity_technique: slot.intensity_technique,
         technique_params: slot.technique_params,
         targetRepRange: budget.targetRepRange,
