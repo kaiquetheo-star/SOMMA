@@ -140,14 +140,14 @@ export function applyDoubleProgression(input: {
     return {
       weight: Math.round(weightKg * 1.025 * 10) / 10,
       targetReps: targetRepsTop,
-      note: 'Hit rep top — +2.5% load',
+      note: 'Topo de reps atingido — +2,5% de carga',
     };
   }
 
   return {
     weight: weightKg,
     targetReps: targetRepsTop,
-    note: `Reps ${bestSetReps}/${targetRepsTop} — add reps before load`,
+    note: `Reps ${bestSetReps}/${targetRepsTop} — adicione reps antes da carga`,
   };
 }
 
@@ -184,12 +184,14 @@ function repRangeForDupFocus(
 }
 
 function displayTechnique(technique: SolverResult['intensity_technique']): string {
-  if (!technique || technique === 'standard') return 'Standard';
+  if (!technique || technique === 'standard') return 'Padrão';
+  if (technique === 'myo_reps') return 'Séries myo';
+  if (technique === 'drop_set') return 'Séries drop';
+  if (technique === 'rest_pause') return 'Pausa-descanso';
   return technique
     .split('_')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join('-')
-    .replace('Myo-Reps', 'Myo-Reps');
+    .join('-');
 }
 
 /**
@@ -238,7 +240,7 @@ export function mapToIronPrescription(
 
   if (bestSet != null) {
     targetWeight = Math.round(bestSet.weightKg * 10) / 10;
-    notes.push(`Best working set ${targetWeight} kg × ${bestSet.reps} — calibrate @ ${targetRir} RIR`);
+    notes.push(`Melhor série de trabalho ${targetWeight} kg × ${bestSet.reps} — calibre @ ${targetRir} RIR`);
 
     const progressed = applyDoubleProgression({
       weightKg: targetWeight,
@@ -252,7 +254,7 @@ export function mapToIronPrescription(
     targetWeight = targetWeightFromE1RM(resolvedE1rm, goalIron, targetReps, targetRir);
     notes.push(`E1RM ${resolvedE1rm} kg (Epley, 21d)`);
   } else {
-    notes.push('Calibrate first set @ prescribed RIR');
+    notes.push('Calibre a primeira série @ RIR prescrito');
   }
 
   if (isIronPrescriptionDebug) {
@@ -278,7 +280,7 @@ export function mapToIronPrescription(
     target_rir: targetRir,
     target_weight_kg: targetWeight,
     rest_seconds: computeRestSecondsFromCns(exercise.cns_fatigue_cost),
-    progression_note: notes.join(' · ') || 'Calibrate First Set',
+    progression_note: notes.join(' · ') || 'Calibre a primeira série',
     execution_technique: displayTechnique(solverResult.intensity_technique),
     tempo: dailyFocus?.defaultTempo ?? exercise.tempo,
     cue_card: mapToExerciseCueCard(exercise, dayFocus),

@@ -9,12 +9,15 @@ import {
 import type { LibraryExercise } from '@/types/catalog';
 
 const DROP_SET_NOTE =
-  'Drop-Set: Execute até a falha, reduza 20% da carga e repita até a falha novamente. Sem descanso. (Não use a série drop como âncora de progressão — preserve o Best Working Set.)';
+  'Drop-set: execute até a falha, reduza 20% da carga e repita até a falha novamente, sem descanso. (Não use a série drop como âncora de progressão — preserve a melhor série de trabalho.)';
 const REST_PAUSE_NOTE =
-  'Rest-Pause: Última série até a falha, descanse 15s, repita com a mesma carga até a falha técnica.';
-const PRE_EXHAUST_NOTE = 'Pré-Exaustão: Execute este isolador antes do composto principal para aumentar recrutamento local.';
-const BI_SET_NOTE = 'Bi-Set Same Muscle: execute em sequência com o par indicado, descansando apenas ao fim do par.';
-const WEIGHTED_BODYWEIGHT_NOTE = 'Loading: WEIGHTED (+10kg) para calibrar força relativa avançada.';
+  'Pausa-descanso: última série até a falha, descanse 15s e repita com a mesma carga até a falha técnica.';
+const PRE_EXHAUST_NOTE =
+  'Pré-exaustão: execute este isolador antes do composto principal para aumentar o recrutamento local.';
+const BI_SET_NOTE =
+  'Bi-set no mesmo músculo: execute em sequência com o par indicado, descansando apenas ao fim do par.';
+const WEIGHTED_BODYWEIGHT_NOTE =
+  'Carga externa (+10 kg) para calibrar força relativa avançada.';
 
 const DROP_SET_ISOLATION_SLUGS = /fly|pec_deck|leg_extension|leg_curl|curl|raise|pushdown|extension|face_pull/i;
 const NON_TARGET_DROP_SET_SLUGS = /calf|abdominal|crunch|plank|dead_bug|pallof/i;
@@ -133,7 +136,9 @@ function applyPreExhaust(exercises: IronExercisePrescription[], focusLabel: stri
   if (!isolation) return exercises;
   next.splice(Math.max(0, compoundIndex), 0, {
     ...isolation,
-    execution_technique: isolation.execution_technique === 'Standard' ? 'PRE_EXHAUST' : isolation.execution_technique,
+    execution_technique: isolation.execution_technique === 'Padrão' || isolation.execution_technique === 'Standard'
+      ? 'Pré-exaustão'
+      : isolation.execution_technique,
     progression_note: appendNote(isolation.progression_note, PRE_EXHAUST_NOTE),
   });
   return /Isolation Focus/i.test(focusLabel) ? next : exercises;
@@ -197,13 +202,14 @@ function applyDayStrategies(
         exercises[dropSetIndex] = {
           ...exercise,
           target_sets: Math.min(exercise.target_sets, 4),
-          execution_technique: 'DROP_SET',
+          execution_technique: 'Séries drop',
           progression_note: appendNote(exercise.progression_note, DROP_SET_NOTE),
         };
       }
 
       const restPauseIndex = exercises.findIndex(
         (exercise) =>
+          exercise.execution_technique !== 'Séries drop' &&
           exercise.execution_technique !== 'DROP_SET' &&
           isCompoundLike(exercise) &&
           compatibleWith(exercise, catalog, IntensityTechnique.REST_PAUSE),
@@ -212,7 +218,7 @@ function applyDayStrategies(
         const exercise = exercises[restPauseIndex]!;
         exercises[restPauseIndex] = {
           ...exercise,
-          execution_technique: 'REST_PAUSE',
+          execution_technique: 'Pausa-descanso',
           progression_note: appendNote(exercise.progression_note, REST_PAUSE_NOTE),
         };
       }

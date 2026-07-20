@@ -96,14 +96,9 @@ export function pruneIronBlocksInMicrocycle(
         availableMinutes,
       );
 
-      const names = exercises
-        .map((row) => row.display_name)
-        .filter(Boolean)
-        .join(' · ');
-
       return {
         ...block,
-        subtitle: names || block.subtitle,
+        subtitle: `${exercises.length} movimentos · sessão Iron`,
         iron: { ...block.iron, exercises },
       };
     });

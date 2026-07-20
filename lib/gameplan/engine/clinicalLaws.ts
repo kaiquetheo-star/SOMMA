@@ -90,13 +90,9 @@ function orderGameplanBlock(
 ): GameplanBlock {
   if (block.pillar === 'iron' && block.iron?.exercises?.length) {
     const exercises = sortIronExercises(block.iron.exercises, catalog, prerequisiteSlugs);
-    const subtitle = exercises
-      .map((row) => row.display_name)
-      .filter(Boolean)
-      .join(' · ');
     return {
       ...block,
-      subtitle: subtitle || block.subtitle,
+      subtitle: `${exercises.length} movimentos · sessão Iron`,
       iron: { ...block.iron, exercises },
     };
   }

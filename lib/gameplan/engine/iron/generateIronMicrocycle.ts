@@ -738,16 +738,14 @@ export function buildIronGameplanBlock(
   prerequisiteSlugs: string[] = [],
 ): GameplanBlock {
   const exercises = ironDayBlockToPrescriptions(ironDay, libraryExercises, prerequisiteSlugs);
-  const names = exercises
-    .map((row) => row.display_name)
-    .filter(Boolean)
-    .join(' · ');
+  // Subtitle stays PT-BR — exercise catalog names remain English on display_name only.
+  const subtitle = `${exercises.length} movimentos · sessão Iron`;
 
   return {
     id: blockId,
     pillar: 'iron',
     title: ironDay.focusLabel,
-    subtitle: names || ironDay.focusLabel,
+    subtitle,
     duration_minutes: durationMinutes,
     order,
     status: 'pending',

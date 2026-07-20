@@ -899,10 +899,10 @@ const ALIAS_SEEDS: readonly AliasSeed[] = [
 
 function fallbackCue(name: string): CatalogExercise['cue_card'] {
   return {
-    setup: `Set up for ${name} with controlled tension.`,
-    vector: 'Drive through the intended line of force.',
-    catch: 'Own the lockout without losing joint stack.',
-    anti_pattern: 'Avoid momentum and end-range collapse.',
+    setup: `Prepare-se para ${name} com tensão controlada.`,
+    vector: 'Dirija a força pela linha pretendida do movimento.',
+    catch: 'Domine o lockout sem perder o empilhamento articular.',
+    anti_pattern: 'Evite impulso e colapso no fim da amplitude.',
     failure_type: 'technical',
   };
 }
@@ -910,11 +910,12 @@ function fallbackCue(name: string): CatalogExercise['cue_card'] {
 /** Alias-owned cue card — never copy the Elite base movement cues. */
 function aliasCueCard(seed: AliasSeed): NonNullable<CatalogExercise['cue_card']> {
   const baseLabel = seed.baseSlug.replace(/_/g, ' ');
+  const muscleLabel = seed.primary_muscle.replace(/_/g, ' ');
   return {
-    setup: `${seed.name}: organize a stable start for ${seed.primary_muscle}; brace before the first rep.`,
-    vector: `Drive ${seed.name} on a clean ${seed.movement_pattern} path targeting ${seed.primary_muscle}.`,
-    catch: `Finish ${seed.name} with owned end-range tension on ${seed.primary_muscle}.`,
-    anti_pattern: `Do not import ${baseLabel} mechanics into ${seed.name}.`,
+    setup: `${seed.name}: organize uma base estável para ${muscleLabel}; braceie antes da primeira repetição.`,
+    vector: `Execute ${seed.name} em trajetória limpa de ${seed.movement_pattern} visando ${muscleLabel}.`,
+    catch: `Finalize ${seed.name} com tensão controlada no fim da amplitude em ${muscleLabel}.`,
+    anti_pattern: `Não importe a mecânica de ${baseLabel} para ${seed.name}.`,
     failure_type: 'technical',
   };
 }
