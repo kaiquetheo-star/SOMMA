@@ -10,6 +10,7 @@ export type SlotCategory =
   | 'back_horizontal_row'
   | 'biceps_curl_long_head'
   | 'biceps_curl_short_head'
+  | 'biceps_hammer'
   | 'quad_compound'
   | 'quad_isolation'
   | 'adductor'
@@ -45,6 +46,11 @@ const ELITE_SLOT_OVERRIDES: Record<string, SlotCategory> = {
   stiff_leg_deadlift: 'hinge_compound',
   conventional_deadlift: 'hinge_compound',
   hip_thrust_barbell: 'glute_isolation',
+  // Curl names contain "bench"/"machine" which otherwise false-hit chest/back heuristics.
+  spider_curl: 'biceps_curl_short_head',
+  preacher_curl_machine: 'biceps_curl_short_head',
+  hammer_curl_incline: 'biceps_hammer',
+  bayesian_curl: 'biceps_curl_long_head',
 };
 
 function exerciseSearchText(exercise: Pick<LibraryExercise, 'slug' | 'name'>): string {
@@ -77,6 +83,16 @@ export function inferSlotCategory(exercise: LibraryExercise): SlotCategory {
     return 'shoulder_lateral_raise';
   }
 
+  // Biceps before chest/back: names like "Spider Curl (Incline Bench)" and
+  // "Preacher Curl (Machine)" false-hit /bench/ and /chin/ (inside "machine").
+  if (primary === 'biceps' || /bicep|curl/.test(text)) {
+    if (/hammer/.test(text)) return 'biceps_hammer';
+    // Short-head variants before incline (spider often uses an incline bench).
+    if (/preacher|spider|concentration/.test(text)) return 'biceps_curl_short_head';
+    if (/incline|bayesian|drag/.test(text)) return 'biceps_curl_long_head';
+    return 'biceps_curl';
+  }
+
   if (primary === 'chest' || primary === 'upper_chest' || /chest|pec|bench|flye?/.test(text)) {
     if (/incline|upper_chest/.test(text) && !/fly/.test(text)) return 'chest_incline_press';
     if (pattern === 'isolation' || /fly|flye|pec_deck|crossover/.test(text)) return 'chest_fly';
@@ -93,16 +109,10 @@ export function inferSlotCategory(exercise: LibraryExercise): SlotCategory {
     primary === 'lats' ||
     primary === 'back' ||
     primary === 'mid_back' ||
-    /(^|_)lat(s?|issimus)(_|$)|pull_?down|pullup|pull_up|chin|row/.test(text)
+    /(^|_)lat(s?|issimus)(_|$)|pull_?down|pull_?up|chin_?up|chinup|(^|_)row(s)?(_|$)/.test(text)
   ) {
-    if (/pull_?down|pullup|pull_up|chin/.test(text)) return 'back_vertical_pull';
+    if (/pull_?down|pull_?up|chin_?up|chinup/.test(text)) return 'back_vertical_pull';
     return 'back_horizontal_row';
-  }
-
-  if (primary === 'biceps' || /bicep|curl/.test(text)) {
-    if (/incline|bayesian|drag/.test(text)) return 'biceps_curl_long_head';
-    if (/preacher|spider|concentration/.test(text)) return 'biceps_curl_short_head';
-    return 'biceps_curl';
   }
 
   if (primary === 'traps' || /trap|shrug/.test(text)) return 'trap_shrug';
