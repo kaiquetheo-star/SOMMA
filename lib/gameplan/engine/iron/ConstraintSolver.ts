@@ -258,7 +258,11 @@ function equipmentSubsetAllowed(
 ): boolean {
   if (available.length === 0) return false;
   if (exercise.equipment_required.length === 0) return true;
-  return exercise.equipment_required.some((tag) => available.includes(tag as EquipmentTag));
+  // Mirror periodization.equipmentMatches: full_gym implies bodyweight eligibility.
+  const effectiveAvailable = available.includes('full_gym')
+    ? Array.from(new Set<EquipmentTag>([...available, 'bodyweight']))
+    : available;
+  return exercise.equipment_required.some((tag) => effectiveAvailable.includes(tag as EquipmentTag));
 }
 
 export function bodyweightExerciseAllowed(exercise: CatalogExercise, available: readonly EquipmentTag[]): boolean {

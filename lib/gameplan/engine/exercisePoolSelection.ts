@@ -10,6 +10,7 @@ import {
   type DeterministicGenerationContext,
   type PullOrientation,
 } from '@/lib/gameplan/engine/generation';
+import { equipmentMatches } from '@/lib/gameplan/engine/periodization';
 import type { IronDayBlueprintKey } from '@/lib/gameplan/engine/goldStandardBlueprint';
 import type { LibraryExercise, MovementPattern } from '@/types/catalog';
 import type { EquipmentTag } from '@/store/useSommaStore';
@@ -84,12 +85,6 @@ function normalizePattern(value: string | null | undefined): MovementPattern {
   if (!value) return 'isolation';
   const v = value.toLowerCase() as MovementPattern;
   return v;
-}
-
-function equipmentMatches(exercise: LibraryExercise, availableEquipment: EquipmentTag[]): boolean {
-  if (availableEquipment.length === 0) return false;
-  if (exercise.equipment_required.length === 0) return true;
-  return exercise.equipment_required.some((tag) => availableEquipment.includes(tag as EquipmentTag));
 }
 
 function isEligible(

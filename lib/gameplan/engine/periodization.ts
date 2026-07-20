@@ -93,7 +93,11 @@ export function targetIronExerciseCount(minutes: number, goalIron: string | null
 export function equipmentMatches(exercise: LibraryExercise, availableEquipment: EquipmentTag[]): boolean {
   if (availableEquipment.length === 0) return false;
   if (exercise.equipment_required.length === 0) return true;
-  return exercise.equipment_required.some((tag) => availableEquipment.includes(tag as EquipmentTag));
+  // full_gym is a superset: bodyweight-only movements remain eligible in a full gym.
+  const effectiveAvailable = availableEquipment.includes('full_gym')
+    ? Array.from(new Set<EquipmentTag>([...availableEquipment, 'bodyweight']))
+    : availableEquipment;
+  return exercise.equipment_required.some((tag) => effectiveAvailable.includes(tag as EquipmentTag));
 }
 
 function setsFromLog(log: EnginePerformanceRow): number {
