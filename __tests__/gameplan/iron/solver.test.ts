@@ -295,7 +295,7 @@ describe('solveDaySlots — V8 constraint solver', () => {
     );
 
     expect(prescription.target_weight_kg).toBeCloseTo(20.5, 1);
-    expect(prescription.progression_note).toMatch(/Best working set|Hit rep top/i);
+    expect(prescription.progression_note).toMatch(/Melhor série de trabalho|Topo de reps|Best working set|Hit rep top/i);
   });
 
   it('F: lastLoggedWeightFromPerformanceHistory reads committed session logs', () => {

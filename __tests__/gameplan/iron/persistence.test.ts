@@ -66,7 +66,7 @@ describe('Iron persistence — weight recovery from local store', () => {
 
     expect(prescription.target_weight_kg).not.toBeNull();
     expect(prescription.target_weight_kg!).toBeGreaterThanOrEqual(40);
-    expect(prescription.progression_note).toMatch(/Last logged|Best working set|RPE/i);
+    expect(prescription.progression_note).toMatch(/Last logged|Melhor série de trabalho|Best working set|RPE/i);
   });
 
   it('never returns null when store has a 40kg log for t_bar_row by slug', () => {

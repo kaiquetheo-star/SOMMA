@@ -284,7 +284,7 @@ describe('SOMMA Iron comprehensive generation pipeline', () => {
       expect(nutrition?.protein_g).toBe(Math.round(57 * 2.2));
     }
 
-    const pushCarbs = gameplan.microcycle.find((day) => /chest|push/i.test(day.focus_label))?.blocks.find((block) => block.pillar === 'nutrition')?.nutrition?.nutrition_target?.carbs_g;
+    const pushCarbs = gameplan.microcycle.find((day) => /peito|empurrar|chest|push/i.test(day.focus_label))?.blocks.find((block) => block.pillar === 'nutrition')?.nutrition?.nutrition_target?.carbs_g;
     const legsCarbs = legsA?.blocks.find((block) => block.pillar === 'nutrition')?.nutrition?.nutrition_target?.carbs_g;
     const restCarbs = restDays[0]?.blocks.find((block) => block.pillar === 'nutrition')?.nutrition?.nutrition_target?.carbs_g;
 

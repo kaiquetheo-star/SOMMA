@@ -191,9 +191,9 @@ describe('real user journey simulation', () => {
     expect(gameplan.microcycle.find((entry) => entry.day_index === 3)?.is_rest_day).toBe(true);
     expect(gameplan.microcycle.find((entry) => entry.day_index === 7)?.is_rest_day).toBe(true);
 
-    const shoulderDay = gameplan.microcycle.find((entry) => entry.day_index === 1);
+    const shoulderDay = gameplan.microcycle.find((entry) => entry.day_index === 6);
     expect(ironExercises(shoulderDay).some((exercise) =>
-      /shoulder|lateral|rear|face_pull|reverse|shrug/i.test(`${exercise.slug ?? ''} ${exercise.display_name ?? ''}`),
+      /shoulder|lateral|rear|face_pull|reverse|shrug|overhead_press/i.test(`${exercise.slug ?? ''} ${exercise.display_name ?? ''}`),
     )).toBe(true);
 
     const backDay = gameplan.microcycle.find((entry) => entry.day_index === 4);

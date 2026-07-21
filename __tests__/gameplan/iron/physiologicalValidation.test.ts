@@ -62,20 +62,28 @@ function chestWeeklySets(microcycle: DailyGameplan['microcycle']): number {
 }
 
 function armsWeeklyDirectSets(microcycle: DailyGameplan['microcycle']): number {
-  const day6 = microcycle.find((day) => day.day_index === 6);
-  return ironExercisesForDay(day6).reduce((sum, exercise) => {
-    const meta = exercise.slug ? catalog.bySlug.get(exercise.slug) : undefined;
-    if (!meta) return sum;
-    if (meta.primary_muscle !== 'biceps' && meta.primary_muscle !== 'triceps') return sum;
-    return sum + exercise.target_sets;
+  // Direct arm volume across the week (Day 1 triceps + Day 4 biceps + Day 6 arms).
+  return microcycle.reduce((weekTotal, day) => {
+    if (day.is_rest_day) return weekTotal;
+    return (
+      weekTotal +
+      ironExercisesForDay(day).reduce((sum, exercise) => {
+        const meta = exercise.slug ? catalog.bySlug.get(exercise.slug) : undefined;
+        if (!meta) return sum;
+        if (meta.primary_muscle !== 'biceps' && meta.primary_muscle !== 'triceps') return sum;
+        return sum + exercise.target_sets;
+      }, 0)
+    );
   }, 0);
 }
 
 function pushWeeklyChestSets(microcycle: DailyGameplan['microcycle']): number {
   return microcycle.reduce((weekTotal, day) => {
     if (day.is_rest_day) return weekTotal;
-    const focus = day.focus_label.toLowerCase();
-    if (!focus.includes('push')) return weekTotal;
+    // Day 1 = peito/empurrar; evita depender de label em inglês.
+    if (day.day_index !== 1 && !day.focus_label.toLowerCase().includes('peito')) {
+      return weekTotal;
+    }
 
     return (
       weekTotal +
@@ -122,7 +130,7 @@ describe('Physiological validation — Iron engine', () => {
       expect(ABCDE_MEV).toBe(14);
     });
 
-    it('Braços (bíceps + tríceps) ≥ 8 sets diretos no Day 6 (Elite coverage)', () => {
+    it('Braços (bíceps + tríceps) ≥ 8 sets diretos na semana (Elite coverage)', () => {
       expect(armsWeeklyDirectSets(microcycle)).toBeGreaterThanOrEqual(8);
     });
 

@@ -148,7 +148,7 @@ describe('generateIronMicrocycle integration', () => {
     expect(benchWeight).not.toBeNull();
     expect(benchWeight!).toBeGreaterThanOrEqual(90);
     expect(benchWeight!).toBeLessThanOrEqual(103);
-    expect(benchPick!.prescription.progression_note).toMatch(/E1RM|Last logged|Best working set/i);
+    expect(benchPick!.prescription.progression_note).toMatch(/E1RM|Last logged|Melhor série de trabalho|Best working set/i);
 
     const shoulder = computeWeeklyShoulderBalance(microcycle);
     expect(shoulder.anterior).toBeGreaterThan(0);

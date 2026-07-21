@@ -127,7 +127,7 @@ describe('linear progression motor (post-lobotomy)', () => {
       targetRepsTop: 8,
     });
     expect(holdReps.weight).toBe(80);
-    expect(holdReps.note).toMatch(/add reps/i);
+    expect(holdReps.note).toMatch(/add reps|adicione reps/i);
   });
 
   it('Scenario D: generates full gameplan without readiness scan', async () => {

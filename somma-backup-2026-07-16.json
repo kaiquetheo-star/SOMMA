@@ -1,0 +1,1316 @@
+{
+  "somma_backup_version": 1,
+  "exported_at": "2026-07-16T22:48:10.088Z",
+  "storage_key": "somma-offline-store",
+  "state": {
+    "user_environment": {
+      "available_equipment": [
+        "full_gym"
+      ],
+      "updated_at": "2026-07-16T22:47:53.955Z"
+    },
+    "user_stats": {
+      "iron_sessions_completed": 0,
+      "nutrition_checkins_completed": 0
+    },
+    "user_foundation": {
+      "focus_preference": {
+        "iron": 100,
+        "nutrition": 100
+      },
+      "foundation_completed_at": "2026-07-16T22:47:53.955Z"
+    },
+    "user_biological": {
+      "date_of_birth": "1994-05-14",
+      "weight_kg": 59,
+      "height_cm": 159,
+      "body_fat_percentage": null,
+      "current_injuries": null,
+      "baseline_stress_level": 3,
+      "goal_iron": "Hypertrophy",
+      "nutrition_goal": "Hypertrophy support",
+      "available_time_iron": 90,
+      "training_days_per_week": 5,
+      "frequency_iron": 5,
+      "experience_level": "advanced",
+      "iron_mastery": 5,
+      "mesocycle_phase": "maintenance",
+      "mesocycle_week": 1,
+      "mesocycle_goal": "hypertrophy",
+      "preferred_split": "abcde",
+      "clinical_exit_interview": null,
+      "current_body_fat_estimate": null,
+      "hormonal_transition": false
+    },
+    "weeklyMicrocycle": [
+      {
+        "day_index": 1,
+        "is_rest_day": false,
+        "focus_label": "Iron: Upper Push (Chest · Shoulders · Triceps)",
+        "date": "2026-07-13",
+        "blocks": [
+          {
+            "id": "block-d1-iron",
+            "pillar": "iron",
+            "title": "Iron: Upper Push (Chest · Shoulders · Triceps)",
+            "subtitle": "Barbell Bench Press · Incline Dumbbell Press (30°) · Standing Overhead Press · Incline Cable Fly (30°) · Dumbbell Fly (Flat) · Cable Lateral Raise",
+            "duration_minutes": 90,
+            "order": 0,
+            "status": "pending",
+            "iron": {
+              "routine_id": "iron_block-d1-iron",
+              "exercises": [
+                {
+                  "exercise_id": "20a5a9f6-a1e1-5cff-9f6a-93de97bbcf75",
+                  "slug": "barbell_bench_press",
+                  "display_name": "Barbell Bench Press",
+                  "target_sets": 5,
+                  "target_reps": 12,
+                  "target_rep_range": "8-12 @ 1 RIR",
+                  "target_rir": 1,
+                  "target_weight_kg": null,
+                  "rest_seconds": 150,
+                  "progression_note": "Calibrate first set @ prescribed RIR",
+                  "execution_technique": "Standard",
+                  "tempo": [
+                    3,
+                    0,
+                    1,
+                    1
+                  ],
+                  "cue_card": {
+                    "setup": "Feet flat, arch legal, wrists over elbows, scapulae pinned.",
+                    "vector": "Leg drive, press to lockout.",
+                    "catch": "3s to mid-chest.",
+                    "anti_pattern": "Spotter or safeties.",
+                    "failure_type": "technical"
+                  },
+                  "tactical_role": "primary_compound",
+                  "stability_demand": "medium",
+                  "axial_loading": 0,
+                  "resistance_profile": "bell_shaped",
+                  "slot_category": "chest_horizontal_press"
+                },
+                {
+                  "exercise_id": "c14832cc-fad4-53a7-aedd-b49f5ef09260",
+                  "slug": "incline_dumbbell_press_30",
+                  "display_name": "Incline Dumbbell Press (30°)",
+                  "target_sets": 5,
+                  "target_reps": 12,
+                  "target_rep_range": "8-12 @ 1 RIR",
+                  "target_rir": 1,
+                  "target_weight_kg": null,
+                  "rest_seconds": 105,
+                  "progression_note": "Calibrate first set @ prescribed RIR",
+                  "execution_technique": "Standard",
+                  "tempo": [
+                    3,
+                    0,
+                    1,
+                    1
+                  ],
+                  "cue_card": {
+                    "setup": "Bench 30° — clavicular head bias; feet planted, scapulae retracted.",
+                    "vector": "Press up and slightly in; dumbbells independent path.",
+                    "catch": "3s to upper chest line; elbows 45°.",
+                    "anti_pattern": "30° reduces impingement vs steep incline.",
+                    "failure_type": "technical"
+                  },
+                  "tactical_role": "secondary_compound",
+                  "stability_demand": "medium",
+                  "axial_loading": 0,
+                  "resistance_profile": "bell_shaped",
+                  "slot_category": "chest_incline_press"
+                },
+                {
+                  "exercise_id": "04e5d706-4342-50c3-bd35-4ebe922c9f68",
+                  "slug": "overhead_press",
+                  "display_name": "Standing Overhead Press",
+                  "target_sets": 5,
+                  "target_reps": 12,
+                  "target_rep_range": "8-12 @ 1 RIR",
+                  "target_rir": 1,
+                  "target_weight_kg": null,
+                  "rest_seconds": 150,
+                  "progression_note": "Calibrate first set @ prescribed RIR",
+                  "execution_technique": "Standard",
+                  "tempo": [
+                    3,
+                    0,
+                    1,
+                    1
+                  ],
+                  "cue_card": {
+                    "setup": "Rack grip, glutes tight, ribs down, chin back.",
+                    "vector": "Press vertical; head through at lockout.",
+                    "catch": "Bar to clavicle without excessive lean.",
+                    "anti_pattern": "Skip if active impingement.",
+                    "failure_type": "technical"
+                  },
+                  "tactical_role": "secondary_compound",
+                  "stability_demand": "medium",
+                  "axial_loading": 0,
+                  "resistance_profile": "bell_shaped",
+                  "slot_category": "shoulder_overhead_press"
+                },
+                {
+                  "exercise_id": "2f9eeb1d-8f3d-55d0-a0db-6cc265810af7",
+                  "slug": "incline_cable_fly",
+                  "display_name": "Incline Cable Fly (30°)",
+                  "target_sets": 4,
+                  "target_reps": 12,
+                  "target_rep_range": "8-12 @ 2 RIR",
+                  "target_rir": 2,
+                  "target_weight_kg": null,
+                  "rest_seconds": 60,
+                  "progression_note": "Calibrate first set @ prescribed RIR · Drop-Set: Execute até a falha, reduza 20% da carga e repita até a falha novamente. Sem descanso. (Não use a série drop como âncora de progressão — preserve o Best Working Set.) · Bi-Set Same Muscle: execute em sequência com o par indicado, descansando apenas ao fim do par.",
+                  "execution_technique": "DROP_SET",
+                  "tempo": [
+                    3,
+                    0,
+                    1,
+                    1
+                  ],
+                  "cue_card": {
+                    "setup": "Bench 30°, cables low, slight elbow bend fixed.",
+                    "vector": "Sweep up on fiber line; constant tension.",
+                    "catch": "Arc down until upper chest stretch.",
+                    "anti_pattern": "Light-moderate load; stretch is the stimulus.",
+                    "failure_type": "concentric"
+                  },
+                  "tactical_role": "isolation_metabolic",
+                  "stability_demand": "low",
+                  "axial_loading": 0,
+                  "resistance_profile": "constant",
+                  "slot_category": "chest_fly",
+                  "superset_id": "d1-biset-1"
+                },
+                {
+                  "exercise_id": "86554c79-aaa7-5913-854c-9e6572516f36",
+                  "slug": "dumbbell_fly_flat",
+                  "display_name": "Dumbbell Fly (Flat)",
+                  "target_sets": 4,
+                  "target_reps": 12,
+                  "target_rep_range": "8-12 @ 2 RIR",
+                  "target_rir": 2,
+                  "target_weight_kg": null,
+                  "rest_seconds": 60,
+                  "progression_note": "Calibrate first set @ prescribed RIR",
+                  "execution_technique": "Standard",
+                  "tempo": [
+                    3,
+                    0,
+                    1,
+                    1
+                  ],
+                  "cue_card": {
+                    "setup": "Slight elbow bend constant, supinated finish optional.",
+                    "vector": "Arc bells up; squeeze without clashing.",
+                    "catch": "Open until chest stretch at bottom.",
+                    "anti_pattern": "Moderate load only.",
+                    "failure_type": "concentric"
+                  },
+                  "tactical_role": "isolation_metabolic",
+                  "stability_demand": "medium",
+                  "axial_loading": 0,
+                  "resistance_profile": "descending",
+                  "slot_category": "chest_fly"
+                },
+                {
+                  "exercise_id": "ea8c2584-a1db-56ce-8afd-72b57d4462fc",
+                  "slug": "cable_lateral_raise",
+                  "display_name": "Cable Lateral Raise",
+                  "target_sets": 4,
+                  "target_reps": 12,
+                  "target_rep_range": "8-12 @ 2 RIR",
+                  "target_rir": 2,
+                  "target_weight_kg": null,
+                  "rest_seconds": 60,
+                  "progression_note": "Calibrate first set @ prescribed RIR · Bi-Set Same Muscle: execute em sequência com o par indicado, descansando apenas ao fim do par.",
+                  "execution_technique": "Standard",
+                  "tempo": [
+                    3,
+                    0,
+                    1,
+                    1
+                  ],
+                  "cue_card": {
+                    "setup": "Cable crosses behind body, soft elbows, lead with elbows.",
+                    "vector": "Raise to shoulder height; constant tension.",
+                    "catch": "3s lower without trap takeover.",
+                    "anti_pattern": "No swinging.",
+                    "failure_type": "concentric"
+                  },
+                  "tactical_role": "isolation_metabolic",
+                  "stability_demand": "low",
+                  "axial_loading": 0,
+                  "resistance_profile": "constant",
+                  "slot_category": "shoulder_lateral_raise",
+                  "superset_id": "d1-biset-1"
+                }
+              ]
+            }
+          },
+          {
+            "id": "block-d1-longevity",
+            "pillar": "longevity",
+            "title": "Manutenção Biológica",
+            "subtitle": "Mobilidade Torácica e Descompressão de Ombro · 10 min Esteira Inclinada (Zona 2, conversa possível)",
+            "duration_minutes": 12,
+            "order": 1,
+            "status": "pending",
+            "longevity": {
+              "pillar": "longevity",
+              "title": "Manutenção Biológica",
+              "duration_minutes": 12,
+              "mobility_focus": "Mobilidade Torácica e Descompressão de Ombro",
+              "mobility_cues": [
+                "Rotação torácica deitado de lado (8/side)",
+                "Alongamento de peitoral no batente da porta (30s)"
+              ],
+              "core_exercise": "Deadbug com respiração diafragmática (3x 8/side)",
+              "cardio_prescription": "10 min Esteira Inclinada (Zona 2, conversa possível)"
+            }
+          },
+          {
+            "id": "block-d1-nutrition",
+            "pillar": "nutrition",
+            "title": "Biological Fueling",
+            "subtitle": "1947 kcal · 177g C · 130g P · 71g F",
+            "duration_minutes": 0,
+            "order": 2,
+            "status": "pending",
+            "nutrition": {
+              "goal": "Hypertrophy support",
+              "note": "Peri-workout carbs: 115g · Water 4300ml",
+              "nutrition_target": {
+                "total_calories": 1947,
+                "protein_g": 130,
+                "carbs_g": 177,
+                "fat_g": 71,
+                "water_ml": 4300,
+                "peri_workout_carb_ratio": 0.65,
+                "hydration_focus": "standard"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "day_index": 2,
+        "is_rest_day": false,
+        "focus_label": "Iron: Lower Anterior (Quads · Calves)",
+        "date": "2026-07-14",
+        "blocks": [
+          {
+            "id": "block-d2-iron",
+            "pillar": "iron",
+            "title": "Iron: Lower Anterior (Quads · Calves)",
+            "subtitle": "Pendulum Squat · Sissy Squat · Hack Squat (Machine) · Leg Extension · Seated Calf Raise · Standing Calf Raise",
+            "duration_minutes": 90,
+            "order": 0,
+            "status": "pending",
+            "iron": {
+              "routine_id": "iron_block-d2-iron",
+              "exercises": [
+                {
+                  "exercise_id": "9c6ccfa8-f566-5f47-adeb-11245deb488a",
+                  "slug": "pendulum_squat",
+                  "display_name": "Pendulum Squat",
+                  "target_sets": 5,
+                  "target_reps": 8,
+                  "target_rep_range": "5-8 @ 1 RIR",
+                  "target_rir": 1,
+                  "target_weight_kg": null,
+                  "rest_seconds": 105,
+                  "progression_note": "Calibrate first set @ prescribed RIR",
+                  "execution_technique": "Standard",
+                  "tempo": [
+                    3,
+                    1,
+                    "X",
+                    0
+                  ],
+                  "cue_card": {
+                    "setup": "Shoulders under pads, feet low on platform for quad emphasis.",
+                    "vector": "Drive knees forward over toes; constant tension arc.",
+                    "catch": "Let arc guide depth; keep ribs stacked.",
+                    "anti_pattern": "Stop above pain-limited ROM.",
+                    "failure_type": "technical"
+                  },
+                  "tactical_role": "primary_compound",
+                  "stability_demand": "medium",
+                  "axial_loading": 0,
+                  "resistance_profile": "bell_shaped",
+                  "slot_category": "quad_compound"
+                },
+                {
+                  "exercise_id": "5a3c8528-b79c-5333-b4ca-7c3e9886ad3c",
+                  "slug": "sissy_squat",
+                  "display_name": "Sissy Squat",
+                  "target_sets": 2,
+                  "diagnostic_reason": "volume_authority_max_sets_session",
+                  "target_reps": 8,
+                  "target_rep_range": "5-8 @ 1 RIR",
+                  "target_rir": 1,
+                  "target_weight_kg": null,
+                  "rest_seconds": 75,
+                  "progression_note": "Calibrate first set @ prescribed RIR · Low-CNS finisher to spend remaining time budget without axial fatigue.",
+                  "execution_technique": "Myo-Reps",
+                  "tempo": [
+                    3,
+                    1,
+                    "X",
+                    0
+                  ],
+                  "cue_card": {
+                    "setup": "Heels elevated or anchored, hips extended, torso lean.",
+                    "vector": "Extend knees without hip closure.",
+                    "catch": "3s knee flexion with hips open — pure quad lengthening.",
+                    "anti_pattern": "Use band assist if patellar irritation.",
+                    "failure_type": "concentric"
+                  },
+                  "tactical_role": "primary_compound",
+                  "stability_demand": "medium",
+                  "axial_loading": 0,
+                  "resistance_profile": "bell_shaped",
+                  "slot_category": "quad_isolation"
+                },
+                {
+                  "exercise_id": "189293a4-100d-5363-9efc-1c7d5ea115e1",
+                  "slug": "hack_squat_machine",
+                  "display_name": "Hack Squat (Machine)",
+                  "target_sets": 5,
+                  "target_reps": 8,
+                  "target_rep_range": "5-8 @ 1 RIR",
+                  "target_rir": 1,
+                  "target_weight_kg": null,
+                  "rest_seconds": 105,
+                  "progression_note": "Calibrate first set @ prescribed RIR · Rest-Pause: Última série até a falha, descanse 15s, repita com a mesma carga até a falha técnica.",
+                  "execution_technique": "REST_PAUSE",
+                  "tempo": [
+                    3,
+                    1,
+                    "X",
+                    0
+                  ],
+                  "cue_card": {
+                    "setup": "Feet mid-platform, back flat on pad, knees align with toes.",
+                    "vector": "Press through mid-foot; avoid locking knees violently.",
+                    "catch": "Controlled 2–3s to deep knee flexion without pelvis tuck.",
+                    "anti_pattern": "Limit depth if lumbar rounds off pad.",
+                    "failure_type": "technical"
+                  },
+                  "tactical_role": "secondary_compound",
+                  "stability_demand": "low",
+                  "axial_loading": 1,
+                  "resistance_profile": "constant",
+                  "slot_category": "quad_compound"
+                },
+                {
+                  "exercise_id": "cc385cc5-8018-519c-a3b7-238217c344b2",
+                  "slug": "leg_extension",
+                  "display_name": "Leg Extension",
+                  "target_sets": 4,
+                  "target_reps": 8,
+                  "target_rep_range": "5-8 @ 2 RIR",
+                  "target_rir": 2,
+                  "target_weight_kg": null,
+                  "rest_seconds": 60,
+                  "progression_note": "Calibrate first set @ prescribed RIR · Bi-Set Same Muscle: execute em sequência com o par indicado, descansando apenas ao fim do par.",
+                  "execution_technique": "Standard",
+                  "tempo": [
+                    3,
+                    1,
+                    "X",
+                    0
+                  ],
+                  "cue_card": {
+                    "setup": "Pad at ankle, femur neutral, back flat on seat.",
+                    "vector": "Extend to peak contraction; pause 1s.",
+                    "catch": "3s lower without hip lift off seat.",
+                    "anti_pattern": "Avoid if active patellar tendinopathy.",
+                    "failure_type": "concentric"
+                  },
+                  "tactical_role": "isolation_metabolic",
+                  "stability_demand": "medium",
+                  "axial_loading": 0,
+                  "resistance_profile": "bell_shaped",
+                  "slot_category": "quad_isolation",
+                  "superset_id": "d2-biset-1"
+                },
+                {
+                  "exercise_id": "3ba03b0a-00ef-5e43-9baf-354c0ef4a932",
+                  "slug": "seated_calf_raise",
+                  "display_name": "Seated Calf Raise",
+                  "target_sets": 4,
+                  "target_reps": 8,
+                  "target_rep_range": "5-8 @ 2 RIR",
+                  "target_rir": 2,
+                  "target_weight_kg": null,
+                  "rest_seconds": 60,
+                  "progression_note": "Calibrate first set @ prescribed RIR · Bi-Set Same Muscle: execute em sequência com o par indicado, descansando apenas ao fim do par.",
+                  "execution_technique": "Standard",
+                  "tempo": [
+                    3,
+                    1,
+                    "X",
+                    0
+                  ],
+                  "cue_card": {
+                    "setup": "Pad on knees, balls of feet on edge, full stretch at bottom.",
+                    "vector": "Rise to peak; pause.",
+                    "catch": "3s lower to soleus stretch.",
+                    "anti_pattern": "Soleus-biased hypertrophy.",
+                    "failure_type": "concentric"
+                  },
+                  "tactical_role": "isolation_metabolic",
+                  "stability_demand": "medium",
+                  "axial_loading": 0,
+                  "resistance_profile": "descending",
+                  "slot_category": "calf_raise",
+                  "superset_id": "d2-biset-1"
+                },
+                {
+                  "exercise_id": "83dde898-2b40-596a-90b0-798e7ac920ce",
+                  "slug": "standing_calf_raise",
+                  "display_name": "Standing Calf Raise",
+                  "target_sets": 4,
+                  "target_reps": 8,
+                  "target_rep_range": "5-8 @ 2 RIR",
+                  "target_rir": 2,
+                  "target_weight_kg": null,
+                  "rest_seconds": 75,
+                  "progression_note": "Calibrate first set @ prescribed RIR",
+                  "execution_technique": "Standard",
+                  "tempo": [
+                    3,
+                    1,
+                    "X",
+                    0
+                  ],
+                  "cue_card": {
+                    "setup": "Gastrocnemius bias — legs straight, full ROM.",
+                    "vector": "Peak contraction at top.",
+                    "catch": "3s lower to stretch.",
+                    "anti_pattern": "Use machine or step for ROM.",
+                    "failure_type": "concentric"
+                  },
+                  "tactical_role": "isolation_metabolic",
+                  "stability_demand": "medium",
+                  "axial_loading": 0,
+                  "resistance_profile": "descending",
+                  "slot_category": "calf_raise"
+                }
+              ]
+            }
+          },
+          {
+            "id": "block-d2-longevity",
+            "pillar": "longevity",
+            "title": "Manutenção Biológica",
+            "subtitle": "Mobilidade Global e Respiração · 10 min Caminhada leve em Zona 2",
+            "duration_minutes": 12,
+            "order": 1,
+            "status": "pending",
+            "longevity": {
+              "pillar": "longevity",
+              "title": "Manutenção Biológica",
+              "duration_minutes": 12,
+              "mobility_focus": "Mobilidade Global e Respiração",
+              "mobility_cues": [
+                "Respiração nasal em decúbito (2 min)",
+                "Mobilidade articular leve de coluna e quadril",
+                "Fallback determinístico do dia 2"
+              ],
+              "core_exercise": "Deadbug com respiração diafragmática (3x 8/side)",
+              "cardio_prescription": "10 min Caminhada leve em Zona 2"
+            }
+          },
+          {
+            "id": "block-d2-nutrition",
+            "pillar": "nutrition",
+            "title": "Biological Fueling",
+            "subtitle": "1947 kcal · 177g C · 130g P · 71g F",
+            "duration_minutes": 0,
+            "order": 2,
+            "status": "pending",
+            "nutrition": {
+              "goal": "Hypertrophy support",
+              "note": "Peri-workout carbs: 115g · Water 4300ml",
+              "nutrition_target": {
+                "total_calories": 1947,
+                "protein_g": 130,
+                "carbs_g": 177,
+                "fat_g": 71,
+                "water_ml": 4300,
+                "peri_workout_carb_ratio": 0.65,
+                "hydration_focus": "standard"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "day_index": 3,
+        "is_rest_day": true,
+        "focus_label": "Rest · Healer Zone & Mobility",
+        "date": "2026-07-15",
+        "blocks": [
+          {
+            "id": "block-d3-spirit-healer",
+            "pillar": "spirit",
+            "title": "Healer Zone",
+            "subtitle": "4-7-8 breathwork · mid-week CNS downshift",
+            "duration_minutes": 12,
+            "order": 0,
+            "status": "pending",
+            "spirit": {
+              "mode": "breathwork",
+              "tempo_id": "tempo_478",
+              "duration_minutes": 12,
+              "prescribed_reason": "Mid-week recovery · Healer Zone & mobility reset."
+            }
+          },
+          {
+            "id": "block-d3-nutrition",
+            "pillar": "nutrition",
+            "title": "Biological Fueling",
+            "subtitle": "1747 kcal · 89g C · 130g P · 89g F",
+            "duration_minutes": 0,
+            "order": 1,
+            "status": "pending",
+            "nutrition": {
+              "goal": "Hypertrophy support",
+              "note": "Peri-workout carbs: 58g · Water 2950ml",
+              "nutrition_target": {
+                "total_calories": 1747,
+                "protein_g": 130,
+                "carbs_g": 89,
+                "fat_g": 89,
+                "water_ml": 2950,
+                "peri_workout_carb_ratio": 0.65,
+                "hydration_focus": "standard"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "day_index": 4,
+        "is_rest_day": false,
+        "focus_label": "Iron: Upper Pull (Back · Rear Delts · Biceps)",
+        "date": "2026-07-16",
+        "blocks": [
+          {
+            "id": "block-d4-iron",
+            "pillar": "iron",
+            "title": "Iron: Upper Pull (Back · Rear Delts · Biceps)",
+            "subtitle": "T-bar Row · Iliac Lat Pulldown · Pull-up (Overhand) · Pendlay Row · Face Pull · Bayesian Cable Curl · Spider Curl (Incline Bench)",
+            "duration_minutes": 90,
+            "order": 0,
+            "status": "pending",
+            "iron": {
+              "routine_id": "iron_block-d4-iron",
+              "exercises": [
+                {
+                  "exercise_id": "f0730633-bd57-5ffb-9489-c13a3b3e2071",
+                  "slug": "t_bar_row",
+                  "display_name": "T-bar Row",
+                  "target_sets": 2,
+                  "diagnostic_reason": "minimum_viable_path_absolute_last_resort",
+                  "target_reps": 15,
+                  "target_rep_range": "10-15 @ 1 RIR",
+                  "target_rir": 1,
+                  "target_weight_kg": null,
+                  "rest_seconds": 105,
+                  "progression_note": "Calibrate first set @ prescribed RIR",
+                  "execution_technique": "Standard",
+                  "tempo": [
+                    3,
+                    1,
+                    1,
+                    1
+                  ],
+                  "cue_card": {
+                    "setup": "Hinge stable, handle to sternum, avoid shrugging.",
+                    "vector": "Squeeze mid-back at top.",
+                    "catch": "3s lower with control.",
+                    "anti_pattern": "Use chest support variant if lumbar tired.",
+                    "failure_type": "technical"
+                  },
+                  "tactical_role": "secondary_compound",
+                  "stability_demand": "low",
+                  "axial_loading": 1,
+                  "resistance_profile": "constant",
+                  "slot_category": "back_horizontal_row"
+                },
+                {
+                  "exercise_id": "b038f967-06fb-5fd4-ba2e-469de94167c7",
+                  "slug": "iliac_lat_pulldown",
+                  "display_name": "Iliac Lat Pulldown",
+                  "target_sets": 2,
+                  "diagnostic_reason": "minimum_viable_path_absolute_last_resort",
+                  "target_reps": 15,
+                  "target_rep_range": "10-15 @ 1 RIR",
+                  "target_rir": 1,
+                  "target_weight_kg": null,
+                  "rest_seconds": 75,
+                  "progression_note": "Calibrate first set @ prescribed RIR",
+                  "execution_technique": "Standard",
+                  "tempo": [
+                    3,
+                    1,
+                    1,
+                    1
+                  ],
+                  "cue_card": {
+                    "setup": "Lean back slightly, grip wide, pull to upper abs/iliac crest line.",
+                    "vector": "Elbows drive down and back — lat not bicep.",
+                    "catch": "3s return maintaining lat tension.",
+                    "anti_pattern": "Avoid behind-neck variant.",
+                    "failure_type": "technical"
+                  },
+                  "tactical_role": "secondary_compound",
+                  "stability_demand": "medium",
+                  "axial_loading": 0,
+                  "resistance_profile": "bell_shaped",
+                  "slot_category": "back_vertical_pull"
+                },
+                {
+                  "exercise_id": "af6f89fe-5106-5296-a733-e31eb914f4ac",
+                  "slug": "pull_up_overhand",
+                  "display_name": "Pull-up (Overhand)",
+                  "target_sets": 2,
+                  "diagnostic_reason": "minimum_viable_path_absolute_last_resort",
+                  "target_reps": 15,
+                  "target_rep_range": "10-15 @ 1 RIR",
+                  "target_rir": 1,
+                  "target_weight_kg": 10,
+                  "rest_seconds": 150,
+                  "progression_note": "Calibrate first set @ prescribed RIR · Loading: WEIGHTED (+10kg) para calibrar força relativa avançada. · Rest-Pause: Última série até a falha, descanse 15s, repita com a mesma carga até a falha técnica.",
+                  "execution_technique": "REST_PAUSE",
+                  "tempo": [
+                    3,
+                    1,
+                    1,
+                    1
+                  ],
+                  "cue_card": {
+                    "setup": "Dead hang, hollow brace, lats engaged.",
+                    "vector": "Chest toward bar.",
+                    "catch": "4s lower without shrug.",
+                    "anti_pattern": "Band assist or pulldown.",
+                    "failure_type": "technical"
+                  },
+                  "tactical_role": "secondary_compound",
+                  "stability_demand": "medium",
+                  "axial_loading": 0,
+                  "resistance_profile": "bell_shaped",
+                  "slot_category": "back_vertical_pull",
+                  "loading_protocol": "weighted"
+                },
+                {
+                  "exercise_id": "505e009d-4581-57a3-98dd-107f7b3c4cda",
+                  "slug": "pendlay_row",
+                  "display_name": "Pendlay Row",
+                  "target_sets": 2,
+                  "diagnostic_reason": "volume_authority_mrv_soft_cap",
+                  "target_reps": 15,
+                  "target_rep_range": "10-15 @ 1 RIR",
+                  "target_rir": 1,
+                  "target_weight_kg": null,
+                  "rest_seconds": 150,
+                  "progression_note": "Calibrate first set @ prescribed RIR",
+                  "execution_technique": "Standard",
+                  "tempo": [
+                    3,
+                    1,
+                    1,
+                    1
+                  ],
+                  "cue_card": {
+                    "setup": "Torso parallel floor each rep, bar on floor reset.",
+                    "vector": "Explosive pull to sternum.",
+                    "catch": "Dead stop on floor.",
+                    "anti_pattern": "Brace hard; not for acute lumbar issues.",
+                    "failure_type": "technical"
+                  },
+                  "tactical_role": "secondary_compound",
+                  "stability_demand": "high",
+                  "axial_loading": 4,
+                  "resistance_profile": "bell_shaped",
+                  "slot_category": "back_horizontal_row"
+                },
+                {
+                  "exercise_id": "161e809d-d896-58af-a36f-6e5e622ec369",
+                  "slug": "face_pull",
+                  "display_name": "Face Pull",
+                  "target_sets": 2,
+                  "diagnostic_reason": "minimum_viable_path_absolute_last_resort",
+                  "target_reps": 15,
+                  "target_rep_range": "10-15 @ 2 RIR",
+                  "target_rir": 2,
+                  "target_weight_kg": null,
+                  "rest_seconds": 60,
+                  "progression_note": "Calibrate first set @ prescribed RIR · Bi-Set Same Muscle: execute em sequência com o par indicado, descansando apenas ao fim do par.",
+                  "execution_technique": "Standard",
+                  "tempo": [
+                    3,
+                    1,
+                    1,
+                    1
+                  ],
+                  "cue_card": {
+                    "setup": "Rope at face height, external rotate at end.",
+                    "vector": "Pull to forehead; spread rope.",
+                    "catch": "3s return without losing posture.",
+                    "anti_pattern": "Rotator cuff health staple.",
+                    "failure_type": "concentric"
+                  },
+                  "tactical_role": "isolation_metabolic",
+                  "stability_demand": "medium",
+                  "axial_loading": 0,
+                  "resistance_profile": "bell_shaped",
+                  "slot_category": "shoulder_posterior_fly",
+                  "superset_id": "d4-biset-1"
+                },
+                {
+                  "exercise_id": "3ba321a9-8282-5205-9c6c-d2a8c0db235e",
+                  "slug": "bayesian_curl",
+                  "display_name": "Bayesian Cable Curl",
+                  "target_sets": 2,
+                  "diagnostic_reason": "minimum_viable_path_absolute_last_resort",
+                  "target_reps": 15,
+                  "target_rep_range": "10-15 @ 2 RIR",
+                  "target_rir": 2,
+                  "target_weight_kg": null,
+                  "rest_seconds": 60,
+                  "progression_note": "Calibrate first set @ prescribed RIR · Drop-Set: Execute até a falha, reduza 20% da carga e repita até a falha novamente. Sem descanso. (Não use a série drop como âncora de progressão — preserve o Best Working Set.) · Bi-Set Same Muscle: execute em sequência com o par indicado, descansando apenas ao fim do par.",
+                  "execution_technique": "DROP_SET",
+                  "tempo": [
+                    3,
+                    1,
+                    1,
+                    1
+                  ],
+                  "cue_card": {
+                    "setup": "Cable behind body, arm behind torso line — long-head bias.",
+                    "vector": "Curl without shoulder swinging forward.",
+                    "catch": "3s to full elbow extension behind plane.",
+                    "anti_pattern": "Prime stretch-mediated biceps stimulus.",
+                    "failure_type": "concentric"
+                  },
+                  "tactical_role": "isolation_metabolic",
+                  "stability_demand": "low",
+                  "axial_loading": 0,
+                  "resistance_profile": "constant",
+                  "slot_category": "biceps_curl_long_head",
+                  "superset_id": "d4-biset-1"
+                },
+                {
+                  "exercise_id": "389151a5-5db2-5d9a-babe-5176f34ed6cd",
+                  "slug": "spider_curl",
+                  "display_name": "Spider Curl (Incline Bench)",
+                  "target_sets": 3,
+                  "diagnostic_reason": "Adjusted to minimum: 3 sets for maintenance phase",
+                  "target_reps": 15,
+                  "target_rep_range": "10-15 @ 2 RIR",
+                  "target_rir": 2,
+                  "target_weight_kg": null,
+                  "rest_seconds": 60,
+                  "progression_note": "Calibrate first set @ prescribed RIR",
+                  "execution_technique": "Standard",
+                  "tempo": [
+                    3,
+                    1,
+                    1,
+                    1
+                  ],
+                  "cue_card": {
+                    "setup": "Chest on pad, arms hang vertical, shoulders fixed.",
+                    "vector": "Curl without shoulder drift.",
+                    "catch": "3s lower to near-full extension.",
+                    "anti_pattern": "Strict form; no hip drive.",
+                    "failure_type": "concentric"
+                  },
+                  "tactical_role": "isolation_metabolic",
+                  "stability_demand": "medium",
+                  "axial_loading": 0,
+                  "resistance_profile": "bell_shaped",
+                  "slot_category": "chest_incline_press"
+                }
+              ]
+            }
+          },
+          {
+            "id": "block-d4-longevity",
+            "pillar": "longevity",
+            "title": "Manutenção Biológica",
+            "subtitle": "Descompressão de Latíssimos e Trapézio · 10 min Bicicleta Ergométrica leve (cadência 80-90 RPM)",
+            "duration_minutes": 12,
+            "order": 1,
+            "status": "pending",
+            "longevity": {
+              "pillar": "longevity",
+              "title": "Manutenção Biológica",
+              "duration_minutes": 12,
+              "mobility_focus": "Descompressão de Latíssimos e Trapézio",
+              "mobility_cues": [
+                "Dead Hang na barra (3x 30s)",
+                "Rotação externa de ombro com elástico"
+              ],
+              "core_exercise": "Bird-Dog com pausa isométrica (3x 8/side)",
+              "cardio_prescription": "10 min Bicicleta Ergométrica leve (cadência 80-90 RPM)"
+            }
+          },
+          {
+            "id": "block-d4-nutrition",
+            "pillar": "nutrition",
+            "title": "Biological Fueling",
+            "subtitle": "1947 kcal · 177g C · 130g P · 71g F",
+            "duration_minutes": 0,
+            "order": 2,
+            "status": "pending",
+            "nutrition": {
+              "goal": "Hypertrophy support",
+              "note": "Peri-workout carbs: 115g · Water 4300ml",
+              "nutrition_target": {
+                "total_calories": 1947,
+                "protein_g": 130,
+                "carbs_g": 177,
+                "fat_g": 71,
+                "water_ml": 4300,
+                "peri_workout_carb_ratio": 0.65,
+                "hydration_focus": "standard"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "day_index": 5,
+        "is_rest_day": false,
+        "focus_label": "Iron: Lower Posterior (Hamstrings · Glutes · Calves)",
+        "date": "2026-07-17",
+        "blocks": [
+          {
+            "id": "block-d5-iron",
+            "pillar": "iron",
+            "title": "Iron: Lower Posterior (Hamstrings · Glutes · Calves)",
+            "subtitle": "Barbell Hip Thrust · Belt Squat · Seated Leg Curl · Cable Glute Kickback",
+            "duration_minutes": 90,
+            "order": 0,
+            "status": "pending",
+            "iron": {
+              "routine_id": "iron_block-d5-iron",
+              "exercises": [
+                {
+                  "exercise_id": "67fa063d-7501-59a0-b183-d84b3cfc2f55",
+                  "slug": "hip_thrust_barbell",
+                  "display_name": "Barbell Hip Thrust",
+                  "target_sets": 5,
+                  "target_reps": 12,
+                  "target_rep_range": "10-12 @ 1 RIR",
+                  "target_rir": 1,
+                  "target_weight_kg": null,
+                  "rest_seconds": 105,
+                  "progression_note": "Calibrate first set @ prescribed RIR",
+                  "execution_technique": "Standard",
+                  "tempo": [
+                    2,
+                    1,
+                    1,
+                    1
+                  ],
+                  "cue_card": {
+                    "setup": "Upper back on bench, bar padded, chin tucked, ribs down.",
+                    "vector": "Full glute lockout; shins vertical at top.",
+                    "catch": "Lower until stretch at bottom without lumbar arch.",
+                    "anti_pattern": "Pause at top; avoid cervical hyperextension.",
+                    "failure_type": "technical"
+                  },
+                  "tactical_role": "primary_compound",
+                  "stability_demand": "high",
+                  "axial_loading": 1,
+                  "resistance_profile": "bell_shaped",
+                  "slot_category": "hinge_compound"
+                },
+                {
+                  "exercise_id": "6ce0cfb7-f62a-51e0-8c74-76954e8f381e",
+                  "slug": "belt_squat",
+                  "display_name": "Belt Squat",
+                  "target_sets": 2,
+                  "target_reps": 10,
+                  "target_rep_range": "8-10 @ 3 RIR",
+                  "target_rir": 3,
+                  "target_weight_kg": null,
+                  "rest_seconds": 75,
+                  "alternative_exercise_id": null,
+                  "diagnostic_reason": "minimum_viable_path_absolute_last_resort",
+                  "progression_note": "Minimum viable deload fallback: MRV/CNS relaxed to avoid an empty training day.",
+                  "execution_technique": "Standard"
+                },
+                {
+                  "exercise_id": "519fbd94-c123-5c45-ba62-b64e6d1b2f92",
+                  "slug": "seated_leg_curl",
+                  "display_name": "Seated Leg Curl",
+                  "target_sets": 4,
+                  "target_reps": 12,
+                  "target_rep_range": "10-12 @ 2 RIR",
+                  "target_rir": 2,
+                  "target_weight_kg": null,
+                  "rest_seconds": 60,
+                  "progression_note": "Calibrate first set @ prescribed RIR",
+                  "execution_technique": "Standard",
+                  "tempo": [
+                    2,
+                    1,
+                    1,
+                    1
+                  ],
+                  "cue_card": {
+                    "setup": "Pad above heels, hips pinned, dorsiflex ankles optional.",
+                    "vector": "Curl without lifting hips.",
+                    "catch": "3s lower to full hamstring stretch.",
+                    "anti_pattern": "Control tempo — avoid ballistic reps.",
+                    "failure_type": "concentric"
+                  },
+                  "tactical_role": "isolation_metabolic",
+                  "stability_demand": "medium",
+                  "axial_loading": 0,
+                  "resistance_profile": "bell_shaped",
+                  "slot_category": "hamstring_curl"
+                },
+                {
+                  "exercise_id": "0632c3c8-dd10-58b9-8be3-383ce4630587",
+                  "slug": "cable_kickback_glute",
+                  "display_name": "Cable Glute Kickback",
+                  "target_sets": 4,
+                  "target_reps": 12,
+                  "target_rep_range": "10-12 @ 2 RIR",
+                  "target_rir": 2,
+                  "target_weight_kg": null,
+                  "rest_seconds": 60,
+                  "progression_note": "Calibrate first set @ prescribed RIR",
+                  "execution_technique": "Standard",
+                  "tempo": [
+                    2,
+                    1,
+                    1,
+                    1
+                  ],
+                  "cue_card": {
+                    "setup": "Ankle strap, slight forward lean, squeeze at top.",
+                    "vector": "Extend hip behind body; glute-only path.",
+                    "catch": "3s return without spinal rotation.",
+                    "anti_pattern": "Avoid excessive lumbar extension.",
+                    "failure_type": "concentric"
+                  },
+                  "tactical_role": "isolation_metabolic",
+                  "stability_demand": "low",
+                  "axial_loading": 0,
+                  "resistance_profile": "constant",
+                  "slot_category": "glute_isolation"
+                }
+              ]
+            }
+          },
+          {
+            "id": "block-d5-longevity",
+            "pillar": "longevity",
+            "title": "Manutenção Biológica",
+            "subtitle": "Mobilidade Global e Respiração · 10 min Caminhada leve em Zona 2",
+            "duration_minutes": 12,
+            "order": 1,
+            "status": "pending",
+            "longevity": {
+              "pillar": "longevity",
+              "title": "Manutenção Biológica",
+              "duration_minutes": 12,
+              "mobility_focus": "Mobilidade Global e Respiração",
+              "mobility_cues": [
+                "Respiração nasal em decúbito (2 min)",
+                "Mobilidade articular leve de coluna e quadril",
+                "Fallback determinístico do dia 5"
+              ],
+              "core_exercise": "Deadbug com respiração diafragmática (3x 8/side)",
+              "cardio_prescription": "10 min Caminhada leve em Zona 2"
+            }
+          },
+          {
+            "id": "block-d5-nutrition",
+            "pillar": "nutrition",
+            "title": "Biological Fueling",
+            "subtitle": "1947 kcal · 177g C · 130g P · 71g F",
+            "duration_minutes": 0,
+            "order": 2,
+            "status": "pending",
+            "nutrition": {
+              "goal": "Hypertrophy support",
+              "note": "Peri-workout carbs: 115g · Water 4300ml",
+              "nutrition_target": {
+                "total_calories": 1947,
+                "protein_g": 130,
+                "carbs_g": 177,
+                "fat_g": 71,
+                "water_ml": 4300,
+                "peri_workout_carb_ratio": 0.65,
+                "hydration_focus": "standard"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "day_index": 6,
+        "is_rest_day": false,
+        "focus_label": "Iron: Weak Point · Arms · Core (X-Frame)",
+        "date": "2026-07-18",
+        "blocks": [
+          {
+            "id": "block-d6-iron",
+            "pillar": "iron",
+            "title": "Iron: Weak Point · Arms · Core (X-Frame)",
+            "subtitle": "Incline Hammer Curl · Preacher Curl (Machine) · Ez-bar Skullcrusher · Tricep Rope Pushdown",
+            "duration_minutes": 90,
+            "order": 0,
+            "status": "pending",
+            "iron": {
+              "routine_id": "iron_block-d6-iron",
+              "exercises": [
+                {
+                  "exercise_id": "66732c4d-b198-5eed-a3a1-5b2df13ee5db",
+                  "slug": "hammer_curl_incline",
+                  "display_name": "Incline Hammer Curl",
+                  "target_sets": 4,
+                  "target_reps": 15,
+                  "target_rep_range": "10-15 @ 2 RIR",
+                  "target_rir": 2,
+                  "target_weight_kg": null,
+                  "rest_seconds": 60,
+                  "progression_note": "Calibrate first set @ prescribed RIR · Bi-Set Same Muscle: execute em sequência com o par indicado, descansando apenas ao fim do par.",
+                  "execution_technique": "Standard",
+                  "tempo": [
+                    3,
+                    1,
+                    1,
+                    1
+                  ],
+                  "cue_card": {
+                    "setup": "Bench 45°, arms hang, neutral grip.",
+                    "vector": "Curl to shoulder; brachialis bias.",
+                    "catch": "3s lower behind torso line.",
+                    "anti_pattern": "Do not swing torso.",
+                    "failure_type": "concentric"
+                  },
+                  "tactical_role": "isolation_metabolic",
+                  "stability_demand": "medium",
+                  "axial_loading": 0,
+                  "resistance_profile": "bell_shaped",
+                  "slot_category": "biceps_curl",
+                  "superset_id": "d6-biset-1"
+                },
+                {
+                  "exercise_id": "4becfce4-e8eb-58d5-94ca-9cd5c22f429e",
+                  "slug": "preacher_curl_machine",
+                  "display_name": "Preacher Curl (Machine)",
+                  "target_sets": 4,
+                  "target_reps": 15,
+                  "target_rep_range": "10-15 @ 2 RIR",
+                  "target_rir": 2,
+                  "target_weight_kg": null,
+                  "rest_seconds": 60,
+                  "progression_note": "Calibrate first set @ prescribed RIR · Drop-Set: Execute até a falha, reduza 20% da carga e repita até a falha novamente. Sem descanso. (Não use a série drop como âncora de progressão — preserve o Best Working Set.) · Bi-Set Same Muscle: execute em sequência com o par indicado, descansando apenas ao fim do par.",
+                  "execution_technique": "DROP_SET",
+                  "tempo": [
+                    3,
+                    1,
+                    1,
+                    1
+                  ],
+                  "cue_card": {
+                    "setup": "Armpits at pad top, triceps on pad, wrists neutral.",
+                    "vector": "Curl without lifting elbows off pad.",
+                    "catch": "3s to near-full stretch at bottom.",
+                    "anti_pattern": "Avoid if distal biceps irritation.",
+                    "failure_type": "concentric"
+                  },
+                  "tactical_role": "isolation_metabolic",
+                  "stability_demand": "low",
+                  "axial_loading": 0,
+                  "resistance_profile": "constant",
+                  "slot_category": "biceps_curl",
+                  "superset_id": "d6-biset-1"
+                },
+                {
+                  "exercise_id": "9e3fb323-f5ac-5f98-bf0d-b330193e7397",
+                  "slug": "ez_bar_skullcrusher",
+                  "display_name": "Ez-bar Skullcrusher",
+                  "target_sets": 4,
+                  "target_reps": 15,
+                  "target_rep_range": "10-15 @ 2 RIR",
+                  "target_rir": 2,
+                  "target_weight_kg": null,
+                  "rest_seconds": 75,
+                  "progression_note": "Calibrate first set @ prescribed RIR",
+                  "execution_technique": "Standard",
+                  "tempo": [
+                    3,
+                    1,
+                    1,
+                    1
+                  ],
+                  "cue_card": {
+                    "setup": "Bench, arms vertical, elbows point to ceiling.",
+                    "vector": "Extend without flaring elbows.",
+                    "catch": "Lower to forehead or behind head for stretch.",
+                    "anti_pattern": "Light-moderate load; elbow friendly path.",
+                    "failure_type": "concentric"
+                  },
+                  "tactical_role": "isolation_metabolic",
+                  "stability_demand": "medium",
+                  "axial_loading": 0,
+                  "resistance_profile": "bell_shaped",
+                  "slot_category": "triceps_extension"
+                },
+                {
+                  "exercise_id": "099bbb3a-6177-52ee-be10-bdc57052d03b",
+                  "slug": "tricep_rope_pushdown",
+                  "display_name": "Tricep Rope Pushdown",
+                  "target_sets": 4,
+                  "target_reps": 15,
+                  "target_rep_range": "10-15 @ 2 RIR",
+                  "target_rir": 2,
+                  "target_weight_kg": null,
+                  "rest_seconds": 60,
+                  "progression_note": "Calibrate first set @ prescribed RIR",
+                  "execution_technique": "Standard",
+                  "tempo": [
+                    3,
+                    1,
+                    1,
+                    1
+                  ],
+                  "cue_card": {
+                    "setup": "Elbows pinned to sides, slight forward lean.",
+                    "vector": "Split rope at lockout; lateral head bias.",
+                    "catch": "3s up without shoulder migration.",
+                    "anti_pattern": "Keep wrists neutral.",
+                    "failure_type": "concentric"
+                  },
+                  "tactical_role": "isolation_metabolic",
+                  "stability_demand": "medium",
+                  "axial_loading": 0,
+                  "resistance_profile": "bell_shaped",
+                  "slot_category": "triceps_extension"
+                }
+              ]
+            }
+          },
+          {
+            "id": "block-d6-longevity",
+            "pillar": "longevity",
+            "title": "Manutenção Biológica",
+            "subtitle": "Mobilidade Global e Respiração · 10 min Caminhada leve em Zona 2",
+            "duration_minutes": 12,
+            "order": 1,
+            "status": "pending",
+            "longevity": {
+              "pillar": "longevity",
+              "title": "Manutenção Biológica",
+              "duration_minutes": 12,
+              "mobility_focus": "Mobilidade Global e Respiração",
+              "mobility_cues": [
+                "Respiração nasal em decúbito (2 min)",
+                "Mobilidade articular leve de coluna e quadril",
+                "Fallback determinístico do dia 6"
+              ],
+              "core_exercise": "Deadbug com respiração diafragmática (3x 8/side)",
+              "cardio_prescription": "10 min Caminhada leve em Zona 2"
+            }
+          },
+          {
+            "id": "block-d6-nutrition",
+            "pillar": "nutrition",
+            "title": "Biological Fueling",
+            "subtitle": "1947 kcal · 177g C · 130g P · 71g F",
+            "duration_minutes": 0,
+            "order": 2,
+            "status": "pending",
+            "nutrition": {
+              "goal": "Hypertrophy support",
+              "note": "Peri-workout carbs: 115g · Water 4300ml",
+              "nutrition_target": {
+                "total_calories": 1947,
+                "protein_g": 130,
+                "carbs_g": 177,
+                "fat_g": 71,
+                "water_ml": 4300,
+                "peri_workout_carb_ratio": 0.65,
+                "hydration_focus": "standard"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "day_index": 7,
+        "is_rest_day": true,
+        "focus_label": "Rest · Spirit & Nutrition Reset",
+        "date": "2026-07-19",
+        "blocks": [
+          {
+            "id": "block-d7-spirit-reset",
+            "pillar": "spirit",
+            "title": "Spirit Reset",
+            "subtitle": "Parasympathetic recovery · weekly close",
+            "duration_minutes": 15,
+            "order": 0,
+            "status": "pending",
+            "spirit": {
+              "mode": "breathwork",
+              "tempo_id": "tempo_478",
+              "duration_minutes": 15,
+              "prescribed_reason": "Sunday spirit reset · nutrition and nervous system recovery."
+            }
+          },
+          {
+            "id": "block-d7-nutrition",
+            "pillar": "nutrition",
+            "title": "Biological Fueling",
+            "subtitle": "1747 kcal · 89g C · 130g P · 89g F",
+            "duration_minutes": 0,
+            "order": 1,
+            "status": "pending",
+            "nutrition": {
+              "goal": "Hypertrophy support",
+              "note": "Peri-workout carbs: 58g · Water 2950ml",
+              "nutrition_target": {
+                "total_calories": 1747,
+                "protein_g": 130,
+                "carbs_g": 89,
+                "fat_g": 89,
+                "water_ml": 2950,
+                "peri_workout_carb_ratio": 0.65,
+                "hydration_focus": "standard"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "protocolDate": "2026-07-16",
+    "weekStartDate": "2026-07-13",
+    "protocolGeneratedAt": "2026-07-16T22:47:54.119Z",
+    "selectedDayIndex": 4,
+    "readinessScanDate": null,
+    "subjectiveReadiness": null,
+    "readinessScan": null,
+    "biometricCheckpoints": [],
+    "adaptationLogs": [],
+    "performance_logs": [],
+    "performanceQueue": [],
+    "lastWorkoutSummary": null
+  }
+}

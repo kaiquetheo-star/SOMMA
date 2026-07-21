@@ -180,7 +180,7 @@ describe('loadPrescriptionMapper — Best Working Set + double progression', () 
       targetRepsTop: 10,
     });
     expect(result.weight).toBe(100);
-    expect(result.note).toMatch(/add reps/i);
+    expect(result.note).toMatch(/add reps|adicione reps/i);
   });
 
   it('applies +2.5% after hitting DUP rep top', () => {
@@ -190,6 +190,6 @@ describe('loadPrescriptionMapper — Best Working Set + double progression', () 
       targetRepsTop: 10,
     });
     expect(result.weight).toBe(102.5);
-    expect(result.note).toMatch(/\+2\.5%/);
+    expect(result.note).toMatch(/\+2\.5%|\+2,5%/);
   });
 });
