@@ -53,6 +53,10 @@ const SCORE_CONSECUTIVE_AXIAL_PENALTY = 1000;
 const SCORE_DUP_MATCH_BONUS = 650;
 const SCORE_SUB_GROUP_MEV_BOOST = 1500;
 const SCORE_DAY_MIN_SETS_BOOST = 1200;
+/** Soft penalty: high patellar shear is a finisher tool, not a default pick. */
+const SCORE_HIGH_KNEE_SHEAR_PENALTY = 1800;
+/** Prefer loaded gym compounds/isos over bodyweight high-shear when full gym is available. */
+const SCORE_BODYWEIGHT_ISOLATION_PENALTY = 900;
 const MAX_DAILY_AXIAL_LOAD = 6;
 const FINISHER_MIN_REMAINING_SECONDS = 5 * 60;
 const MINIMUM_VIABLE_WORKOUT_EXERCISE_COUNT = 2;
@@ -602,6 +606,14 @@ function projectedAxialLoadAllowed(exercise: CatalogExercise, state: Pick<Solver
 }
 
 function tacticalOrderRank(exercise: CatalogExercise): number {
+  // Never let mis-tagged isolations float to the front of the session.
+  if (
+    exercise.movement_pattern === 'isolation' ||
+    exercise.joint_stress_profile === 'high_knee_shear' ||
+    /sissy/.test(exercise.slug)
+  ) {
+    return 3;
+  }
   switch (exercise.tactical_role) {
     case 'primary_compound':
       return 0;
@@ -614,7 +626,7 @@ function tacticalOrderRank(exercise: CatalogExercise): number {
     case 'corrective':
       return 4;
     default:
-      return exercise.movement_pattern === 'isolation' ? 3 : 1;
+      return 1;
   }
 }
 
@@ -695,6 +707,28 @@ export function scoreExerciseCandidate(
     score += SCORE_POSTERIOR_HAMSTRING_STRETCH_BOOST;
   }
 
+  // Elite coach: high knee shear (sissy etc.) is stretch-mediated finisher — never preferred early.
+  if (exercise.joint_stress_profile === 'high_knee_shear') {
+    score -= SCORE_HIGH_KNEE_SHEAR_PENALTY;
+  }
+
+  // Bodyweight high-shear isolations lose to machine/loaded options in a full gym.
+  const equipmentBlob = exercise.equipment_required.map((tag) => tag.toLowerCase()).join('_');
+  const lacksLoadedImplements =
+    !equipmentBlob.includes('barbell') &&
+    !equipmentBlob.includes('dumbbell') &&
+    !equipmentBlob.includes('cable') &&
+    !equipmentBlob.includes('machine') &&
+    !equipmentBlob.includes('sled') &&
+    !equipmentBlob.includes('smith');
+  if (
+    exercise.joint_stress_profile === 'high_knee_shear' &&
+    equipmentBlob.includes('bodyweight') &&
+    lacksLoadedImplements
+  ) {
+    score -= SCORE_BODYWEIGHT_ISOLATION_PENALTY;
+  }
+
   return score;
 }
 
@@ -759,7 +793,15 @@ export function prescribedSetsForSlot(
   const target = chaseRaisedMev
     ? Math.max(requestedSets, budget.minSets, budget.maxSets)
     : Math.max(budget.minSets, requestedSets);
-  const prescribedSets = Math.min(target, budget.maxSets);
+
+  // ABCDE hits calves 1×/week — allow the slot's default dose to clear gastroc/soleus MEV
+  // even when the generic isolation budget caps at 3–4.
+  const isCalfDoseSlot =
+    slot.category === 'calf_raise' ||
+    slot.category === 'calf_raise_seated' ||
+    exercise.primary_muscle === 'calves';
+  const effectiveMax = isCalfDoseSlot ? Math.max(budget.maxSets, requestedSets) : budget.maxSets;
+  const prescribedSets = Math.min(target, effectiveMax);
   return { prescribedSets, budget, phase };
 }
 
@@ -955,6 +997,46 @@ export function pickBestCandidate(
       return {
         exercise: benchPress,
         score: scoreExerciseCandidate(benchPress, tracker, constraints, state, currentDayIndex),
+      };
+    }
+  }
+
+  // Elite coach: machine leg extension before starvation aliases / high-shear sissy.
+  if (
+    slot?.category === 'quad_isolation' ||
+    slot?.slotId?.startsWith('quad_isolation')
+  ) {
+    const alreadyHasLegExtension = [...state.usedExerciseIds].some((id) => {
+      // used ids only — slug check happens via candidates below
+      return id.includes('leg_extension') || id.includes('cc385cc5');
+    });
+    if (!alreadyHasLegExtension) {
+      const legExtension = candidates.find((candidate) => candidate.slug === 'leg_extension');
+      if (legExtension) {
+        return {
+          exercise: legExtension,
+          score: scoreExerciseCandidate(legExtension, tracker, constraints, state, currentDayIndex),
+        };
+      }
+    }
+  }
+
+  if (slot?.category === 'calf_raise') {
+    const standing = candidates.find((candidate) => candidate.slug === 'standing_calf_raise');
+    if (standing) {
+      return {
+        exercise: standing,
+        score: scoreExerciseCandidate(standing, tracker, constraints, state, currentDayIndex),
+      };
+    }
+  }
+
+  if (slot?.category === 'calf_raise_seated') {
+    const seated = candidates.find((candidate) => candidate.slug === 'seated_calf_raise');
+    if (seated) {
+      return {
+        exercise: seated,
+        score: scoreExerciseCandidate(seated, tracker, constraints, state, currentDayIndex),
       };
     }
   }

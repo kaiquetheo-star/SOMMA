@@ -28,8 +28,11 @@ function isCoreFinisher(meta: ClinicalExerciseMeta | undefined): boolean {
 function isIsolation(meta: ClinicalExerciseMeta | undefined): boolean {
   if (!meta || isCoreFinisher(meta)) return false;
   if (meta.movement_pattern === 'isolation') return true;
+  const text = blob(meta);
+  // High-shear / machine knee isolations are finishers, never phase-2 openers.
+  if (/sissy|leg.?extension|terminal.?knee|calf.?raise|shrug/.test(text)) return true;
   return /\bcurl\b|pushdown|push-down|lateral raise|front raise|\bfly\b|flye|kickback|pullover|extension/.test(
-    blob(meta),
+    text,
   );
 }
 
@@ -40,7 +43,7 @@ function isHeavyCompound(meta: ClinicalExerciseMeta | undefined): boolean {
   if (cns >= 4) return true;
   if (
     /\bdeadlift\b|\bbench press\b|\bbarbell bench\b/.test(name) ||
-    (/\bsquat\b/.test(name) && !/goblet|jump|split|pistol|sissy|wall/.test(name)) ||
+    (/\bsquat\b/.test(name) && !/goblet|jump|split|pistol|sissy|wall|air/.test(name)) ||
     /\boverhead press\b|\bmilitary press\b|\bohp\b/.test(name) ||
     /\bpull[- ]?up\b|\bchin[- ]?up\b/.test(name) ||
     /\bbarbell row\b|\bbent[- ]over row\b/.test(name)
@@ -60,6 +63,7 @@ function isSecondaryCompound(meta: ClinicalExerciseMeta | undefined): boolean {
 /**
  * Phase 1: biomechanical prerequisites ONLY (no generic warmups).
  * Phases 2–5: biomechanics-first — not display name heuristics alone.
+ * Mis-tagged tactical_role never overrides true isolation / high-shear finishers.
  */
 export function classifyClinicalPhase(
   meta: ClinicalExerciseMeta | undefined,
@@ -72,11 +76,12 @@ export function classifyClinicalPhase(
   if (slug && prereqSet.has(slug)) return 1;
 
   if (isCoreFinisher(meta)) return 5;
+  // Isolation / high-knee finishers always phase 4 — even if enrichment lied.
+  if (isIsolation(meta)) return 4;
   if (tacticalRole === 'primary_compound') return 2;
   if (tacticalRole === 'secondary_compound') return 3;
   if (tacticalRole === 'isolation_metabolic' || tacticalRole === 'pre_exhaust') return 4;
   if (tacticalRole === 'corrective') return 5;
-  if (isIsolation(meta)) return 4;
   if (isHeavyCompound(meta)) return 2;
   if (isSecondaryCompound(meta)) return 3;
   return 3;

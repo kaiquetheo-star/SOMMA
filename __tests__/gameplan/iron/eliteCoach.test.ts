@@ -156,4 +156,52 @@ describe('Elite Coach Validation', () => {
       expect(totalSets).toBeLessThanOrEqual(48);
     });
   });
+
+  it('Sissy Squat é isolador (nunca primary compound)', () => {
+    const sissy = catalog.bySlug.get('sissy_squat');
+    expect(sissy).toBeDefined();
+    expect(sissy?.movement_pattern).toBe('isolation');
+    expect(sissy?.tactical_role).toBe('isolation_metabolic');
+    expect(sissy?.joint_stress_profile).toBe('high_knee_shear');
+  });
+
+  it('Dia 2: abre com composto de quad, ≤2 panturrilhas, Sissy nunca abre', () => {
+    const day2 = microcycle.find((day) => day.day_index === 2);
+    const exercises = ironExercisesForDay(day2);
+    expect(exercises.length).toBeGreaterThanOrEqual(5);
+
+    const first = exercises[0]!;
+    const firstMeta = first.slug ? catalog.bySlug.get(first.slug) : undefined;
+    expect(first.slug?.includes('sissy') ?? false).toBe(false);
+    expect(firstMeta?.joint_stress_profile).not.toBe('high_knee_shear');
+    expect(firstMeta?.movement_pattern).not.toBe('isolation');
+    expect(['primary_compound', 'secondary_compound']).toContain(firstMeta?.tactical_role);
+
+    const calfCount = exercises.filter((exercise) => {
+      const category = exercise.slot_category ?? '';
+      return category === 'calf_raise' || category === 'calf_raise_seated' || exercise.slug?.includes('calf');
+    }).length;
+    expect(calfCount).toBeGreaterThanOrEqual(1);
+    expect(calfCount).toBeLessThanOrEqual(2);
+
+    const sissyIdx = exercises.findIndex((exercise) => exercise.slug?.includes('sissy'));
+    if (sissyIdx >= 0) {
+      expect(sissyIdx).toBeGreaterThan(1);
+      expect(exercises[sissyIdx]!.target_sets).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it('Nenhum dia Iron abre com isolador de alto shear no joelho', () => {
+    microcycle.forEach((day) => {
+      if (day.is_rest_day) return;
+      const exercises = ironExercisesForDay(day);
+      if (exercises.length === 0) return;
+      const opener = exercises[0]!;
+      const meta = opener.slug ? catalog.bySlug.get(opener.slug) : undefined;
+      expect(meta?.joint_stress_profile, `Day ${day.day_index} opener ${opener.slug}`).not.toBe(
+        'high_knee_shear',
+      );
+      expect(opener.slug?.includes('sissy') ?? false).toBe(false);
+    });
+  });
 });

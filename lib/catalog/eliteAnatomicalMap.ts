@@ -17,7 +17,7 @@ export const ELITE_ANATOMICAL_MAP: Readonly<Record<string, EliteAnatomicalMappin
     synergist_sub_groups: ['gluteus_maximus', 'adductors', 'rectus_abdominis'],
   },
   hack_squat_machine: {
-    muscle_sub_groups: ['quadriceps_vastus_lat', 'quadriceps_vastus_med'],
+    muscle_sub_groups: ['quadriceps_vastus_lat', 'quadriceps_vastus_med', 'quadriceps_rectus'],
     primary_sub_group: 'quadriceps_vastus_lat',
     synergist_sub_groups: ['gluteus_maximus'],
   },
@@ -27,7 +27,7 @@ export const ELITE_ANATOMICAL_MAP: Readonly<Record<string, EliteAnatomicalMappin
     synergist_sub_groups: ['gluteus_maximus'],
   },
   belt_squat: {
-    muscle_sub_groups: ['quadriceps_vastus_lat', 'quadriceps_vastus_med'],
+    muscle_sub_groups: ['quadriceps_vastus_lat', 'quadriceps_vastus_med', 'quadriceps_rectus'],
     primary_sub_group: 'quadriceps_vastus_lat',
     synergist_sub_groups: ['gluteus_maximus', 'adductors'],
   },

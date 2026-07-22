@@ -48,6 +48,10 @@ function anatomicalPrimaryForAlias(primaryMuscle: string, slug?: string): Muscle
     case 'traps':
       return 'trapezius_upper';
     case 'quads':
+      // Knee-extension aliases target rectus like a true leg extension.
+      if (slug && /extension|sissy|terminal_knee/.test(slug)) {
+        return 'quadriceps_rectus';
+      }
       return 'quadriceps_vastus_lat';
     case 'hamstrings':
       return 'hamstrings_biceps_fem';
@@ -955,6 +959,14 @@ export function expandStarvationAliases(
     if (!base) continue;
 
     const cues = aliasCueCard(seed);
+    const tactical_role =
+      seed.movement_pattern === 'isolation'
+        ? 'isolation_metabolic'
+        : base.tactical_role === 'primary_compound' || base.tactical_role === 'secondary_compound'
+          ? base.tactical_role
+          : seed.movement_pattern === 'squat' || seed.movement_pattern === 'hinge'
+            ? 'secondary_compound'
+            : base.tactical_role;
     const alias: CatalogExercise = {
       ...base,
       id: `alias:${seed.slug}`,
@@ -964,6 +976,7 @@ export function expandStarvationAliases(
       primary_muscle: seed.primary_muscle,
       synergist_muscles: [...(seed.synergist_muscles ?? base.synergist_muscles)],
       equipment_required: [...seed.equipment_required],
+      tactical_role,
       // Own cues — never inherit Elite base cue_card or biomechanical_instructions.
       cue_card: cues,
       biomechanical_instructions: {

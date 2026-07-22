@@ -191,6 +191,14 @@ function toCatalogExercise(row: LibraryExercise): CatalogExercise | null {
   const primary_sub_group: MuscleSubGroup | null = anatomical?.primary_sub_group ?? null;
   const synergist_sub_groups: readonly MuscleSubGroup[] = anatomical?.synergist_sub_groups ?? [];
 
+  // Pattern overrides (e.g. sissy → isolation) must win over enrichment that still
+  // saw the raw row as a squat and stamped primary_compound.
+  const tactical_role =
+    movement_pattern === 'isolation' &&
+    (enriched.tactical_role === 'primary_compound' || enriched.tactical_role === 'secondary_compound')
+      ? 'isolation_metabolic'
+      : enriched.tactical_role;
+
   return {
     id: row.id,
     slug: row.slug,
@@ -211,7 +219,7 @@ function toCatalogExercise(row: LibraryExercise): CatalogExercise | null {
     selection_score: enriched.selection_score,
     tempo: enriched.tempo,
     cue_card: enriched.cue_card,
-    tactical_role: enriched.tactical_role,
+    tactical_role,
     stability_demand: enriched.stability_demand,
     axial_loading: enriched.axial_loading,
     resistance_profile: enriched.resistance_profile,

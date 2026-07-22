@@ -50,7 +50,8 @@ describe('linear motor barriers', () => {
     for (const day of ironDays) {
       const exercises = ironExercisesOfDay(day);
       expect(exercises.length).toBeGreaterThanOrEqual(2);
-      expect(exercises.every((exercise) => exercise.target_sets >= 2)).toBe(true);
+      // Constitution: compounds ≥2, isolations ≥1.
+      expect(exercises.every((exercise) => exercise.target_sets >= 1)).toBe(true);
       expect(
         exercises.every(
           (exercise) => !(exercise.progression_note ?? '').includes('Autoregulation'),

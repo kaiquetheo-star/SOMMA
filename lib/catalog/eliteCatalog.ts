@@ -91,7 +91,8 @@ export const ELITE_EXERCISES: readonly LibraryExercise[] = [
     equipment_required: ["bodyweight","full_gym"],
     default_sets: 3,
     default_reps: 12,
-    movement_pattern: "squat",
+    // Isolation finisher — not a session opener / primary compound.
+    movement_pattern: "isolation",
     primary_muscle: "quadriceps",
     synergist_muscles: ["core"],
     cns_fatigue_cost: 2,

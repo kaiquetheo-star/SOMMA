@@ -130,8 +130,8 @@ const ABCDE_TRAINING_DAYS: readonly AbcdeTrainingDay[] = [
     slots: [
       { category: 'quad_compound', count: 2, priority: 1 },
       { category: 'quad_isolation', count: 2, priority: 1 },
-      // Standing×2 (gastroc MEV 6) + seated (soleus). Adductor dropped — maintenance cap is 7.
-      { category: 'calf_raise', count: 2, priority: 1 },
+      // Elite coach: 1 standing (gastroc) + 1 seated (soleus) — dose via sets, not exercise spam.
+      { category: 'calf_raise', count: 1, priority: 1 },
       { category: 'calf_raise_seated', count: 1, priority: 1 },
     ],
   },
@@ -314,7 +314,8 @@ function slotDefaultsForCategory(category: AbcdeCategory): Pick<
     case 'adductor':
       return { requiredPatterns: ['isolation'], primaryMuscleHint: 'adductors', isolationOnly: true, defaultSets: 3 };
     case 'calf_raise':
-      return { requiredPatterns: ['isolation'], primaryMuscleHint: 'calves', isolationOnly: true, defaultSets: 4 };
+      // Single standing calf must carry gastroc day min (6) alone.
+      return { requiredPatterns: ['isolation'], primaryMuscleHint: 'calves', isolationOnly: true, defaultSets: 6 };
     case 'calf_raise_seated':
       return { requiredPatterns: ['isolation'], primaryMuscleHint: 'calves', isolationOnly: true, defaultSets: 6 };
     case 'shoulder_overhead_press':

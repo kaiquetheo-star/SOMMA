@@ -156,6 +156,23 @@ const RULES: readonly TacticalRule[] = [
     axial_loading: 1,
     resistance_profile: 'constant',
   },
+  // Knee-dominant quad isolations — never primary compounds (do not open sessions).
+  {
+    slugs: ['sissy_squat', 'sissy_squat_quad_extension'],
+    nameIncludes: ['sissy'],
+    tactical_role: 'isolation_metabolic',
+    stability_demand: 'high',
+    axial_loading: 0,
+    resistance_profile: 'descending',
+  },
+  {
+    slugs: ['leg_extension', 'dumbbell_quad_extension_hold', 'bodyweight_terminal_knee_extension'],
+    nameIncludes: ['leg_extension', 'quad_extension'],
+    tactical_role: 'isolation_metabolic',
+    stability_demand: 'low',
+    axial_loading: 0,
+    resistance_profile: 'constant',
+  },
 ];
 
 function ruleForExercise(exercise: LibraryExercise): TacticalRule | null {
@@ -192,9 +209,18 @@ function equipmentProfile(exercise: LibraryExercise): {
 }
 
 function fallbackRole(exercise: LibraryExercise): TacticalExerciseRole {
+  const slug = normalizeToken(exercise.slug);
+  const name = normalizeToken(exercise.name);
   const movement = normalizeToken(exercise.movement_pattern);
   const { isCable, isMachine } = equipmentProfile(exercise);
 
+  // Bodyweight / high-shear "squats" are isolations in a hypertrophy coach's book.
+  if (includesAny(slug, ['sissy']) || includesAny(name, ['sissy'])) {
+    return 'isolation_metabolic';
+  }
+  if (exercise.joint_stress_profile === 'high_knee_shear' && !isMachine) {
+    return 'isolation_metabolic';
+  }
   if (movement === 'isolation') return 'isolation_metabolic';
   if (movement === 'squat' || movement === 'hinge') {
     return isCable || isMachine ? 'secondary_compound' : 'primary_compound';

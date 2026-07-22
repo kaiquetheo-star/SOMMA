@@ -211,7 +211,12 @@ describe('real user journey simulation', () => {
     for (const day of gameplan.microcycle) {
       for (const exercise of ironExercises(day)) {
         if (isIsolationOrFinisher(exercise)) {
-          expect(exercise.target_sets).toBeLessThanOrEqual(5);
+          const isCalf =
+            /calf/i.test(exercise.slug ?? '') ||
+            exercise.slot_category === 'calf_raise' ||
+            exercise.slot_category === 'calf_raise_seated';
+          // ABCDE calves are once/week — 6 working sets on a single raise is coach-legal.
+          expect(exercise.target_sets).toBeLessThanOrEqual(isCalf ? 6 : 5);
         }
       }
     }

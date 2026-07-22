@@ -53,9 +53,17 @@ function sanitizeTargetSets(exercise: {
   execution_technique?: string;
   target_sets: number;
   rest_seconds?: number;
+  slot_category?: string | null;
 }): number {
   const requested = Number(exercise.target_sets);
   const safe = Number.isFinite(requested) ? Math.max(1, Math.round(requested)) : 1;
+  const slug = normalizedToken(exercise.slug);
+  const slot = normalizedToken(exercise.slot_category);
+  const isCalf =
+    slug.includes('calf') || slot === 'calf_raise' || slot === 'calf_raise_seated';
+  if (isCalf) {
+    return Math.min(safe, 6);
+  }
   if (isIsolationOrFinisherLike({ ...exercise, target_sets: safe })) {
     return Math.min(safe, MAX_FINISHER_OR_ISOLATION_SETS);
   }
@@ -120,11 +128,18 @@ function sanitizeTargetSetsWithBudget(
     isCompoundExercise(catalogExercise),
   );
 
-  if (safe > budget.maxSets) {
+  // Once-weekly calf dose (ABCDE) may legitimately exceed the generic iso ceiling.
+  const isCalfDose =
+    catalogExercise.primary_muscle === 'calves' ||
+    exercise.slot_category === 'calf_raise' ||
+    exercise.slot_category === 'calf_raise_seated';
+  const maxAllowed = isCalfDose ? Math.max(budget.maxSets, 6) : budget.maxSets;
+
+  if (safe > maxAllowed) {
     return {
       ...exercise,
-      target_sets: budget.maxSets,
-      diagnostic_reason: `Sanitized: ${safe} sets exceeded budget max of ${budget.maxSets} for ${mesocyclePhase}`,
+      target_sets: maxAllowed,
+      diagnostic_reason: `Sanitized: ${safe} sets exceeded budget max of ${maxAllowed} for ${mesocyclePhase}`,
     };
   }
 
