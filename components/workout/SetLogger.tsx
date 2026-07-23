@@ -159,6 +159,9 @@ interface SetLoggerProps {
 /**
  * Touch-first set capture — vertical Peso | Reps | RIR steppers with a
  * full-width Matte Gold "Log Set". Every tap answers with light haptics.
+ *
+ * Weight is always editable (steppers + direct input). `isBodyweight` only
+ * affects the unit label when the working load is 0 — never locks the control.
  */
 export function SetLogger({
   weight,
@@ -173,18 +176,20 @@ export function SetLogger({
   onRirChange,
   onLog,
 }: SetLoggerProps) {
+  const weightUnit = isBodyweight && weight <= 0 ? 'BW' : 'kg';
+
   return (
     <View className="gap-5 rounded-2xl border border-white/10 bg-white/5 px-4 py-5">
       <StepperRow
         label="Peso (kg)"
         value={weight}
-        unit={isBodyweight ? 'BW' : 'kg'}
-        step={isBodyweight ? 0 : 2.5}
+        unit={weightUnit}
+        step={2.5}
         min={0}
         max={300}
         onChange={onWeightChange}
         disabled={disabled}
-        allowDirectInput={!isBodyweight}
+        allowDirectInput
       />
 
       <StepperRow

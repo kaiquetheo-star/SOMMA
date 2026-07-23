@@ -65,6 +65,10 @@ function findIronBlock(day: MicrocycleDay | null): GameplanBlock | null {
   return day?.blocks.find((block) => block.pillar === 'iron' && block.iron?.exercises.length) ?? null;
 }
 
+function findLongevityBlock(day: MicrocycleDay | null): GameplanBlock | null {
+  return day?.blocks.find((block) => block.pillar === 'longevity' && block.longevity) ?? null;
+}
+
 function formatTempo(exercise: IronExercisePrescription): string {
   return exercise.tempo?.join('-') ?? '3-1-1-1';
 }
@@ -131,9 +135,30 @@ export default function DailyCommandScreen() {
   const activeDayIndex = requestedDayIndex ?? selectedDayIndex;
   const selectedDay = getMicrocycleDay(weeklyMicrocycle, activeDayIndex);
   const ironBlock = findIronBlock(selectedDay);
+  const longevityBlock = findLongevityBlock(selectedDay);
   const ironExercises = ironBlock?.iron?.exercises ?? [];
   const ancillaryBlocks = (selectedDay?.blocks ?? []).filter((block) => block.pillar !== 'iron');
   const isToday = activeDayIndex === todayDayIndex;
+  const ironFinished = ironBlock?.status === 'completed';
+  const longevityPending =
+    longevityBlock != null && longevityBlock.status !== 'completed';
+  /** Sticky primary CTA: Iron while available; Mobility after Iron; hide when both done. */
+  const stickyCta =
+    isToday && ironBlock && ironExercises.length > 0 && !ironFinished
+      ? {
+          kind: 'iron' as const,
+          block: ironBlock,
+          label: 'Iniciar Protocolo de Ferro',
+          accessibilityLabel: 'Iniciar Protocolo de Ferro',
+        }
+      : isToday && ironFinished && longevityPending && longevityBlock
+        ? {
+            kind: 'longevity' as const,
+            block: longevityBlock,
+            label: 'Iniciar Protocolo de Mobilidade',
+            accessibilityLabel: 'Iniciar Protocolo de Mobilidade pós-treino',
+          }
+        : null;
 
   const foundationComplete = hasCompletedFoundationScan({
     user_foundation: userFoundation,
@@ -359,7 +384,7 @@ export default function DailyCommandScreen() {
                   <GameplanBlockCard
                     key={block.id}
                     block={block}
-                    onPress={block.pillar === 'longevity' ? () => undefined : () => openBlock(block)}
+                    onPress={() => openBlock(block)}
                   />
                 ))}
               </View>
@@ -395,23 +420,29 @@ export default function DailyCommandScreen() {
         </Pressable>
       </ScrollView>
 
-      {isToday && ironBlock && ironExercises.length > 0 ? (
+      {stickyCta ? (
         <View className="absolute bottom-0 left-0 right-0 border-t border-white/10 bg-[#0F1512] px-5 pb-5 pt-4">
           <Pressable
-            onPress={() => openBlock(ironBlock)}
+            onPress={() => openBlock(stickyCta.block)}
             disabled={gameplanLoading || performanceSyncing}
             accessibilityRole="button"
-            accessibilityLabel="Start Iron protocol"
-            className="rounded-2xl bg-[#BFA06A] py-4 active:opacity-85"
+            accessibilityLabel={stickyCta.accessibilityLabel}
+            className={`rounded-2xl py-4 active:opacity-85 ${
+              stickyCta.kind === 'longevity' ? 'bg-[#6B8E78]' : 'bg-[#BFA06A]'
+            }`}
             style={{
-              shadowColor: '#BFA06A',
+              shadowColor: stickyCta.kind === 'longevity' ? '#6B8E78' : '#BFA06A',
               shadowOpacity: 0.24,
               shadowRadius: 18,
               shadowOffset: { width: 0, height: 0 },
             }}
           >
-            <Text className="text-center font-body-bold text-sm uppercase tracking-[0.22em] text-[#0F1512]">
-              Iniciar Protocolo de Ferro
+            <Text
+              className={`text-center font-body-bold text-sm uppercase tracking-[0.22em] ${
+                stickyCta.kind === 'longevity' ? 'text-[#0F1512]' : 'text-[#0F1512]'
+              }`}
+            >
+              {stickyCta.label}
             </Text>
           </Pressable>
         </View>

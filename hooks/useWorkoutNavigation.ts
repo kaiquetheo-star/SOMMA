@@ -8,8 +8,11 @@ import {
 } from '@/store/useSommaStore';
 import type { WorkoutCompletionInput, WorkoutPillarLog } from '@/types/performance';
 
+/** Pillars that finish via workout screens (longevity has no performance queue). */
+export type FinishablePillar = WorkoutPillarLog | 'longevity';
+
 export interface FinishBlockMeta {
-  pillar: WorkoutPillarLog;
+  pillar: FinishablePillar;
   rpe_score?: number | null;
   volume?: number | null;
   exercise_id?: string | null;

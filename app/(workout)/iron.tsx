@@ -252,9 +252,13 @@ export default function IronModeScreen() {
         historyWeight ??
         (prescribedTargetKg != null && prescribedTargetKg > 0
           ? prescribedTargetKg
-          : exercise.target_weight_kg);
+          : exercise.target_weight_kg > 0
+            ? exercise.target_weight_kg
+            : 0);
 
-      setWeight(baseline);
+      // Always seed an editable number — never trap the logger at uneditable BW when
+      // the prescription simply omitted a load (common for first-time lifts).
+      setWeight(Number.isFinite(baseline) ? Math.max(0, baseline) : 0);
       setReps(exercise.target_reps);
       setRir(exercise.target_rir);
       setCurrentSet(1);

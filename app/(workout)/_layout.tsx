@@ -10,6 +10,7 @@ export default function WorkoutLayout() {
       }}
     >
       <Stack.Screen name="iron" />
+      <Stack.Screen name="longevity" />
       <Stack.Screen
         name="ascension"
         options={{ gestureEnabled: false, animation: 'fade' }}

@@ -113,8 +113,15 @@ export function GameplanBlockCard({ block, onPress }: GameplanBlockCardProps) {
             className={`mt-4 font-body-medium text-xs uppercase tracking-[0.26em] ${
               isCompleted ? 'text-matte-gold/70' : 'text-matte-gold'
             }`}
+            style={
+              !isCompleted && block.pillar === 'longevity' ? { color: LONGEVITY_SAGE } : undefined
+            }
           >
-            {isCompleted ? 'Protocolo Concluído' : 'Iniciar Protocolo'}
+            {isCompleted
+              ? 'Protocolo Concluído'
+              : block.pillar === 'longevity'
+                ? 'Iniciar Mobilidade'
+                : 'Iniciar Protocolo'}
           </Text>
         </View>
         <Text
